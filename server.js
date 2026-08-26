@@ -23,6 +23,22 @@ app.use((req, res, next) => {
     next();
 });
 
+// Explicit Favicon Routes with Cache-Busting Headers
+app.get('/favicon.ico', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.sendFile(path.join(__dirname, 'public', 'favicon.ico'));
+});
+
+app.get('/favicon.png', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.sendFile(path.join(__dirname, 'public', 'favicon.png'));
+});
+
+app.get('/favicon.svg', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.sendFile(path.join(__dirname, 'public', 'favicon.svg'));
+});
+
 // Routes
 const webhookRoutes = require('./src/routes/webhook');
 const setupRoutes = require('./src/routes/setup');
@@ -47,7 +63,7 @@ app.use('/auth', oauthRoutes);
 app.use('/', redirectRoutes);
 
 // Serve static frontend files
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: 0 }));
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
