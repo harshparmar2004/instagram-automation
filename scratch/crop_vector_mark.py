@@ -20,10 +20,10 @@ for item in datas:
         newData.append(item)
 img.putdata(newData)
 
-# 2. Crop top 78% of the image to discard small text at the bottom
-img = img.crop((0, 0, width, int(height * 0.78)))
+# 2. Crop top 68% to completely eliminate the small text at the bottom
+img = img.crop((0, 0, width, int(height * 0.68)))
 
-# 3. Crop tight bounding box around the vector mark
+# 3. Crop tight bounding box around the clean camera vector mark
 bbox = img.getbbox()
 if bbox:
     img = img.crop(bbox)
@@ -34,4 +34,4 @@ img.save(output_logo, "PNG")
 img.save(output_favicon_sub, "PNG")
 img.save(output_favicon_ico, format="ICO", sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128)])
 
-print("Successfully cropped logo text and generated large standalone vector mark!")
+print("Successfully removed text completely from logo mark!")
