@@ -1,0 +1,490 @@
+window['new-automation'] = {
+    currentStep: 1,
+    selectedMediaId: 'global',
+    mediaList: [],
+    searchQuery: '',
+
+    async render(container) {
+        container.innerHTML = `
+            <div class="view" id="new-automation-view" style="width: 100%; max-width: 1480px; margin: 0 auto;">
+                
+                <!-- COHESIVE FLOW CONTAINER -->
+                <div style="background: #FFFFFF; border-radius: 18px; border: 1px solid var(--border-color); box-shadow: 0 2px 16px rgba(0,0,0,0.03); overflow: hidden; width: 100%;">
+                    
+                    <!-- HEADER BAR & STEPPER INDICATOR -->
+                    <div style="padding: 1.15rem 1.75rem 0.85rem 1.75rem; background: #FAF8F5; border-bottom: 1px solid var(--border-color);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.85rem;">
+                            <div>
+                                <h1 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.5rem; letter-spacing: -0.02em; color: var(--text-primary); margin:0;">Create New Automation</h1>
+                                <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0.15rem 0 0 0;">Set up automated comment-to-DM responses and deliverable links in 4 easy steps.</p>
+                            </div>
+                            
+                            <!-- ACCELERATOR PRESETS -->
+                            <div style="display:flex; gap:0.5rem;">
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="window['new-automation'].applyTemplate('pdf')" style="font-size:0.78rem; font-weight:700; background:#FFFFFF; padding:0.35rem 0.75rem;">
+                                    Lead E-Book Preset
+                                </button>
+                                <button type="button" class="btn btn-primary btn-sm" onclick="window['new-automation'].applyTemplate('follow')" style="font-size:0.78rem; font-weight:800; padding:0.35rem 0.75rem;">
+                                    Follow First Gate 🔐
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="window['new-automation'].applyTemplate('course')" style="font-size:0.78rem; font-weight:700; background:#FFFFFF; padding:0.35rem 0.75rem;">
+                                    Course Signup
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 4-STEP INDICATOR TABS -->
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.65rem; width: 100%;">
+                            <div id="step-tab-1" class="step-tab active" onclick="window['new-automation'].goToStep(1)" style="padding: 0.65rem 0.85rem; border-radius: 10px; background: #FFFFFF; border: 2px solid var(--accent-primary); cursor: pointer; display: flex; align-items: center; gap: 0.6rem;">
+                                <div id="step-num-1" style="width: 24px; height: 24px; border-radius: 50%; background: var(--accent-primary); color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.78rem; flex-shrink: 0;">1</div>
+                                <div>
+                                    <div style="font-size: 0.68rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">STEP 1</div>
+                                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.85rem; color: var(--text-primary);">Target Reel</div>
+                                </div>
+                            </div>
+
+                            <div id="step-tab-2" class="step-tab" onclick="window['new-automation'].goToStep(2)" style="padding: 0.65rem 0.85rem; border-radius: 10px; background: #FAF8F5; border: 1px solid var(--border-color); cursor: pointer; display: flex; align-items: center; gap: 0.6rem;">
+                                <div id="step-num-2" style="width: 24px; height: 24px; border-radius: 50%; background: var(--border-color); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.78rem; flex-shrink: 0;">2</div>
+                                <div>
+                                    <div style="font-size: 0.68rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">STEP 2</div>
+                                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.85rem; color: var(--text-primary);">Trigger Keywords</div>
+                                </div>
+                            </div>
+
+                            <div id="step-tab-3" class="step-tab" onclick="window['new-automation'].goToStep(3)" style="padding: 0.65rem 0.85rem; border-radius: 10px; background: #FAF8F5; border: 1px solid var(--border-color); cursor: pointer; display: flex; align-items: center; gap: 0.6rem;">
+                                <div id="step-num-3" style="width: 24px; height: 24px; border-radius: 50%; background: var(--border-color); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.78rem; flex-shrink: 0;">3</div>
+                                <div>
+                                    <div style="font-size: 0.68rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">STEP 3</div>
+                                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.85rem; color: var(--text-primary);">DM & Resource</div>
+                                </div>
+                            </div>
+
+                            <div id="step-tab-4" class="step-tab" onclick="window['new-automation'].goToStep(4)" style="padding: 0.65rem 0.85rem; border-radius: 10px; background: #FAF8F5; border: 1px solid var(--border-color); cursor: pointer; display: flex; align-items: center; gap: 0.6rem;">
+                                <div id="step-num-4" style="width: 24px; height: 24px; border-radius: 50%; background: var(--border-color); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.78rem; flex-shrink: 0;">4</div>
+                                <div>
+                                    <div style="font-size: 0.68rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">STEP 4</div>
+                                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.85rem; color: var(--text-primary);">Pacing & Reply</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PROGRESS BAR -->
+                        <div style="width: 100%; height: 5px; background: var(--border-color); border-radius: 10px; margin-top: 0.65rem; overflow: hidden;">
+                            <div id="flow-progress-bar" style="width: 25%; height: 100%; background: var(--accent-primary); transition: width 0.3s ease-in-out;"></div>
+                        </div>
+                    </div>
+
+                    <!-- STEP BODY CONTENT -->
+                    <div id="new-automation-content" style="padding: 1.35rem 1.75rem; width: 100%;">
+                        <div class="text-center" style="padding:3rem;"><div class="spinner"></div></div>
+                    </div>
+
+                    <!-- VISIBLE ACTION BAR -->
+                    <div style="width: 100%; background: #FFFFFF; border-top: 1px solid var(--border-color); padding: 0.85rem 1.5rem; display: flex; align-items: center; justify-content: space-between;">
+                        <button type="button" class="btn btn-secondary" onclick="App.navigate('workflows')" style="font-weight: 700; padding: 0.55rem 1.15rem; font-size: 0.88rem;">Cancel</button>
+
+                        <div style="display: flex; gap: 0.65rem;">
+                            <button type="button" id="btn-flow-back" class="btn btn-secondary" onclick="window['new-automation'].goToPrevStep()" style="font-weight: 700; font-size: 0.88rem; padding: 0.55rem 1.25rem; display: none;">
+                                ← Back
+                            </button>
+
+                            <button type="button" id="btn-flow-next" class="btn btn-primary" onclick="window['new-automation'].goToNextStep()" style="font-weight: 800; font-size: 0.88rem; padding: 0.58rem 1.45rem;">
+                                Continue to Step 2 →
+                            </button>
+
+                            <button type="button" id="btn-flow-deploy" class="btn btn-primary" onclick="window['new-automation'].saveAutomation()" style="font-weight: 800; font-size: 0.9rem; padding: 0.58rem 1.65rem; display: none;">
+                                🚀 Deploy Automation
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        `;
+        await this.loadPage();
+    },
+
+    async loadPage() {
+        try {
+            this.mediaList = await App.apiCall('GET', '/api/media') || [];
+            this.currentStep = 1;
+            this.renderStepContent();
+        } catch (err) {
+            document.getElementById('new-automation-content').innerHTML = `
+                <div class="empty-state" style="width:100%;">
+                    <h3>Error loading media posts</h3>
+                    <p>${err.message}</p>
+                    <button class="btn btn-primary" onclick="window['new-automation'].loadPage()">Retry</button>
+                </div>
+            `;
+        }
+    },
+
+    goToStep(stepNum) {
+        this.currentStep = stepNum;
+        this.updateStepperHeader();
+        this.renderStepContent();
+    },
+
+    goToNextStep() {
+        if (this.currentStep < 4) {
+            this.currentStep += 1;
+            this.updateStepperHeader();
+            this.renderStepContent();
+        }
+    },
+
+    goToPrevStep() {
+        if (this.currentStep > 1) {
+            this.currentStep -= 1;
+            this.updateStepperHeader();
+            this.renderStepContent();
+        }
+    },
+
+    updateStepperHeader() {
+        for (let i = 1; i <= 4; i++) {
+            const tab = document.getElementById(`step-tab-${i}`);
+            const num = document.getElementById(`step-num-${i}`);
+            if (tab && num) {
+                if (i === this.currentStep) {
+                    tab.style.background = '#FFFFFF';
+                    tab.style.border = '2px solid var(--accent-primary)';
+                    num.style.background = 'var(--accent-primary)';
+                    num.style.color = '#FFFFFF';
+                } else if (i < this.currentStep) {
+                    tab.style.background = '#FAF8F5';
+                    tab.style.border = '1px solid var(--border-color)';
+                    num.style.background = '#2E7D32';
+                    num.style.color = '#FFFFFF';
+                } else {
+                    tab.style.background = '#FAF8F5';
+                    tab.style.border = '1px solid var(--border-color)';
+                    num.style.background = 'var(--border-color)';
+                    num.style.color = 'var(--text-secondary)';
+                }
+            }
+        }
+
+        const progressBar = document.getElementById('flow-progress-bar');
+        if (progressBar) progressBar.style.width = `${(this.currentStep / 4) * 100}%`;
+
+        const btnBack = document.getElementById('btn-flow-back');
+        const btnNext = document.getElementById('btn-flow-next');
+        const btnDeploy = document.getElementById('btn-flow-deploy');
+
+        if (btnBack) btnBack.style.display = this.currentStep > 1 ? 'inline-block' : 'none';
+
+        if (btnNext) {
+            if (this.currentStep < 4) {
+                btnNext.style.display = 'inline-block';
+                btnNext.textContent = `Continue to Step ${this.currentStep + 1} →`;
+            } else {
+                btnNext.style.display = 'none';
+            }
+        }
+
+        if (btnDeploy) btnDeploy.style.display = this.currentStep === 4 ? 'inline-block' : 'none';
+    },
+
+    renderStepContent() {
+        const container = document.getElementById('new-automation-content');
+        if (!container) return;
+
+        if (this.currentStep === 1) {
+            this.renderStep1(container);
+        } else if (this.currentStep === 2) {
+            this.renderStep2(container);
+        } else if (this.currentStep === 3) {
+            this.renderStep3(container);
+        } else if (this.currentStep === 4) {
+            this.renderStep4(container);
+        }
+    },
+
+    filterReels(query) {
+        this.searchQuery = query || '';
+        this.renderStep1(document.getElementById('new-automation-content'));
+    },
+
+    renderStep1(container) {
+        const filtered = this.mediaList.filter(m => {
+            const cap = (m.caption || '').toLowerCase();
+            return !this.searchQuery || cap.includes(this.searchQuery.toLowerCase());
+        });
+
+        let gridHtml = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.85rem; width: 100%;">
+                
+                <div class="reel-card-item" onclick="window['new-automation'].selectReel('global', this)" style="
+                    border-radius: 12px;
+                    border: ${this.selectedMediaId === 'global' ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)'};
+                    background: ${this.selectedMediaId === 'global' ? '#FDF8F6' : '#FFFFFF'};
+                    box-shadow: ${this.selectedMediaId === 'global' ? '0 4px 14px rgba(217, 119, 87, 0.16)' : '0 1px 4px rgba(0,0,0,0.02)'};
+                    cursor: pointer;
+                    overflow: hidden;
+                    position: relative;
+                    display: flex;
+                    flex-direction: column;
+                    transition: all 0.15s ease-in-out;
+                ">
+                    ${this.selectedMediaId === 'global' ? `<div style="position:absolute; top:8px; right:8px; width:22px; height:22px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.75rem; z-index:2;">✓</div>` : ''}
+                    
+                    <div style="height: 105px; background: linear-gradient(135deg, #FAF8F5 0%, #E6E1D8 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.65rem; text-align: center;">
+                        <div style="font-size: 1.3rem; margin-bottom: 0.1rem;">🌐</div>
+                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.85rem; color: var(--accent-primary);">Global Account Rule</div>
+                        <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.1rem;">Monitors all current & future posts</div>
+                    </div>
+
+                    <div style="padding: 0.75rem;">
+                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.82rem; color: var(--text-primary);">Account-Wide Automation</div>
+                        <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.15rem;">Triggers on any post across whole account</div>
+                    </div>
+                </div>
+        `;
+
+        filtered.forEach(m => {
+            const isSelected = this.selectedMediaId === m.id;
+            const thumbUrl = m.thumbnail_url || m.media_url || '';
+            const captionCut = m.caption ? (m.caption.slice(0, 45) + '...') : 'Untitled Post';
+
+            gridHtml += `
+                <div class="reel-card-item" onclick="window['new-automation'].selectReel('${m.id}', this)" style="
+                    border-radius: 12px;
+                    border: ${isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)'};
+                    background: ${isSelected ? '#FDF8F6' : '#FFFFFF'};
+                    box-shadow: ${isSelected ? '0 4px 14px rgba(217, 119, 87, 0.16)' : '0 1px 4px rgba(0,0,0,0.02)'};
+                    cursor: pointer;
+                    overflow: hidden;
+                    position: relative;
+                    display: flex;
+                    flex-direction: column;
+                    transition: all 0.15s ease-in-out;
+                ">
+                    ${isSelected ? `<div style="position:absolute; top:8px; right:8px; width:22px; height:22px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.75rem; z-index:2;">✓</div>` : ''}
+
+                    <div style="height: 105px; width: 100%; background-size: cover; background-position: center; background-image: url('${thumbUrl}'); position: relative;">
+                        <div style="position: absolute; bottom: 6px; left: 6px; font-size: 0.65rem; font-weight: 800; color: #FFFFFF; background: rgba(0,0,0,0.65); padding: 0.15rem 0.45rem; border-radius: 4px;">
+                            ${m.media_type}
+                        </div>
+                    </div>
+
+                    <div style="padding: 0.75rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.82rem; color: var(--text-primary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                            ${captionCut}
+                        </div>
+                        <div style="font-size: 0.72rem; color: var(--text-secondary); display: flex; gap: 0.6rem; margin-top: 0.35rem; font-weight: 600;">
+                            <span>Views: <strong>${(m.views_count || 48500).toLocaleString()}</strong></span>
+                            <span>Comments: <strong>${(m.comments_count || 1420).toLocaleString()}</strong></span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        gridHtml += '</div>';
+
+        container.innerHTML = `
+            <div style="width: 100%;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.75rem; flex-wrap:wrap; gap:0.5rem;">
+                    <div>
+                        <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.1rem; font-weight: 800; color: var(--text-primary); margin: 0;">Step 1: Pick a Target Reel or Post</h2>
+                        <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.1rem;">Select which specific Instagram content item this comment-to-DM automation rule will monitor.</p>
+                    </div>
+
+                    <div style="min-width: 220px;">
+                        <input type="text" value="${this.searchQuery}" onkeyup="window['new-automation'].filterReels(this.value)" placeholder="Search reels..." style="padding: 0.45rem 0.85rem; font-size: 0.82rem; font-weight: 500; border-radius: 8px; border: 1px solid var(--border-color); background: #FAF8F5; outline: none; width: 100%;">
+                    </div>
+                </div>
+
+                <div style="max-height: 280px; overflow-y: auto; border-radius: 12px; border: 1px solid var(--border-color); padding: 0.75rem; background: #FAF8F5;">
+                    ${gridHtml}
+                </div>
+            </div>
+        `;
+    },
+
+    selectReel(id, el) {
+        this.selectedMediaId = id;
+        this.renderStep1(document.getElementById('new-automation-content'));
+    },
+
+    renderStep2(container) {
+        const val = this.savedKeywords || 'PLAYBOOK, PDF';
+
+        container.innerHTML = `
+            <div style="width: 100%;">
+                <div style="margin-bottom: 1rem;">
+                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">Step 2: Define Trigger Keywords</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.15rem;">Followers who comment these exact words will trigger the automated DM dispatch.</p>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 1rem; width: 100%;">
+                    <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                        <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">Comment Keyword(s)</label>
+                        <input type="text" id="auto_trigger_word" value="${val}" onchange="window['new-automation'].savedKeywords=this.value" placeholder="e.g. PLAYBOOK (or comma-separated: PLAYBOOK, PDF, GUIDE)" style="width: 100%; padding: 0.75rem 1.1rem; font-size: 0.92rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; box-shadow: inset 0 2px 4px rgba(0,0,0,0.03); outline: none;">
+                        <div style="font-size: 0.78rem; color: var(--text-secondary);">Separate multiple keywords with commas. Matching is case-insensitive.</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    // STEP 3: DM & RESOURCE DISPATCH WITH FOLLOW-FIRST GATE WORKFLOW PREVIEW
+    renderStep3(container) {
+        const actionVal = this.savedActionType || 'link_dm';
+        const responseVal = this.savedResponseText || 'Hey! Thanks for commenting. Here is your requested resource link 🚀';
+        const linkVal = this.savedLinkUrl || 'https://example.com/guide.pdf';
+        const promptVal = this.savedFollowPrompt || 'Thanks for commenting! Please follow @creator.studio first, then reply "I FOLLOWED" in this DM to unlock your link!';
+
+        container.innerHTML = `
+            <div style="width: 100%;">
+                <div style="margin-bottom: 1rem;">
+                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">Step 3: Direct Message Dispatch & Resource</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.15rem;">Configure the automated response message body and deliverable URL sent to followers.</p>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 1.1rem; width: 100%;">
+                    
+                    <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                        <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">Automation Action Type</label>
+                        <select id="auto_action_type" onchange="window['new-automation'].savedActionType=this.value; window['new-automation'].renderStep3(document.getElementById('new-automation-content'))" style="width: 100%; padding: 0.7rem 1rem; font-size: 0.9rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none;">
+                            <option value="link_dm" ${actionVal==='link_dm'?'selected':''}>Send DM with Clickable Deliverable Link</option>
+                            <option value="follow_first" ${actionVal==='follow_first'?'selected':''}>Ask to Follow First Gate (Follow Verification)</option>
+                            <option value="direct_dm" ${actionVal==='direct_dm'?'selected':''}>Send Direct Text Message (No Link)</option>
+                        </select>
+                    </div>
+
+                    ${actionVal === 'follow_first' ? `
+                        <!-- FOLLOW-FIRST GATE WORKFLOW VISUAL PREVIEW -->
+                        <div style="padding: 1rem 1.25rem; background: #FDF8F6; border: 2px solid var(--accent-primary); border-radius: 14px; box-shadow: 0 4px 14px rgba(217,119,87,0.08);">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.65rem;">
+                                <span style="font-size: 1.2rem;">🔐</span>
+                                <h3 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--accent-primary); margin: 0;">
+                                    Follow-First Gate System Active
+                                </h3>
+                            </div>
+                            
+                            <p style="font-size: 0.82rem; color: var(--text-primary); line-height: 1.45; margin: 0 0 0.85rem 0;">
+                                Followers must <strong>follow @creator.studio</strong> first before receiving your PDF resource. InstaAuto automatically verifies their follow status in DM when they reply!
+                            </p>
+
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; background: #FFFFFF; padding: 0.85rem; border-radius: 10px; border: 1px solid #F2E3D5;">
+                                <div style="font-size: 0.78rem;">
+                                    <strong style="color: var(--accent-primary);">1. Comment:</strong> Follower comments trigger word on your Reel.
+                                </div>
+                                <div style="font-size: 0.78rem;">
+                                    <strong style="color: var(--accent-primary);">2. Gate DM:</strong> InstaAuto asks follower to follow your account first.
+                                </div>
+                                <div style="font-size: 0.78rem;">
+                                    <strong style="color: var(--accent-primary);">3. Follow & Reply:</strong> Follower clicks Follow and replies <em>"I FOLLOWED"</em>.
+                                </div>
+                                <div style="font-size: 0.78rem;">
+                                    <strong style="color: #2E7D32;">4. PDF Unlocked:</strong> Deliverable PDF link is automatically dispatched!
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                            <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">Follow Gate Prompt DM Message</label>
+                            <textarea id="auto_follow_prompt" rows="2" onchange="window['new-automation'].savedFollowPrompt=this.value" placeholder="e.g. Thanks for commenting! Please follow @creator.studio first, then reply 'I FOLLOWED' in this DM to unlock your link!" style="width: 100%; padding: 0.75rem 1.1rem; font-size: 0.9rem; font-family: inherit; font-weight: 500; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none; line-height: 1.4;">${promptVal}</textarea>
+                        </div>
+                    ` : ''}
+
+                    <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                        <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">${actionVal==='follow_first' ? 'Unlocked Deliverable DM Message Body' : 'DM Message Body'}</label>
+                        <textarea id="auto_response_text" rows="3" onchange="window['new-automation'].savedResponseText=this.value" placeholder="e.g. Thanks for commenting! Here is your requested resource link..." style="width: 100%; padding: 0.75rem 1.1rem; font-size: 0.9rem; font-family: inherit; font-weight: 500; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; box-shadow: inset 0 2px 4px rgba(0,0,0,0.03); outline: none; line-height: 1.45;">${responseVal}</textarea>
+                    </div>
+
+                    ${(actionVal === 'link_dm' || actionVal === 'follow_first') ? `
+                        <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                            <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">Deliverable Resource URL (PDF / Guide)</label>
+                            <input type="url" id="auto_link_url" value="${linkVal}" onchange="window['new-automation'].savedLinkUrl=this.value" placeholder="https://example.com/guide.pdf" style="width: 100%; padding: 0.75rem 1.1rem; font-size: 0.9rem; font-weight: 500; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; box-shadow: inset 0 2px 4px rgba(0,0,0,0.03); outline: none;">
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    },
+
+    renderStep4(container) {
+        const delayVal = this.savedDelay || 5;
+        const replyVal = this.savedPublicReply || 'Sent! Check your DMs 📩';
+
+        container.innerHTML = `
+            <div style="width: 100%;">
+                <div style="margin-bottom: 1rem;">
+                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">Step 4: Anti-Spam Pacing & Public Comment Reply</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.15rem;">Protect account health with delay pacing and boost post engagement with public comment replies.</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; width: 100%;">
+                    <div style="padding: 1.15rem; background: #FAF8F5; border: 1px solid var(--border-color); border-radius: 12px;">
+                        <label style="font-size: 0.88rem; font-weight: 800; color: var(--text-primary);">Anti-Spam Delay Pacing</label>
+                        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.1rem;">Natural delay before sending DM</div>
+                        <select id="auto_delay_seconds" onchange="window['new-automation'].savedDelay=parseInt(this.value)" style="width: 100%; padding: 0.65rem 0.95rem; font-size: 0.88rem; font-weight: 600; border-radius: 8px; border: 1px solid #D1C9BE; background: #FFF; marginTop: 0.5rem; outline: none;">
+                            <option value="0" ${delayVal===0?'selected':''}>Instant Dispatch (0 seconds)</option>
+                            <option value="5" ${delayVal===5?'selected':''}>5 Seconds Delay (Recommended)</option>
+                            <option value="15" ${delayVal===15?'selected':''}>15 Seconds Delay</option>
+                        </select>
+                    </div>
+
+                    <div style="padding: 1.15rem; background: #FAF8F5; border: 1px solid var(--border-color); border-radius: 12px;">
+                        <label style="font-size: 0.88rem; font-weight: 800; color: var(--text-primary);">Public Comment Reply (Optional)</label>
+                        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.1rem;">Posts public comment reply under post</div>
+                        <input type="text" id="auto_public_reply" value="${replyVal}" onchange="window['new-automation'].savedPublicReply=this.value" placeholder="e.g. Sent! Check your DMs 📩" style="width: 100%; padding: 0.65rem 0.95rem; font-size: 0.88rem; font-weight: 500; border-radius: 8px; border: 1px solid #D1C9BE; background: #FFF; marginTop: 0.5rem; outline: none;">
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    applyTemplate(type) {
+        if (type === 'pdf') {
+            this.savedKeywords = 'PDF, GUIDE, EBOOK';
+            this.savedActionType = 'link_dm';
+            this.savedResponseText = 'Thanks for commenting! Here is your requested PDF resource link:';
+            this.savedLinkUrl = 'https://example.com/free-guide.pdf';
+            this.savedPublicReply = 'Sent to your DMs! Check your inbox 📩';
+            App.showToast('Applied "Lead E-Book" preset', 'success');
+        } else if (type === 'follow') {
+            this.savedKeywords = 'SECRET, LINK, UNLOCK';
+            this.savedActionType = 'follow_first';
+            this.savedFollowPrompt = 'Thanks for commenting! Please follow @creator.studio first, then reply "I FOLLOWED" in this DM to unlock your link!';
+            this.savedResponseText = '🎉 Thank you for following @creator.studio! Here is your requested resource link:';
+            this.savedLinkUrl = 'https://example.com/secret-guide.pdf';
+            this.savedPublicReply = 'Check your DMs for access instructions!';
+            App.showToast('Applied "Follow First Gate" preset 🔐', 'success');
+        } else if (type === 'course') {
+            this.savedKeywords = 'COURSE, MASTERCLASS';
+            this.savedActionType = 'link_dm';
+            this.savedResponseText = 'Here is your private access link to register for the Masterclass:';
+            this.savedLinkUrl = 'https://example.com/masterclass';
+            this.savedPublicReply = 'Check your DMs!';
+            App.showToast('Applied "Course Signup" preset', 'success');
+        }
+        this.renderStepContent();
+    },
+
+    async saveAutomation() {
+        const payload = {
+            media_id: this.selectedMediaId,
+            trigger_word: this.savedKeywords || document.getElementById('auto_trigger_word')?.value || 'PLAYBOOK',
+            action_type: this.savedActionType || document.getElementById('auto_action_type')?.value || 'link_dm',
+            response_text: this.savedResponseText || document.getElementById('auto_response_text')?.value || 'Here is your resource link!',
+            link_url: this.savedLinkUrl || document.getElementById('auto_link_url')?.value || 'https://example.com/guide.pdf',
+            follow_prompt: this.savedFollowPrompt || document.getElementById('auto_follow_prompt')?.value || 'Please follow us first!',
+            public_reply: this.savedPublicReply || document.getElementById('auto_public_reply')?.value || 'Sent to DMs!',
+            delay_seconds: this.savedDelay || 5,
+            is_active: true
+        };
+
+        try {
+            await App.apiCall('POST', '/api/rules', payload);
+            App.showToast('Automation deployed successfully!', 'success');
+            App.navigate('workflows');
+        } catch (err) {
+            App.showToast(err.message, 'error');
+        }
+    }
+};

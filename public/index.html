@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InstaAuto — Creator Automation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#FDF8F6',
+                            100: '#F6EBE6',
+                            500: '#D97757',
+                            600: '#C66444',
+                            700: '#A84C30',
+                        },
+                        cream: {
+                            50: '#FAF8F5',
+                            100: '#F5F1EA',
+                            200: '#E6E1D8',
+                            800: '#2C2A29',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-cream-50 text-cream-800 antialiased min-h-screen">
+    <div id="toast-container" class="toast-container"></div>
+    
+    <!-- Login Screen -->
+    <div id="login-screen" class="login-screen active">
+        <div class="login-card card">
+            <div class="logo">
+                <span class="logo-icon">✦</span>
+                <h1 class="text-2xl font-bold tracking-tight">InstaAuto</h1>
+            </div>
+            <p class="login-subtitle">Enter password to access dashboard</p>
+            <form id="login-form">
+                <div class="form-group">
+                    <input type="password" id="password" class="input" placeholder="Password" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-full">
+                    <span>Login</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="dashboard hidden">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo" style="justify-content: flex-start; gap: 0.6rem;">
+                    <div style="width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, #E28263 0%, #D97757 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 0.85rem; shadow: 0 2px 6px rgba(217,119,87,0.3);">
+                        IA
+                    </div>
+                    <div>
+                        <h2 style="font-size: 1.05rem; font-weight: 800; letter-spacing: -0.03em;">InstaAuto</h2>
+                        <div style="font-size: 0.68rem; color: #2E7D32; font-weight: 700; display: flex; align-items: center; gap: 4px; margin-top: 1px;">
+                            <span style="width: 6px; height: 6px; border-radius: 50%; background: #2E7D32; display: inline-block;"></span> @creator.studio
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dedicated Sidebar "+ New Automation" Action Button -->
+            <div style="padding: 0 1rem 0.85rem 1rem;">
+                <button class="btn btn-primary w-full" style="padding: 0.65rem 1rem; font-size: 0.88rem; border-radius: 10px; font-weight: 700; tracking-tight: -0.01em; box-shadow: 0 2px 8px rgba(217,119,87,0.25);" onclick="App.navigate('new-automation')">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span>New Automation</span>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#dashboard" class="nav-item active" data-view="dashboard">
+                    <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span class="nav-label">Overview Dashboard</span>
+                </a>
+                <a href="#workflows" class="nav-item" data-view="workflows">
+                    <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                    <span class="nav-label">My Automations</span>
+                </a>
+                <a href="#new-automation" class="nav-item" data-view="new-automation">
+                    <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                    <span class="nav-label">Create Automation</span>
+                </a>
+                <a href="#analytics" class="nav-item" data-view="analytics">
+                    <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    <span class="nav-label">Reel Analytics</span>
+                </a>
+                <a href="#history" class="nav-item" data-view="history">
+                    <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <span class="nav-label">Monthly History</span>
+                </a>
+                <a href="#activity" class="nav-item" data-view="activity">
+                    <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <span class="nav-label">Activity & Leads</span>
+                </a>
+                <a href="#setup" class="nav-item" data-view="setup">
+                    <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span class="nav-label">Settings & Setup</span>
+                </a>
+                <a href="#about" class="nav-item" data-view="about">
+                    <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                    <span class="nav-label">About & Meta Handbook</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="btn btn-secondary w-full" style="font-weight: 600; font-size: 0.82rem;">Sign Out</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div id="view-container">
+                <!-- Views render here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-container" class="modal-container hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal card">
+            <div class="modal-header">
+                <h3 id="modal-title">Modal Title</h3>
+                <button id="close-modal-btn" class="close-modal-btn">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Modal content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/app.js" defer></script>
+    <script src="js/dashboardView.js" defer></script>
+    <script src="js/setup.js" defer></script>
+    <script src="js/workflows.js" defer></script>
+    <script src="js/newAutomation.js" defer></script>
+    <script src="js/history.js" defer></script>
+    <script src="js/media.js" defer></script>
+    <script src="js/rules.js" defer></script>
+    <script src="js/activity.js" defer></script>
+    <script src="js/analytics.js" defer></script>
+    <script src="js/about.js" defer></script>
+</body>
+</html>
