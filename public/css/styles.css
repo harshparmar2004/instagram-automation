@@ -270,76 +270,22 @@ input:checked + .toggle-slider:before {
 .status-dot.disconnected { background-color: var(--error); }
 .status-dot.expiring { background-color: var(--warning); }
 
-/* Full Modern SaaS Landing Page & Integrated Login Experience */
+/* Dedicated Clean Sign In to Dashboard Screen */
 .login-screen {
     position: fixed;
     inset: 0;
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     background-color: #FAF8F5;
     z-index: 1000;
+    padding: 1.5rem;
     overflow-y: auto;
 }
 .login-screen.hidden {
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.35s ease;
-}
-
-/* Landing Top Navigation Bar */
-.landing-navbar {
-    width: 100%;
-    max-width: 1200px;
-    margin: 0 auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.35rem 1.75rem;
-    position: relative;
-    z-index: 20;
-}
-
-@media (max-width: 768px) {
-    .landing-nav-links {
-        display: none !important;
-    }
-    .landing-navbar {
-        padding: 1rem 1.25rem;
-    }
-}
-
-/* Landing Hero Container & Grid */
-.landing-hero-container {
-    width: 100%;
-    max-width: 1200px;
-    margin: 1.5rem auto 3rem auto;
-    padding: 0 1.75rem;
-    flex: 1;
-}
-
-.landing-hero-grid {
-    display: grid;
-    grid-template-columns: 1.15fr 1fr;
-    gap: 3.5rem;
-    align-items: center;
-}
-
-@media (max-width: 940px) {
-    .landing-hero-grid {
-        grid-template-columns: 1fr;
-        gap: 2.5rem;
-    }
-}
-
-.hero-left-col {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-}
-
-.hero-right-col {
-    display: flex;
-    justify-content: center;
 }
 
 /* Centered Clean Login Card Box */
@@ -353,6 +299,7 @@ input:checked + .toggle-slider:before {
     padding: 2.5rem 2.25rem;
     position: relative;
     z-index: 10;
+    margin: auto;
 }
 .logo-wrapper {
     display: flex;
