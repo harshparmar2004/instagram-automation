@@ -270,91 +270,55 @@ input:checked + .toggle-slider:before {
 .status-dot.disconnected { background-color: var(--error); }
 .status-dot.expiring { background-color: var(--warning); }
 
-/* Clean High-End SaaS Login Experience */
+/* Full-Screen Clean Aesthetic Login Experience */
 .login-screen {
     position: fixed;
     inset: 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: #FAF8F5;
+    background-color: #FAF8F5;
     z-index: 1000;
     padding: 1.5rem;
-    overflow: hidden;
+    overflow-y: auto;
 }
 .login-screen.hidden {
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.35 ease;
+    transition: opacity 0.35s ease;
 }
 
-/* Centered Split Container */
-.login-container {
+/* Header Bar Floating on Top */
+.login-top-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2.5rem;
+}
+
+@media (max-width: 640px) {
+    .login-top-bar {
+        padding: 1.25rem 1.5rem;
+    }
+}
+
+/* Centered Login Card Box */
+.login-card-box {
     width: 100%;
-    max-width: 1000px;
-    min-height: 560px;
-    display: grid;
-    grid-template-columns: 1.15fr 1fr;
+    max-width: 440px;
     background: #FFFFFF;
-    border-radius: 24px;
-    border: 1px solid #E6E1D8;
-    box-shadow: 0 20px 50px rgba(44, 42, 41, 0.07);
-    overflow: hidden;
+    border-radius: 20px;
+    border: 1.5px solid #E6E1D8;
+    box-shadow: 0 10px 30px rgba(44, 42, 41, 0.04);
+    padding: 2.5rem 2.25rem;
     position: relative;
     z-index: 10;
-}
-
-@media (max-width: 860px) {
-    .login-container {
-        grid-template-columns: 1fr;
-        max-width: 440px;
-        min-height: auto;
-    }
-    .login-product-showcase {
-        display: none;
-    }
-}
-
-/* Left Side: Code-Driven Live Product Preview Showcase */
-.login-product-showcase {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 2.75rem;
-    background: #1C1A19;
-    color: #FFFFFF;
-    overflow: hidden;
-}
-.showcase-header {
-    position: relative;
-    z-index: 2;
-}
-
-/* Live Interactive Automation Preview Box */
-.preview-card-box {
-    padding: 1.35rem;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 18px;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-    margin: 1.5rem 0;
-    position: relative;
-    z-index: 2;
-}
-
-/* Right Side: Ultra-Clean SaaS Login Form */
-.login-form-side {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2.75rem 2.5rem;
-    background: #FFFFFF;
-}
-.login-card-inner {
-    width: 100%;
-    max-width: 350px;
+    margin: auto;
 }
 .logo-wrapper {
     display: flex;
