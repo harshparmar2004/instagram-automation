@@ -1,0 +1,3 @@
+can draft a design brief for your bookstore’s new logo and export it to Docs
+og:logo
+{tool_logo_placeholder}\

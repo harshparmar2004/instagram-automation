@@ -3,11 +3,12 @@ from PIL import Image
 
 input_path = r"C:\Users\harsh parmar\.gemini\antigravity\brain\4b301477-2736-4430-93d9-8fb55110a9c9\instaauto_transparent_logo_1787761789566.png"
 output_favicon = r"c:\Users\harsh parmar\Desktop\instagram-automation\public\favicon.png"
+output_favicon_ico = r"c:\Users\harsh parmar\Desktop\instagram-automation\public\favicon.ico"
 output_logo = r"c:\Users\harsh parmar\Desktop\instagram-automation\public\images\logo.png"
 output_favicon_sub = r"c:\Users\harsh parmar\Desktop\instagram-automation\public\images\favicon.png"
 
 img = Image.open(input_path).convert("RGBA")
-datas = img.getdata()
+datas = list(img.getdata())
 
 newData = []
 for item in datas:
@@ -29,4 +30,7 @@ img.save(output_favicon, "PNG")
 img.save(output_logo, "PNG")
 img.save(output_favicon_sub, "PNG")
 
-print("Successfully generated transparent background logo & favicon PNGs!")
+# Save transparent ICO file for browser tab icons
+img.save(output_favicon_ico, format="ICO", sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128)])
+
+print("Successfully generated transparent background logo, favicon PNGs, and favicon.ico!")
