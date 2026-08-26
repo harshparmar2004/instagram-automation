@@ -120,7 +120,10 @@ const App = {
         
         if (this.state.pollingInterval) clearInterval(this.state.pollingInterval);
         this.state.pollingInterval = setInterval(() => {
-            const currentObj = (this.state.currentView === 'history') ? window.monthlyHistory : window[this.state.currentView];
+            let currentObj = window[this.state.currentView];
+            if (this.state.currentView === 'history') currentObj = window.monthlyHistory;
+            if (this.state.currentView === 'about') currentObj = window.aboutHandbook;
+
             if (currentObj && typeof currentObj.refresh === 'function') {
                 currentObj.refresh();
             }
@@ -142,7 +145,10 @@ const App = {
         this.elements.viewContainer.innerHTML = '<div class="text-center" style="margin-top:4rem"><div class="spinner" style="width:40px;height:40px"></div></div>';
         
         setTimeout(() => {
-            const targetObj = (view === 'history') ? window.monthlyHistory : window[view];
+            let targetObj = window[view];
+            if (view === 'history') targetObj = window.monthlyHistory;
+            if (view === 'about') targetObj = window.aboutHandbook;
+
             if (targetObj && typeof targetObj.render === 'function') {
                 targetObj.render(this.elements.viewContainer);
             } else {

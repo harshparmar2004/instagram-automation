@@ -1,4 +1,4 @@
-window.about = {
+window.aboutHandbook = {
     activeFaq: null,
 
     async render(container) {
@@ -49,7 +49,7 @@ window.about = {
         faqs.forEach((faq, idx) => {
             const isOpen = this.activeFaq === idx;
             faqHtml += `
-                <div class="faq-item" onclick="window.about.toggleFaq(${idx})" style="padding: 1rem 1.25rem; border-radius: 12px; background: ${isOpen ? '#FDF8F6' : '#FAF8F5'}; border: ${isOpen ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)'}; cursor: pointer; transition: all 0.15s ease-in-out;">
+                <div class="faq-item" onclick="window.aboutHandbook.toggleFaq(${idx})" style="padding: 1rem 1.25rem; border-radius: 12px; background: ${isOpen ? '#FDF8F6' : '#FAF8F5'}; border: ${isOpen ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)'}; cursor: pointer; transition: all 0.15s ease-in-out;">
                     <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 0.92rem; color: ${isOpen ? 'var(--accent-primary)' : 'var(--text-primary)'};">
                         <span>${faq.q}</span>
                         <span style="font-size: 1.1rem; font-weight: 800;">${isOpen ? '−' : '+'}</span>
@@ -267,3 +267,5 @@ window.about = {
         this.render(document.getElementById('view-container'));
     }
 };
+
+window.aboutView = window.aboutHandbook;
