@@ -1,4 +1,4 @@
-window.history = {
+window.monthlyHistory = {
     selectedMonth: '2026-08',
 
     mockDatabase: {
@@ -191,13 +191,13 @@ window.history = {
                     </div>
                     <div style="display:flex; align-items:center; gap:0.75rem;">
                         <span style="font-size:0.85rem; font-weight:600; color:var(--text-secondary);">Select Month:</span>
-                        <select id="history-month-select" class="select" style="min-width:170px; font-weight:600; padding:0.55rem 0.95rem; font-size:0.88rem; border-radius:10px;" onchange="window.history.onMonthChange(this.value)">
+                        <select id="history-month-select" class="select" style="min-width:170px; font-weight:600; padding:0.55rem 0.95rem; font-size:0.88rem; border-radius:10px;" onchange="window.monthlyHistory.onMonthChange(this.value)">
                             <option value="2026-08" selected>August 2026</option>
                             <option value="2026-07">July 2026</option>
                             <option value="2026-06">June 2026</option>
                             <option value="2026-05">May 2026</option>
                         </select>
-                        <button class="btn btn-secondary btn-sm" style="font-weight:700; padding:0.55rem 1.15rem; font-size:0.88rem; border-radius:10px;" onclick="window.history.exportCsv()">Export CSV</button>
+                        <button class="btn btn-secondary btn-sm" style="font-weight:700; padding:0.55rem 1.15rem; font-size:0.88rem; border-radius:10px;" onclick="window.monthlyHistory.exportCsv()">Export CSV</button>
                     </div>
                 </div>
                 <div id="history-content" style="width: 100%;">
@@ -323,3 +323,6 @@ window.history = {
         `;
     }
 };
+
+// Also attach to window.historyView for compatibility
+window.monthlyHistoryView = window.monthlyHistory;

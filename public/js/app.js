@@ -120,8 +120,9 @@ const App = {
         
         if (this.state.pollingInterval) clearInterval(this.state.pollingInterval);
         this.state.pollingInterval = setInterval(() => {
-            if (window[this.state.currentView] && typeof window[this.state.currentView].refresh === 'function') {
-                window[this.state.currentView].refresh();
+            const currentObj = (this.state.currentView === 'history') ? window.monthlyHistory : window[this.state.currentView];
+            if (currentObj && typeof currentObj.refresh === 'function') {
+                currentObj.refresh();
             }
         }, 10000);
     },
@@ -141,8 +142,9 @@ const App = {
         this.elements.viewContainer.innerHTML = '<div class="text-center" style="margin-top:4rem"><div class="spinner" style="width:40px;height:40px"></div></div>';
         
         setTimeout(() => {
-            if (window[view] && typeof window[view].render === 'function') {
-                window[view].render(this.elements.viewContainer);
+            const targetObj = (view === 'history') ? window.monthlyHistory : window[view];
+            if (targetObj && typeof targetObj.render === 'function') {
+                targetObj.render(this.elements.viewContainer);
             } else {
                 this.elements.viewContainer.innerHTML = '<div class="empty-state"><h3>View not found</h3></div>';
             }
