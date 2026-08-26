@@ -270,14 +270,14 @@ input:checked + .toggle-slider:before {
 .status-dot.disconnected { background-color: var(--error); }
 .status-dot.expiring { background-color: var(--warning); }
 
-/* 3D Glassmorphic Split-Screen Login Experience */
+/* Clean High-End SaaS Login Experience */
 .login-screen {
     position: fixed;
     inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #111015;
+    background: #FAF8F5;
     z-index: 1000;
     padding: 1.5rem;
     overflow: hidden;
@@ -285,48 +285,20 @@ input:checked + .toggle-slider:before {
 .login-screen.hidden {
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.4s ease;
+    transition: opacity 0.35 ease;
 }
 
-/* Ambient 3D Glow Orbs */
-.login-glow-orb {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(90px);
-    opacity: 0.45;
-    pointer-events: none;
-}
-.orb-1 {
-    width: 450px;
-    height: 450px;
-    top: -100px;
-    left: -100px;
-    background: radial-gradient(circle, #833AB4 0%, #FD1D1D 100%);
-    animation: orbFloat1 12s infinite alternate ease-in-out;
-}
-.orb-2 {
-    width: 400px;
-    height: 400px;
-    bottom: -100px;
-    right: -100px;
-    background: radial-gradient(circle, #F77737 0%, #D97757 100%);
-    animation: orbFloat2 10s infinite alternate ease-in-out;
-}
-@keyframes orbFloat1 { 0% { transform: translate(0, 0); } 100% { transform: translate(60px, 40px); } }
-@keyframes orbFloat2 { 0% { transform: translate(0, 0); } 100% { transform: translate(-50px, -50px); } }
-
-/* 3D Glass Container */
+/* Centered Split Container */
 .login-container {
     width: 100%;
-    max-width: 1020px;
-    min-height: 580px;
+    max-width: 1000px;
+    min-height: 560px;
     display: grid;
     grid-template-columns: 1.15fr 1fr;
-    background: rgba(255, 255, 255, 0.96);
-    backdrop-filter: blur(24px);
-    border-radius: 28px;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35), 0 0 40px rgba(217, 119, 87, 0.15);
+    background: #FFFFFF;
+    border-radius: 24px;
+    border: 1px solid #E6E1D8;
+    box-shadow: 0 20px 50px rgba(44, 42, 41, 0.07);
     overflow: hidden;
     position: relative;
     z-index: 10;
@@ -335,87 +307,45 @@ input:checked + .toggle-slider:before {
 @media (max-width: 860px) {
     .login-container {
         grid-template-columns: 1fr;
-        max-width: 460px;
+        max-width: 440px;
         min-height: auto;
     }
-    .login-hero {
+    .login-product-showcase {
         display: none;
     }
 }
 
-/* Left 3D Hero Side */
-.login-hero {
+/* Left Side: Code-Driven Live Product Preview Showcase */
+.login-product-showcase {
     position: relative;
     display: flex;
     flex-direction: column;
-    justify-content: flex-end;
+    justify-content: space-between;
     padding: 2.75rem;
+    background: #1C1A19;
+    color: #FFFFFF;
     overflow: hidden;
 }
-.login-hero-bg {
-    position: absolute;
-    inset: 0;
-    background-size: cover;
-    background-position: center;
-    transform: scale(1.03);
-    transition: transform 0.8s ease;
-}
-.login-hero-overlay {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(17, 16, 21, 0.2) 0%, rgba(17, 16, 21, 0.88) 75%, rgba(17, 16, 21, 0.98) 100%);
-}
-.login-hero-content {
+.showcase-header {
     position: relative;
     z-index: 2;
-    color: #FFFFFF;
-}
-.login-hero-badge {
-    display: inline-block;
-    padding: 0.35rem 0.85rem;
-    background: rgba(255, 255, 255, 0.18);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.85rem;
-}
-.login-hero-title {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-weight: 800;
-    font-size: 1.75rem;
-    line-height: 1.25;
-    letter-spacing: -0.02em;
-    color: #FFFFFF;
-    margin-bottom: 0.65rem;
-}
-.login-hero-desc {
-    font-size: 0.88rem;
-    color: rgba(255, 255, 255, 0.85);
-    line-height: 1.5;
-    margin-bottom: 1.35rem;
-}
-.login-hero-features {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-.hero-feature-pill {
-    padding: 0.35rem 0.75rem;
-    background: rgba(255, 255, 255, 0.14);
-    backdrop-filter: blur(8px);
-    border-radius: 8px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: #FFFFFF;
-    border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-/* Right Glassmorphic Form Side */
-.login-form-wrapper {
+/* Live Interactive Automation Preview Box */
+.preview-card-box {
+    padding: 1.35rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 18px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    margin: 1.5rem 0;
+    position: relative;
+    z-index: 2;
+}
+
+/* Right Side: Ultra-Clean SaaS Login Form */
+.login-form-side {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -424,7 +354,7 @@ input:checked + .toggle-slider:before {
 }
 .login-card-inner {
     width: 100%;
-    max-width: 360px;
+    max-width: 350px;
 }
 .logo-wrapper {
     display: flex;
