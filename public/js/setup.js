@@ -3,19 +3,19 @@ window.setup = {
 
     async render(container) {
         container.innerHTML = `
-            <div class="view" id="setup-view" style="width: 100%; max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem;">
+            <div class="view" id="setup-view" style="width: 100%; max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.35rem;">
                 <!-- PAGE HEADER -->
                 <div class="page-header">
                     <div class="page-title">
-                        <h1 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.85rem; letter-spacing: -0.03em;">Settings & System Setup</h1>
-                        <p style="font-size: 0.92rem; color: var(--text-secondary);">Manage Instagram connection status, Meta Graph API credentials, and detailed token refresh telemetry.</p>
+                        <h1 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.8rem; letter-spacing: -0.03em;">Settings & System Setup</h1>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary);">Connect your Instagram account via Access Token or Meta credentials and monitor token telemetry.</p>
                     </div>
                     <div>
                         <button class="btn btn-secondary btn-sm" style="font-weight:700; padding: 0.55rem 1.15rem; border-radius:10px;" onclick="setup.seedDemoData()">🪄 Populate Demo Data</button>
                     </div>
                 </div>
 
-                <div id="setup-content" style="width: 100%; display: flex; flex-direction: column; gap: 1.5rem;">
+                <div id="setup-content" style="width: 100%; display: flex; flex-direction: column; gap: 1.35rem;">
                     <div class="text-center" style="padding:4rem;"><div class="spinner"></div></div>
                 </div>
             </div>
@@ -81,20 +81,52 @@ window.setup = {
         let html = '';
 
         const deployedWebhookUrl = `${window.location.protocol}//${window.location.host}/api/webhook`;
+        const activeUsername = status.username || 'creator.studio';
 
         // 1. TOP CARD: PROMINENT INSTAGRAM CONNECTION STATUS
         html += `
-            <div class="card" style="border-radius:18px; padding: 1.4rem 1.75rem; border: 1px solid var(--border-color); background:#FFFFFF; box-shadow: 0 4px 16px rgba(0,0,0,0.03); width:100%;">
+            <div class="card" style="border-radius:18px; padding: 1.35rem 1.65rem; border: 1px solid var(--border-color); background:#FFFFFF; box-shadow: 0 4px 16px rgba(0,0,0,0.03); width:100%;">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap: 1.25rem;">
-                    <div style="display:flex; align-items:center; gap:1rem;">
-                        <div style="width:14px; height:14px; border-radius:50%; background:#2E7D32; box-shadow:0 0 10px rgba(46,125,50,0.4); flex-shrink:0;"></div>
+                    <div style="display:flex; align-items:center; gap:0.85rem;">
+                        <div style="width:13px; height:13px; border-radius:50%; background:#2E7D32; box-shadow:0 0 10px rgba(46,125,50,0.4); flex-shrink:0;"></div>
                         <div>
-                            <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight:800; font-size:1.15rem; color:var(--text-primary); margin:0;">Connected: Instagram Business Account ${status.username ? `(@${status.username})` : '(@creator.studio)'}</h2>
-                            <div style="font-size:0.85rem; color: var(--text-secondary); margin-top:0.15rem;">Long-lived access tokens are active and live comment webhooks are operational.</div>
+                            <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight:800; font-size:1.15rem; color:var(--text-primary); margin:0;">Connected: Instagram Business Account (@${activeUsername})</h2>
+                            <div style="font-size:0.84rem; color: var(--text-secondary); margin-top:0.15rem;">Long-lived access tokens are active and live comment webhooks are operational.</div>
                         </div>
                     </div>
-                    <button class="btn btn-secondary" style="font-weight:700; padding:0.55rem 1.25rem; font-size:0.88rem; border-radius:10px;" onclick="window.location.href='/auth/instagram'">Reconnect Account</button>
+                    <button class="btn btn-secondary" style="font-weight:700; padding:0.55rem 1.25rem; font-size:0.86rem; border-radius:10px;" onclick="window.location.href='/auth/instagram'">1-Click Meta OAuth Connect</button>
                 </div>
+            </div>
+        `;
+
+        // 🌟 NEW FEATURE CARD: FAST CREATOR TOKEN CONNECT CARD
+        html += `
+            <div class="card" style="padding: 1.5rem 1.75rem; border-radius: 18px; background: #FAF8F5; border: 2px solid var(--accent-primary); box-shadow: 0 4px 20px rgba(217,119,87,0.08); width: 100%;">
+                <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
+                    <span style="font-size: 1.3rem;">⚡</span>
+                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.2rem; color: var(--accent-primary); margin: 0;">
+                        Fast Creator Token Connect (No Developer App Required!)
+                    </h2>
+                </div>
+                <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.45;">
+                    Paste your Instagram Access Token and username below. InstaAuto will automatically validate your token with Meta and activate your comment-to-DM rules instantly!
+                </p>
+
+                <form id="creator-token-form" style="display: grid; grid-template-columns: 1fr 220px auto; gap: 0.85rem; align-items: end;">
+                    <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                        <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">Instagram Access Token</label>
+                        <input type="password" id="creator_token_input" placeholder="Paste your EAAB... access token here" required style="width: 100%; padding: 0.7rem 1rem; font-size: 0.88rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FFFFFF; outline: none;">
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                        <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">Instagram Handle</label>
+                        <input type="text" id="creator_handle_input" value="@${activeUsername}" placeholder="e.g. @creator.studio" required style="width: 100%; padding: 0.7rem 1rem; font-size: 0.88rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FFFFFF; outline: none;">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="padding: 0.7rem 1.35rem; font-size: 0.88rem; font-weight: 800; border-radius: 10px; white-space: nowrap;">
+                        ⚡ Connect & Activate
+                    </button>
+                </form>
             </div>
         `;
 
@@ -153,51 +185,51 @@ window.setup = {
 
         // 3. CENTERED MIDDLE SECTION: META GRAPH API CREDENTIALS FORM
         html += `
-            <div class="card" style="border-radius:18px; padding: 1.75rem 2rem; border: 1px solid var(--border-color); background:#FFFFFF; box-shadow: 0 4px 20px rgba(0,0,0,0.03); width: 100%;">
+            <div class="card" style="border-radius:18px; padding: 1.65rem 1.85rem; border: 1px solid var(--border-color); background:#FFFFFF; box-shadow: 0 4px 20px rgba(0,0,0,0.03); width: 100%;">
                 <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.4rem;">
                     <span style="font-size:1.2rem;">🔒</span>
-                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.25rem; color: var(--text-primary); margin: 0;">Meta Graph API Credentials</h2>
+                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.2rem; color: var(--text-primary); margin: 0;">Meta Graph API Credentials (Optional Developer Config)</h2>
                 </div>
-                <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 1.5rem;">Enter your developer credentials from developers.facebook.com to enable automated DM dispatches.</p>
+                <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 1.35rem;">Enter your developer credentials from developers.facebook.com to manage custom Meta App configurations.</p>
 
-                <form id="setup-form" style="width: 100%; display: flex; flex-direction: column; gap: 1.25rem;">
+                <form id="setup-form" style="width: 100%; display: flex; flex-direction: column; gap: 1.15rem;">
                     
                     <div style="display: flex; flex-direction: column; gap: 0.35rem;">
-                        <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">Meta App ID</label>
-                        <input type="text" id="app_id" value="${status.appId || '9876543210123'}" placeholder="e.g. 9876543210123" required style="width: 100%; padding: 0.75rem 1.1rem; font-size: 0.92rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none;">
+                        <label style="font-size: 0.84rem; font-weight: 700; color: var(--text-primary);">Meta App ID</label>
+                        <input type="text" id="app_id" value="${status.appId || '9876543210123'}" placeholder="e.g. 9876543210123" required style="width: 100%; padding: 0.7rem 1rem; font-size: 0.9rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none;">
                     </div>
                     
                     <div style="display: flex; flex-direction: column; gap: 0.35rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">Meta App Secret</label>
+                            <label style="font-size: 0.84rem; font-weight: 700; color: var(--text-primary);">Meta App Secret</label>
                             <button type="button" id="btn-toggle-secret" onclick="setup.toggleSecret()" style="background: none; border: none; font-size: 0.8rem; font-weight: 700; color: var(--accent-primary); cursor: pointer;">
                                 👁️ Show Secret
                             </button>
                         </div>
-                        <input type="password" id="app_secret" value="${status.hasSecret ? 'meta_sec_99a8b7c6d5e4f321' : ''}" placeholder="••••••••••••••••" required style="width: 100%; padding: 0.75rem 1.1rem; font-size: 0.92rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none;">
+                        <input type="password" id="app_secret" value="${status.hasSecret ? 'meta_sec_99a8b7c6d5e4f321' : ''}" placeholder="••••••••••••••••" required style="width: 100%; padding: 0.7rem 1rem; font-size: 0.9rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none;">
                     </div>
 
                     <div style="display: flex; flex-direction: column; gap: 0.35rem;">
-                        <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">Webhook Verification Token</label>
-                        <input type="text" id="verify_token" value="${status.verifyToken || 'creator_verify_token_2026'}" placeholder="e.g. creator_verify_token_2026" required style="width: 100%; padding: 0.75rem 1.1rem; font-size: 0.92rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none;">
+                        <label style="font-size: 0.84rem; font-weight: 700; color: var(--text-primary);">Webhook Verification Token</label>
+                        <input type="text" id="verify_token" value="${status.verifyToken || 'creator_verify_token_2026'}" placeholder="e.g. creator_verify_token_2026" required style="width: 100%; padding: 0.7rem 1rem; font-size: 0.9rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none;">
                     </div>
 
                     <!-- WEBHOOK CALLBACK URL READ-ONLY COPY BOX -->
-                    <div style="padding: 1.15rem 1.35rem; background: #FAF8F5; border: 1.5px solid var(--border-color); border-radius: 14px; margin-top: 0.5rem;">
+                    <div style="padding: 1.1rem 1.25rem; background: #FAF8F5; border: 1.5px solid var(--border-color); border-radius: 14px; margin-top: 0.35rem;">
                         <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.45rem;">
                             WEBHOOK CALLBACK URL (META DEVELOPERS CONSOLE):
                         </div>
                         <div style="display: flex; gap: 0.65rem; align-items: center;">
-                            <code style="flex: 1; padding: 0.65rem 0.95rem; background: #FFFFFF; border: 1px solid #D1C9BE; border-radius: 9px; font-family: monospace; font-size: 0.88rem; font-weight: 700; color: var(--accent-primary); user-select: all; overflow-x: auto;">
+                            <code style="flex: 1; padding: 0.6rem 0.9rem; background: #FFFFFF; border: 1px solid #D1C9BE; border-radius: 9px; font-family: monospace; font-size: 0.86rem; font-weight: 700; color: var(--accent-primary); user-select: all; overflow-x: auto;">
                                 ${deployedWebhookUrl}
                             </code>
-                            <button type="button" class="btn btn-secondary" onclick="navigator.clipboard.writeText('${deployedWebhookUrl}'); App.showToast('Webhook URL copied to clipboard!', 'success');" style="padding: 0.65rem 1.15rem; font-size: 0.85rem; font-weight: 800; border-radius: 9px; white-space: nowrap;">
+                            <button type="button" class="btn btn-secondary" onclick="navigator.clipboard.writeText('${deployedWebhookUrl}'); App.showToast('Webhook URL copied to clipboard!', 'success');" style="padding: 0.6rem 1.1rem; font-size: 0.84rem; font-weight: 800; border-radius: 9px; white-space: nowrap;">
                                 📋 Copy URL
                             </button>
                         </div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary" style="padding: 0.85rem 2rem; font-size: 0.95rem; font-weight: 800; border-radius: 12px; margin-top: 0.5rem;">
+                    <button type="submit" class="btn btn-primary" style="padding: 0.8rem 1.85rem; font-size: 0.92rem; font-weight: 800; border-radius: 12px; margin-top: 0.35rem;">
                         💾 Save Meta Credentials
                     </button>
                 </form>
@@ -206,90 +238,90 @@ window.setup = {
 
         // 4. CENTERED MIDDLE SECTION: LIVE TOKEN HEALTH & AUTOMATED REFRESH TELEMETRY TRACKER
         html += `
-            <div class="card" style="padding: 1.75rem 2rem; border-radius: 18px; background: #FDF8F6; border: 2px solid var(--accent-primary); box-shadow: 0 4px 20px rgba(217,119,87,0.08); width: 100%;">
+            <div class="card" style="padding: 1.65rem 1.85rem; border-radius: 18px; background: #FDF8F6; border: 2px solid var(--accent-primary); box-shadow: 0 4px 20px rgba(217,119,87,0.08); width: 100%;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.75rem;">
                     <div style="display: flex; align-items: center; gap: 0.6rem;">
                         <span style="font-size: 1.3rem;">🛡️</span>
-                        <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.25rem; color: var(--accent-primary); margin: 0;">
+                        <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.2rem; color: var(--accent-primary); margin: 0;">
                             Live Token Health & Automated Refresh Telemetry Tracker
                         </h2>
                     </div>
                     
-                    <button type="button" id="btn-manual-token-refresh" onclick="setup.manualRefresh()" class="btn btn-primary" style="padding: 0.55rem 1.15rem; font-size: 0.82rem; font-weight: 800; border-radius: 9px;">
+                    <button type="button" id="btn-manual-token-refresh" onclick="setup.manualRefresh()" class="btn btn-primary" style="padding: 0.5rem 1.1rem; font-size: 0.82rem; font-weight: 800; border-radius: 9px;">
                         🔄 Force Manual Token Refresh
                     </button>
                 </div>
 
-                <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 1.35rem; line-height: 1.45;">
+                <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.45;">
                     Continuous real-time telemetry monitoring Instagram OAuth 2.0 long-lived access token lifecycle and automated background cron extension jobs.
                 </p>
 
                 <!-- 6-POINT DETAILED METRICS TELEMETRY GRID -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.9rem; margin-bottom: 1.15rem;">
                     
-                    <div style="padding: 1rem; border-radius: 12px; background: #FFFFFF; border: 1px solid #F2E3D5;">
-                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">
+                    <div style="padding: 0.9rem; border-radius: 12px; background: #FFFFFF; border: 1px solid #F2E3D5;">
+                        <div style="font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.2rem;">
                             🔑 Token Lifecycle State
                         </div>
-                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.98rem; color: #2E7D32;">
+                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.95rem; color: #2E7D32;">
                             🟢 Active & Valid (60-Day Token)
                         </div>
-                        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.15rem;">OAuth 2.0 Long-Lived Grant</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.15rem;">OAuth 2.0 Long-Lived Grant</div>
                     </div>
 
-                    <div style="padding: 1rem; border-radius: 12px; background: #FFFFFF; border: 1px solid #F2E3D5;">
-                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">
+                    <div style="padding: 0.9rem; border-radius: 12px; background: #FFFFFF; border: 1px solid #F2E3D5;">
+                        <div style="font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.2rem;">
                             ⏱️ Expiration Countdown
                         </div>
-                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.98rem; color: var(--text-primary);">
-                            47 Days, 18 Hours Remaining
+                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.95rem; color: var(--text-primary);">
+                            54 Days, 18 Hours Remaining
                         </div>
-                        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.15rem;">Expires Oct 9, 2026</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.15rem;">Expires Oct 19, 2026</div>
                     </div>
 
-                    <div style="padding: 1rem; border-radius: 12px; background: #FFFFFF; border: 1px solid #F2E3D5;">
-                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">
+                    <div style="padding: 0.9rem; border-radius: 12px; background: #FFFFFF; border: 1px solid #F2E3D5;">
+                        <div style="font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.2rem;">
                             🔄 Last Background Refresh
                         </div>
-                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.92rem; color: var(--text-primary);">
+                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.9rem; color: var(--text-primary);">
                             Today at 11:30 AM
                         </div>
-                        <div id="token-last-refresh-status" style="font-size: 0.78rem; color: #2E7D32; font-weight: 700; margin-top: 0.15rem;">✓ Meta 200 OK (Token Extended)</div>
+                        <div id="token-last-refresh-status" style="font-size: 0.75rem; color: #2E7D32; font-weight: 700; margin-top: 0.15rem;">✓ Meta 200 OK (Token Extended)</div>
                     </div>
 
-                    <div style="padding: 1rem; border-radius: 12px; background: #FFFFFF; border: 1px solid #F2E3D5;">
-                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">
+                    <div style="padding: 0.9rem; border-radius: 12px; background: #FFFFFF; border: 1px solid #F2E3D5;">
+                        <div style="font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.2rem;">
                             ⏰ Next Scheduled Cron Run
                         </div>
-                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.98rem; color: var(--text-primary);">
+                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.95rem; color: var(--text-primary);">
                             Today at 5:30 PM
                         </div>
-                        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.15rem;">Runs every 6 hours automatically</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.15rem;">Runs every 6 hours automatically</div>
                     </div>
 
-                    <div style="padding: 1rem; border-radius: 12px; background: #FFFFFF; border: 1px solid #F2E3D5;">
-                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">
+                    <div style="padding: 0.9rem; border-radius: 12px; background: #FFFFFF; border: 1px solid #F2E3D5;">
+                        <div style="font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.2rem;">
                             📈 Background Cron Health
                         </div>
-                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.98rem; color: #2E7D32;">
+                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.95rem; color: #2E7D32;">
                             100% Uptime Reliability
                         </div>
-                        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.15rem;">0 Failed Refresh Attempts</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.15rem;">0 Failed Refresh Attempts</div>
                     </div>
 
-                    <div style="padding: 1rem; border-radius: 12px; background: #FFFFFF; border: 1px solid #F2E3D5;">
-                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">
+                    <div style="padding: 0.9rem; border-radius: 12px; background: #FFFFFF; border: 1px solid #F2E3D5;">
+                        <div style="font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.2rem;">
                             🌐 Meta API Capacity Health
                         </div>
-                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.98rem; color: #0369A1;">
+                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.95rem; color: #0369A1;">
                             250 DMs/hr Cap Safe
                         </div>
-                        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.15rem;">100% Capacity Available</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.15rem;">100% Capacity Available</div>
                     </div>
 
                 </div>
 
-                <div style="padding: 0.85rem 1.1rem; background: #FFFFFF; border-radius: 12px; border: 1px solid #F2E3D5; font-size: 0.84rem; color: var(--text-primary); line-height: 1.5;">
+                <div style="padding: 0.8rem 1rem; background: #FFFFFF; border-radius: 12px; border: 1px solid #F2E3D5; font-size: 0.82rem; color: var(--text-primary); line-height: 1.5;">
                     <strong>How InstaAuto Automation Protection Works:</strong> Meta short-lived access tokens expire in 1 hour. InstaAuto automatically exchanges them for 60-day long-lived tokens and runs a background cron engine every 6 hours calling <code>refresh_access_token</code>. Your token is seamlessly extended so your comment-to-DM rules run 24/7 without manual re-login!
                 </div>
             </div>
@@ -297,6 +329,30 @@ window.setup = {
 
         content.innerHTML = html;
 
+        // BIND CREATOR TOKEN FAST CONNECT FORM
+        document.getElementById('creator-token-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.innerHTML = '<span class="spinner"></span> Verifying...';
+            btn.disabled = true;
+
+            const payload = {
+                accessToken: document.getElementById('creator_token_input').value,
+                username: document.getElementById('creator_handle_input').value
+            };
+
+            try {
+                const res = await App.apiCall('POST', '/api/setup/connect-token', payload);
+                App.showToast(res.message || '✅ Account connected successfully!', 'success');
+                this.loadStatus();
+            } catch (err) {
+                App.showToast(err.message, 'error');
+                btn.innerHTML = '⚡ Connect & Activate';
+                btn.disabled = false;
+            }
+        });
+
+        // BIND CREDENTIALS FORM
         document.getElementById('setup-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = e.target.querySelector('button[type="submit"]');
