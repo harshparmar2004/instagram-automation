@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "public": true,
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "https://YOUR-RENDER-BACKEND.onrender.com/api/$1" },
+    { "source": "/auth/(.*)", "destination": "https://YOUR-RENDER-BACKEND.onrender.com/auth/$1" },
+    { "source": "/webhook", "destination": "https://YOUR-RENDER-BACKEND.onrender.com/webhook" },
+    { "source": "/r/(.*)", "destination": "https://YOUR-RENDER-BACKEND.onrender.com/r/$1" }
+  ]
+}

@@ -6,6 +6,13 @@ const App = {
         pollingInterval: null
     },
 
+    // Dynamic API Base URL for Vercel (Frontend) -> Render (Backend) cross-deployment
+    getApiUrl(path) {
+        const baseUrl = window.API_BASE_URL || '';
+        if (path.startsWith('http://') || path.startsWith('https://')) return path;
+        return baseUrl ? `${baseUrl.replace(/\/$/, '')}${path}` : path;
+    },
+
     elements: {
         loginScreen: document.getElementById('login-screen'),
         loginForm: document.getElementById('login-form'),
@@ -57,7 +64,7 @@ const App = {
             btn.innerHTML = '<span class="spinner"></span>';
             btn.disabled = true;
 
-            const res = await fetch('/api/status', {
+            const res = await fetch(this.getApiUrl('/api/status'), {
                 headers: { 'Authorization': `Bearer ${password}` }
             });
             
@@ -80,7 +87,7 @@ const App = {
 
     async checkAuth() {
         try {
-            const res = await fetch('/api/status', {
+            const res = await fetch(this.getApiUrl('/api/status'), {
                 headers: { 'Authorization': `Bearer ${this.state.password}` }
             });
             if (res.ok) {
@@ -111,7 +118,6 @@ const App = {
         this.elements.dashboard.classList.remove('hidden');
         this.navigate(this.state.currentView || 'dashboard');
         
-        // Start polling for current view
         if (this.state.pollingInterval) clearInterval(this.state.pollingInterval);
         this.state.pollingInterval = setInterval(() => {
             if (window[this.state.currentView] && typeof window[this.state.currentView].refresh === 'function') {
@@ -124,7 +130,6 @@ const App = {
         this.state.currentView = view;
         window.location.hash = view;
         
-        // Update nav
         this.elements.navItems.forEach(item => {
             if (item.dataset.view === view) {
                 item.classList.add('active');
@@ -133,7 +138,6 @@ const App = {
             }
         });
 
-        // Load view template and script logic
         this.elements.viewContainer.innerHTML = '<div class="text-center" style="margin-top:4rem"><div class="spinner" style="width:40px;height:40px"></div></div>';
         
         setTimeout(() => {
@@ -146,6 +150,7 @@ const App = {
     },
 
     async apiCall(method, url, body = null) {
+        const fullUrl = this.getApiUrl(url);
         const options = {
             method,
             headers: {
@@ -157,7 +162,7 @@ const App = {
             options.body = JSON.stringify(body);
         }
         
-        const res = await fetch(url, options);
+        const res = await fetch(fullUrl, options);
         let data = null;
         try { data = await res.json(); } catch(e) {}
         

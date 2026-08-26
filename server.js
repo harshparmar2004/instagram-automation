@@ -12,6 +12,17 @@ const PORT = process.env.PORT || 3000;
 // Initialize database
 getDb();
 
+// Enable CORS for Vercel / cross-origin deployments
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
 // Routes
 const webhookRoutes = require('./src/routes/webhook');
 const setupRoutes = require('./src/routes/setup');
