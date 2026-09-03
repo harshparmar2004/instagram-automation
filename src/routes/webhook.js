@@ -48,8 +48,15 @@ router.post('/', webhookVerify, async (req, res) => {
 
 router.post('/simulate', auth, async (req, res) => {
     try {
-        const { media_id, comment_text, username } = req.body;
-        const fakeCommentId = 'test_' + Date.now();
+        let bodyData = {};
+        if (Buffer.isBuffer(req.body)) {
+            try { bodyData = JSON.parse(req.body.toString()); } catch(e) {}
+        } else if (typeof req.body === 'object') {
+            bodyData = req.body || {};
+        }
+
+        const { media_id, comment_text, username } = bodyData;
+        const fakeCommentId = 'sim_' + Date.now();
         const payload = {
             object: 'instagram',
             entry: [{
