@@ -1,5 +1,5 @@
 const express = require('express');
-const { getConfig, setConfig } = require('../database');
+const { getDb, getConfig, setConfig } = require('../database');
 const auth = require('../middleware/auth');
 const { subscribeWebhook, getUserProfile } = require('../services/instagram');
 const { seedDemoData } = require('../seedData');

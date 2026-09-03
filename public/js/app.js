@@ -73,8 +73,10 @@ const App = {
                 sessionStorage.setItem('dashboard_password', password);
                 this.showToast('Login successful', 'success');
                 this.showDashboard();
+            } else if (res.status === 401) {
+                this.showToast('Invalid password. Try: changeme', 'error');
             } else {
-                this.showToast('Invalid password', 'error');
+                this.showToast(`Server status: ${res.status}. Retrying...`, 'error');
             }
         } catch (err) {
             this.showToast('Connection error', 'error');
