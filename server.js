@@ -50,7 +50,9 @@ const redirectRoutes = require('./src/routes/redirect');
 
 // Mount routes
 // Webhook needs raw body for HMAC signature verification
+// Mount on both /webhook and /api/webhook for Meta compatibility
 app.use('/webhook', express.raw({ type: 'application/json' }), webhookRoutes);
+app.use('/api/webhook', express.raw({ type: 'application/json' }), webhookRoutes);
 
 // Other routes need JSON parser
 app.use(express.json());
