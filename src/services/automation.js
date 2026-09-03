@@ -58,9 +58,13 @@ function checkDedupUserForMedia(commenterIgId, mediaIgId) {
 }
 
 function matchKeyword(ruleTrigger, textLower) {
-    if (!ruleTrigger) return false;
+    if (!ruleTrigger || ruleTrigger.trim() === '' || ruleTrigger.trim() === '*' || ruleTrigger.trim().toLowerCase() === 'any') {
+        return true; // Matches ANY comment on this Reel!
+    }
     const keywords = ruleTrigger.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+    if (keywords.length === 0) return true;
     for (const kw of keywords) {
+        if (kw === '*' || kw === 'any') return true;
         const escaped = kw.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
         if (textLower.match(new RegExp(`\\b${escaped}\\b`, 'i'))) {
             return true;

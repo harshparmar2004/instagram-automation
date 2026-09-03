@@ -276,7 +276,7 @@ window.workflows = {
                                     <div style="margin-bottom: 0.85rem;">
                                         <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.2rem;">Trigger Keywords:</div>
                                         <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); line-height: 1.4;">
-                                            ${keywords.map(kw => `"${kw}"`).join(' or ')}
+                                            ${rule.trigger_keyword === '*' ? '<span style="color: #D97757; font-weight: 800; background: #FDF8F6; border: 1px solid var(--accent-primary); padding: 3px 8px; border-radius: 6px; font-size: 0.85rem;">⚡ ANY COMMENT (Triggers on all comments)</span>' : keywords.map(kw => `"${kw}"`).join(' or ')}
                                         </div>
                                     </div>
 
