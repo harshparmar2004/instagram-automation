@@ -492,12 +492,18 @@ window['new-automation'] = {
                     <!-- 2. INTERACTIVE KEYWORD INPUT & CHIPS -->
                     <div style="display: flex; flex-direction: column; gap: 1rem; width: 100%;">
                         
-                        <!-- ADD KEYWORD BAR -->
-                        <div style="display: flex; gap: 0.65rem; align-items: center;">
-                            <input type="text" id="input-new-keyword" placeholder="Type keyword (e.g. PLAYBOOK, GUIDE) and press Enter or click + Add..." onkeydown="if(event.key==='Enter'){event.preventDefault(); window['new-automation'].addKeyword();}" style="flex: 1; padding: 0.75rem 1.1rem; font-size: 0.92rem; font-weight: 600; border-radius: 10px; border: 1.5px solid #D1C9BE; background: #FAF8F5; outline: none;">
-                            <button type="button" class="btn btn-primary" onclick="window['new-automation'].addKeyword()" style="padding: 0.75rem 1.4rem; font-size: 0.88rem; font-weight: 800; border-radius: 10px; white-space: nowrap;">
-                                + Add Keyword
-                            </button>
+                        <!-- ADD KEYWORD BAR WITH CLEAR LABEL -->
+                        <div style="display: flex; flex-direction: column; gap: 0.45rem;">
+                            <label for="input-new-keyword" style="font-size: 0.85rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+                                <span>Type Keyword Here:</span>
+                                <span style="font-size: 0.76rem; font-weight: 600; color: var(--text-secondary);">(Type word and press Enter or click + Add Keyword)</span>
+                            </label>
+                            <div style="display: flex; gap: 0.65rem; align-items: center;">
+                                <input type="text" id="input-new-keyword" placeholder="e.g. PLAYBOOK, GUIDE, LINK, PDF..." onkeydown="if(event.key==='Enter'){event.preventDefault(); window['new-automation'].addKeyword();}" style="flex: 1; padding: 0.75rem 1.1rem; font-size: 0.92rem; font-weight: 600; border-radius: 10px; border: 1.5px solid #D1C9BE; background: #FAF8F5; outline: none;">
+                                <button type="button" class="btn btn-primary" onclick="window['new-automation'].addKeyword()" style="padding: 0.75rem 1.4rem; font-size: 0.88rem; font-weight: 800; border-radius: 10px; white-space: nowrap;">
+                                    + Add Keyword
+                                </button>
+                            </div>
                         </div>
 
                         <!-- KEYWORD CHIPS CONTAINER BOX -->
