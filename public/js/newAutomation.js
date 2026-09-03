@@ -428,158 +428,112 @@ window['new-automation'] = {
     renderStep2(container) {
         const isAny = this.keywordMode === 'any';
 
+        let chipsHtml = '';
+        if (this.keywordList && this.keywordList.length > 0) {
+            chipsHtml = this.keywordList.map((kw, idx) => `
+                <div style="display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1.5px solid var(--accent-primary); border-radius: 8px; padding: 6px 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
+                    <span style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.85rem; color: var(--accent-primary);">${kw}</span>
+                    <button type="button" onclick="window['new-automation'].removeKeyword(${idx})" style="background: none; border: none; cursor: pointer; color: #736E68; font-weight: 800; font-size: 1.05rem; line-height: 1; padding: 0 2px;" title="Remove keyword">×</button>
+                </div>
+            `).join('');
+        } else {
+            chipsHtml = `<div style="font-size: 0.85rem; color: var(--text-muted); font-style: italic;">No keywords added yet. Type below and click "+ Add Keyword" (or select "Any Comment" mode).</div>`;
+        }
+
         container.innerHTML = `
             <div style="width: 100%;">
-                <div style="margin-bottom: 1.25rem;">
-                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">Step 2: Define Trigger Keywords</h2>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.15rem;">Followers who comment these words will receive your automated DM response.</p>
+                <div style="margin-bottom: 1.15rem;">
+                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">Step 2: Trigger Keyword Configuration</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.15rem;">Choose whether to trigger on specific keywords or on every single comment on this Reel.</p>
                 </div>
 
-                <div style="display: flex; flex-direction: column; gap: 1.15rem; max-width: 860px;">
-                    
-                    <!-- COMPACT SEGMENTED MODE SWITCH -->
-                    <div style="display: inline-flex; background: #FAF8F5; padding: 4px; border-radius: 10px; border: 1px solid var(--border-color); width: fit-content; gap: 4px;">
-                        <button type="button" onclick="window['new-automation'].setKeywordMode('specific')" style="
-                            padding: 0.45rem 1.1rem;
-                            border-radius: 8px;
-                            font-size: 0.82rem;
-                            font-family: 'Plus Jakarta Sans', sans-serif;
-                            font-weight: ${!isAny ? '800' : '600'};
-                            border: ${!isAny ? '1px solid var(--border-color)' : 'none'};
-                            background: ${!isAny ? '#FFFFFF' : 'transparent'};
-                            color: ${!isAny ? 'var(--text-primary)' : 'var(--text-secondary)'};
-                            box-shadow: ${!isAny ? '0 1px 4px rgba(0,0,0,0.04)' : 'none'};
-                            cursor: pointer;
-                            transition: all 0.15s ease;
-                        ">
-                            🎯 Specific Keywords
-                        </button>
-
-                        <button type="button" onclick="window['new-automation'].setKeywordMode('any')" style="
-                            padding: 0.45rem 1.1rem;
-                            border-radius: 8px;
-                            font-size: 0.82rem;
-                            font-family: 'Plus Jakarta Sans', sans-serif;
-                            font-weight: ${isAny ? '800' : '600'};
-                            border: ${isAny ? '1px solid var(--border-color)' : 'none'};
-                            background: ${isAny ? '#FFFFFF' : 'transparent'};
-                            color: ${isAny ? 'var(--accent-primary)' : 'var(--text-secondary)'};
-                            box-shadow: ${isAny ? '0 1px 4px rgba(0,0,0,0.04)' : 'none'};
-                            cursor: pointer;
-                            transition: all 0.15s ease;
-                        ">
-                            ⚡ Any Comment (All Comments)
-                        </button>
+                <!-- 1. TRIGGER MODE SELECTION (SPECIFIC KEYWORDS vs ANY COMMENT) -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.85rem; margin-bottom: 1.25rem;">
+                    <div onclick="window['new-automation'].setKeywordMode('specific')" style="
+                        padding: 1rem 1.25rem;
+                        border-radius: 12px;
+                        border: ${!isAny ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)'};
+                        background: ${!isAny ? '#FDF8F6' : '#FFFFFF'};
+                        box-shadow: ${!isAny ? '0 2px 10px rgba(217, 119, 87, 0.12)' : 'none'};
+                        cursor: pointer;
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 0.85rem;
+                        transition: all 0.15s ease;
+                    ">
+                        <input type="radio" name="trigger_mode" ${!isAny ? 'checked' : ''} style="accent-color: var(--accent-primary); margin-top: 3px; cursor: pointer;">
+                        <div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.92rem; color: var(--text-primary);">🎯 Specific Keyword(s) Only</div>
+                            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.2rem; line-height: 1.4;">Only followers who comment your chosen keywords (e.g. PLAYBOOK, PDF) receive the automated DM.</div>
+                        </div>
                     </div>
 
-                    ${!isAny ? `
-                        <!-- UNIFIED INTERACTIVE KEYWORD TAG BOX -->
-                        <div style="display: flex; flex-direction: column; gap: 0.45rem;">
-                            <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary); display: flex; justify-content: space-between; align-items: center;">
-                                <span>Trigger Keywords</span>
-                                <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary);">${this.keywordList.length} active keyword(s)</span>
-                            </label>
-
-                            <div style="
-                                background: #FAF8F5;
-                                border: 1.5px solid #D1C9BE;
-                                border-radius: 12px;
-                                padding: 0.45rem 0.65rem;
-                                display: flex;
-                                flex-wrap: wrap;
-                                gap: 0.5rem;
-                                align-items: center;
-                                min-height: 52px;
-                                box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);
-                                cursor: text;
-                            " onclick="document.getElementById('input-new-keyword')?.focus()">
-                                
-                                ${this.keywordList.map((kw, idx) => `
-                                    <span style="
-                                        display: inline-flex;
-                                        align-items: center;
-                                        gap: 6px;
-                                        background: #FFFFFF;
-                                        border: 1.5px solid var(--accent-primary);
-                                        color: var(--accent-primary);
-                                        font-family: 'Plus Jakarta Sans', sans-serif;
-                                        font-weight: 800;
-                                        font-size: 0.82rem;
-                                        padding: 4px 10px;
-                                        border-radius: 8px;
-                                        box-shadow: 0 1px 3px rgba(217, 119, 87, 0.08);
-                                    ">
-                                        <span>${kw}</span>
-                                        <button type="button" onclick="event.stopPropagation(); window['new-automation'].removeKeyword(${idx})" style="background: none; border: none; cursor: pointer; color: #8C827A; font-weight: 800; font-size: 1rem; line-height: 1; padding: 0 2px;" title="Remove">×</button>
-                                    </span>
-                                `).join('')}
-
-                                <input type="text" id="input-new-keyword" placeholder="${this.keywordList.length === 0 ? 'Type keyword and press Enter or Save...' : 'Add another keyword...'}" onkeydown="if(event.key==='Enter'||event.key===','){event.preventDefault(); window['new-automation'].addKeyword();}" style="
-                                    border: none;
-                                    outline: none;
-                                    background: transparent;
-                                    font-size: 0.88rem;
-                                    font-weight: 600;
-                                    color: var(--text-primary);
-                                    flex: 1;
-                                    min-width: 150px;
-                                    padding: 0.35rem 0.4rem;
-                                ">
-
-                                <button type="button" onclick="event.stopPropagation(); window['new-automation'].addKeyword()" class="btn btn-secondary btn-sm" style="
-                                    font-size: 0.78rem;
-                                    font-weight: 700;
-                                    padding: 0.35rem 0.75rem;
-                                    border-radius: 8px;
-                                    background: #FFFFFF;
-                                    border: 1px solid var(--border-color);
-                                    color: var(--text-primary);
-                                    white-space: nowrap;
-                                ">
-                                    + Save Keyword
-                                </button>
-                            </div>
-
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.25rem; flex-wrap: wrap; gap: 0.5rem;">
-                                <div style="font-size: 0.76rem; color: var(--text-secondary);">
-                                    Type a keyword and click <strong>+ Save Keyword</strong> or hit Enter. Matching is case-insensitive.
-                                </div>
-                                
-                                <div style="display: flex; gap: 0.4rem; align-items: center;">
-                                    <span style="font-size: 0.75rem; color: var(--text-muted);">Quick add:</span>
-                                    <a href="javascript:void(0)" onclick="window['new-automation'].addKeyword('PLAYBOOK')" style="font-size: 0.75rem; font-weight: 700; color: var(--accent-primary); text-decoration: none;">+PLAYBOOK</a>
-                                    <span style="color: var(--border-color);">•</span>
-                                    <a href="javascript:void(0)" onclick="window['new-automation'].addKeyword('PDF')" style="font-size: 0.75rem; font-weight: 700; color: var(--accent-primary); text-decoration: none;">+PDF</a>
-                                    <span style="color: var(--border-color);">•</span>
-                                    <a href="javascript:void(0)" onclick="window['new-automation'].addKeyword('GUIDE')" style="font-size: 0.75rem; font-weight: 700; color: var(--accent-primary); text-decoration: none;">+GUIDE</a>
-                                    <span style="color: var(--border-color);">•</span>
-                                    <a href="javascript:void(0)" onclick="window['new-automation'].addKeyword('LINK')" style="font-size: 0.75rem; font-weight: 700; color: var(--accent-primary); text-decoration: none;">+LINK</a>
-                                </div>
-                            </div>
+                    <div onclick="window['new-automation'].setKeywordMode('any')" style="
+                        padding: 1rem 1.25rem;
+                        border-radius: 12px;
+                        border: ${isAny ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)'};
+                        background: ${isAny ? '#FDF8F6' : '#FFFFFF'};
+                        box-shadow: ${isAny ? '0 2px 10px rgba(217, 119, 87, 0.12)' : 'none'};
+                        cursor: pointer;
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 0.85rem;
+                        transition: all 0.15s ease;
+                    ">
+                        <input type="radio" name="trigger_mode" ${isAny ? 'checked' : ''} style="accent-color: var(--accent-primary); margin-top: 3px; cursor: pointer;">
+                        <div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.92rem; color: var(--text-primary);">⚡ Any Comment (Every Comment)</div>
+                            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.2rem; line-height: 1.4;">Triggers the automated DM for EVERY comment posted on this Reel, no matter what they write!</div>
                         </div>
-                    ` : `
-                        <!-- UNIVERSAL ANY COMMENT CALLOUT -->
-                        <div style="
-                            background: #FAF8F5;
-                            border: 1px solid var(--border-color);
-                            border-radius: 12px;
-                            padding: 1.15rem 1.25rem;
-                            display: flex;
-                            gap: 0.85rem;
-                            align-items: center;
-                        ">
-                            <div style="font-size: 1.4rem;">⚡</div>
-                            <div>
-                                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.92rem; color: var(--text-primary);">
-                                    Universal Trigger Active
-                                </div>
-                                <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.15rem; line-height: 1.4;">
-                                    InstaAuto will automatically send the configured DM whenever <strong>anyone</strong> posts a comment on this Reel. No keyword required.
-                                </div>
-                            </div>
-                        </div>
-                    `}
+                    </div>
                 </div>
+
+                ${!isAny ? `
+                    <!-- 2. INTERACTIVE KEYWORD INPUT & CHIPS -->
+                    <div style="display: flex; flex-direction: column; gap: 1rem; width: 100%;">
+                        
+                        <!-- ADD KEYWORD BAR -->
+                        <div style="display: flex; gap: 0.65rem; align-items: center;">
+                            <input type="text" id="input-new-keyword" placeholder="Type keyword (e.g. PLAYBOOK, GUIDE) and press Enter or click + Add..." onkeydown="if(event.key==='Enter'){event.preventDefault(); window['new-automation'].addKeyword();}" style="flex: 1; padding: 0.75rem 1.1rem; font-size: 0.92rem; font-weight: 600; border-radius: 10px; border: 1.5px solid #D1C9BE; background: #FAF8F5; outline: none;">
+                            <button type="button" class="btn btn-primary" onclick="window['new-automation'].addKeyword()" style="padding: 0.75rem 1.4rem; font-size: 0.88rem; font-weight: 800; border-radius: 10px; white-space: nowrap;">
+                                + Add Keyword
+                            </button>
+                        </div>
+
+                        <!-- KEYWORD CHIPS CONTAINER BOX -->
+                        <div>
+                            <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.4rem; display: block;">
+                                Active Trigger Keywords (${this.keywordList.length})
+                            </label>
+                            <div style="min-height: 62px; padding: 0.85rem; background: #FAF8F5; border: 1.5px solid #E6E1D8; border-radius: 12px; display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center;">
+                                ${chipsHtml}
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.35rem;">Each box above is an individual active trigger keyword. Matching is case-insensitive.</div>
+                        </div>
+
+                        <!-- ONE-CLICK PRESET SUGGESTIONS -->
+                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                            <span style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary);">Popular Presets:</span>
+                            <button type="button" onclick="window['new-automation'].addKeyword('PLAYBOOK')" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700; border-radius: 6px; background: #FFFFFF; border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer;">+ PLAYBOOK</button>
+                            <button type="button" onclick="window['new-automation'].addKeyword('PDF')" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700; border-radius: 6px; background: #FFFFFF; border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer;">+ PDF</button>
+                            <button type="button" onclick="window['new-automation'].addKeyword('LINK')" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700; border-radius: 6px; background: #FFFFFF; border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer;">+ LINK</button>
+                            <button type="button" onclick="window['new-automation'].addKeyword('GUIDE')" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700; border-radius: 6px; background: #FFFFFF; border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer;">+ GUIDE</button>
+                            <button type="button" onclick="window['new-automation'].addKeyword('COURSE')" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700; border-radius: 6px; background: #FFFFFF; border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer;">+ COURSE</button>
+                        </div>
+
+                    </div>
+                ` : `
+                    <!-- ANY COMMENT MODE ACTIVE ALERT BANNER -->
+                    <div style="padding: 1.25rem; background: #FDF8F6; border: 1.5px solid var(--accent-primary); border-radius: 12px; display: flex; gap: 0.85rem; align-items: center;">
+                        <div style="font-size: 1.8rem;">⚡</div>
+                        <div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.95rem; color: var(--accent-primary);">Universal Comment Trigger Enabled</div>
+                            <div style="font-size: 0.84rem; color: var(--text-primary); margin-top: 0.2rem; line-height: 1.45;">
+                                InstaAuto will dispatch your automated DM for <strong>ANY comment</strong> left on this Reel. No keyword typing required by your followers!
+                            </div>
+                        </div>
+                    </div>
+                `}
             </div>
         `;
     },
