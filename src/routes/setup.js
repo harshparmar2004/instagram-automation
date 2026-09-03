@@ -10,11 +10,14 @@ const axios = require('axios');
 const router = express.Router();
 
 router.get('/status', auth, (req, res) => {
+    const db = getDb();
     const appId = getConfig('meta_app_id');
     const appSecret = getConfig('meta_app_secret');
     const verifyToken = getConfig('webhook_verify_token');
     const accessToken = getConfig('access_token');
     const tokenExpiresAt = getConfig('token_expires_at');
+    const igUsername = getConfig('ig_username');
+    const igUserId = getConfig('ig_user_id');
     
     let tokenHealth = null;
     if (tokenExpiresAt) {
@@ -22,17 +25,26 @@ router.get('/status', auth, (req, res) => {
         tokenHealth = daysLeft > 10 ? 'healthy' : daysLeft > 0 ? 'expiring' : 'expired';
     }
 
+    const isConnected = !!(accessToken && accessToken.trim());
+    let mediaCount = 0;
+    try {
+        const row = db.prepare('SELECT COUNT(*) as cnt FROM media').get();
+        mediaCount = row?.cnt || 0;
+    } catch(e) {}
+
     res.json({
         configured: !!appId,
-        connected: !!accessToken,
-        username: getConfig('ig_username') || 'creator.studio',
+        connected: isConnected,
+        username: igUsername || (isConnected ? 'connected.creator' : ''),
+        igUserId: igUserId || '',
         profilePic: getConfig('ig_profile_pic') || '',
         webhookSubscribed: getConfig('webhook_subscribed') === '1',
         appId: appId || '',
         hasSecret: !!appSecret,
         verifyToken: verifyToken || '',
-        tokenHealth: tokenHealth || 'healthy',
-        tokenExpiresAt: tokenExpiresAt || new Date(Date.now() + 54 * 24 * 60 * 60 * 1000).toISOString()
+        tokenHealth: isConnected ? (tokenHealth || 'healthy') : 'disconnected',
+        tokenExpiresAt: tokenExpiresAt || '',
+        mediaCount: mediaCount
     });
 });
 
@@ -43,67 +55,83 @@ router.post('/setup', auth, (req, res) => {
     const secret = appSecret || meta_app_secret;
     const token = verifyToken || webhook_verify_token;
 
-    if (id) setConfig('meta_app_id', id);
-    if (secret && secret !== '********') setConfig('meta_app_secret', secret);
-    if (token) setConfig('webhook_verify_token', token);
+    if (id) setConfig('meta_app_id', id.trim());
+    if (secret && secret !== '********') setConfig('meta_app_secret', secret.trim());
+    if (token) setConfig('webhook_verify_token', token.trim());
     
-    res.json({ success: true });
+    res.json({ success: true, message: 'Meta credentials saved successfully' });
 });
 
 /**
  * ⚡ Creator 1-Click Token Connection Endpoint
- * Allows creators to enter their Instagram Access Token + Username directly!
+ * Allows creators to enter their Instagram Access Token directly!
  */
 router.post('/setup/connect-token', auth, async (req, res) => {
     try {
-        const { accessToken, username } = req.body;
-        if (!accessToken) {
+        const { accessToken, username, igUserId } = req.body;
+        if (!accessToken || !accessToken.trim()) {
             return res.status(400).json({ error: 'Access token is required' });
         }
 
         const trimmedToken = accessToken.trim();
-        let igUsername = (username || 'creator.studio').replace('@', '').trim();
-        const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+        let targetUsername = (username || '').replace('@', '').trim();
+        let resolvedIgUserId = (igUserId || '').trim();
+        let profilePic = '';
 
-        setConfig('access_token', trimmedToken);
-        setConfig('token_expires_at', expiresAt);
+        console.log('[Setup] Verifying access token with Meta API...');
 
-        // Attempt to auto-resolve real Instagram profile details
         try {
             const profile = await getUserProfile(trimmedToken);
-            if (profile && profile.id) {
-                setConfig('ig_user_id', profile.id);
+            if (profile?.id) {
+                resolvedIgUserId = profile.id;
             }
-            if (profile && profile.username) {
-                igUsername = profile.username;
+            if (profile?.username) {
+                targetUsername = profile.username;
             }
-            if (profile && profile.profile_picture_url) {
-                setConfig('ig_profile_pic', profile.profile_picture_url);
+            if (profile?.profile_picture_url) {
+                profilePic = profile.profile_picture_url;
             }
         } catch (profileErr) {
-            console.log('[Setup] Optional profile resolution notice:', profileErr.message);
-            if (!getConfig('ig_user_id')) {
-                setConfig('ig_user_id', '17841400000000000');
+            console.warn('[Setup] Profile auto-lookup notice:', profileErr.message);
+            if (!resolvedIgUserId && !targetUsername) {
+                return res.status(400).json({
+                    error: `Meta rejected token: ${profileErr.message}. Ensure token is valid and has 'instagram_basic' permission.`
+                });
             }
         }
 
-        setConfig('ig_username', igUsername);
+        const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+        setConfig('access_token', trimmedToken);
+        setConfig('token_expires_at', expiresAt);
+        if (targetUsername) setConfig('ig_username', targetUsername);
+        if (resolvedIgUserId) setConfig('ig_user_id', resolvedIgUserId);
+        if (profilePic) setConfig('ig_profile_pic', profilePic);
 
-        // Trigger media sync in background
+        // Immediately run media sync
+        let syncCount = 0;
+        let syncErrMessage = null;
         try {
-            await syncMedia();
-        } catch(e) {
-            console.log('[Setup] Optional media sync notice:', e.message);
+            const syncRes = await syncMedia();
+            syncCount = syncRes?.synced || 0;
+        } catch (syncErr) {
+            console.warn('[Setup] Post-connection media sync notice:', syncErr.message);
+            syncErrMessage = syncErr.message;
         }
 
         res.json({
             success: true,
-            username: igUsername,
+            username: targetUsername || 'Instagram Creator',
+            igUserId: resolvedIgUserId,
+            syncedCount: syncCount,
+            syncError: syncErrMessage,
             tokenExpiresAt: expiresAt,
-            message: `✅ Success! @${igUsername} connected with 60-day active token status!`
+            message: syncCount > 0 
+                ? `🎉 Success! @${targetUsername || 'account'} connected and ${syncCount} live Instagram Reels synced!`
+                : `✅ Token connected for @${targetUsername || 'account'}!${syncErrMessage ? ` (Sync notice: ${syncErrMessage})` : ''}`
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('[Setup] Failed to connect token:', err);
+        res.status(500).json({ error: err.response?.data?.error?.message || err.message });
     }
 });
 

@@ -45,27 +45,134 @@ async function refreshToken(token) {
 }
 
 async function getUserProfile(token) {
-    const isFbToken = token && token.startsWith('EAA');
-    const base = isFbToken ? FB_API_BASE : IG_API_BASE;
-    const res = await axios.get(`${base}/me`, {
-        params: {
-            fields: 'id,username,profile_picture_url,name',
-            access_token: token
+    if (!token) throw new Error('No access token provided');
+
+    // Strategy 1: Instagram Basic / User Token (starts with IG...)
+    if (token.startsWith('IG')) {
+        try {
+            const res = await axios.get(`${IG_API_BASE}/me`, {
+                params: {
+                    fields: 'id,username,profile_picture_url,name',
+                    access_token: token
+                }
+            });
+            return res.data;
+        } catch (e) {
+            console.log('[Instagram] IG endpoint lookup notice:', e.response?.data?.error?.message || e.message);
         }
-    });
-    return res.data;
+    }
+
+    // Strategy 2: Meta / Facebook Token (starts with EAA...)
+    // A: Look for connected Facebook Pages that have an Instagram Business Account
+    try {
+        const accountsRes = await axios.get(`${FB_API_BASE}/me/accounts`, {
+            params: {
+                fields: 'id,name,access_token,instagram_business_account{id,username,profile_picture_url,name}',
+                access_token: token
+            }
+        });
+        const pages = accountsRes.data?.data || [];
+        for (const page of pages) {
+            if (page.instagram_business_account && page.instagram_business_account.id) {
+                const ig = page.instagram_business_account;
+                console.log(`[Instagram] Discovered Instagram Business Account @${ig.username} (ID: ${ig.id}) linked to Page "${page.name}"`);
+                return {
+                    id: ig.id,
+                    username: ig.username,
+                    name: ig.name || page.name,
+                    profile_picture_url: ig.profile_picture_url || '',
+                    page_token: page.access_token
+                };
+            }
+        }
+    } catch (e) {
+        console.log('[Instagram] /me/accounts lookup notice:', e.response?.data?.error?.message || e.message);
+    }
+
+    // B: Check /me directly for instagram_business_account
+    try {
+        const meRes = await axios.get(`${FB_API_BASE}/me`, {
+            params: {
+                fields: 'id,name,instagram_business_account{id,username,profile_picture_url,name}',
+                access_token: token
+            }
+        });
+        if (meRes.data?.instagram_business_account?.id) {
+            const ig = meRes.data.instagram_business_account;
+            return {
+                id: ig.id,
+                username: ig.username,
+                name: ig.name || meRes.data.name,
+                profile_picture_url: ig.profile_picture_url || ''
+            };
+        }
+    } catch (e) {
+        console.log('[Instagram] /me instagram_business_account lookup notice:', e.response?.data?.error?.message || e.message);
+    }
+
+    // C: Check /me basic fields (id, name)
+    try {
+        const basicRes = await axios.get(`${FB_API_BASE}/me`, {
+            params: {
+                fields: 'id,name',
+                access_token: token
+            }
+        });
+        if (basicRes.data?.id) {
+            return {
+                id: basicRes.data.id,
+                name: basicRes.data.name,
+                username: basicRes.data.name ? basicRes.data.name.toLowerCase().replace(/\s+/g, '.') : 'creator'
+            };
+        }
+    } catch (e) {
+        console.log('[Instagram] /me basic lookup notice:', e.response?.data?.error?.message || e.message);
+    }
+
+    // Strategy 3: Try graph.instagram.com/me
+    try {
+        const igRes = await axios.get(`${IG_API_BASE}/me`, {
+            params: {
+                fields: 'id,username',
+                access_token: token
+            }
+        });
+        return igRes.data;
+    } catch (e) {
+        const metaError = e.response?.data?.error?.message || e.message;
+        throw new Error(`Meta API error: ${metaError}`);
+    }
 }
 
 async function getMedia(token, after = null, limit = 50) {
     const isFbToken = token && token.startsWith('EAA');
     const base = isFbToken ? FB_API_BASE : IG_API_BASE;
-    const igUserId = getConfig('ig_user_id');
-    const endpoint = isFbToken && igUserId && igUserId !== '17841400000000000'
+    let igUserId = getConfig('ig_user_id');
+
+    // Auto-resolve IG user ID if missing or default placeholder
+    if (isFbToken && (!igUserId || igUserId === '17841400000000000')) {
+        try {
+            const profile = await getUserProfile(token);
+            if (profile?.id) {
+                igUserId = profile.id;
+                setConfig('ig_user_id', profile.id);
+                if (profile.username) setConfig('ig_username', profile.username);
+                if (profile.profile_picture_url) setConfig('ig_profile_pic', profile.profile_picture_url);
+            }
+        } catch(e) {
+            console.log('[Instagram] Could not auto-resolve IG User ID for getMedia:', e.message);
+        }
+    }
+
+    const endpoint = (isFbToken && igUserId && igUserId !== '17841400000000000')
         ? `${base}/${igUserId}/media`
         : `${base}/me/media`;
 
+    const fullFields = 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count';
+    const fallbackFields = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp';
+
     const params = {
-        fields: 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count',
+        fields: fullFields,
         access_token: token,
         limit: limit
     };
@@ -73,8 +180,19 @@ async function getMedia(token, after = null, limit = 50) {
         params.after = after;
     }
 
-    const res = await axios.get(endpoint, { params });
-    return res.data;
+    try {
+        const res = await axios.get(endpoint, { params });
+        return res.data;
+    } catch (err) {
+        // If error was about an unsupported field, retry with core fields
+        if (err.response?.data?.error?.message?.includes('nonexisting field')) {
+            console.log('[Instagram] Retrying getMedia with core fields fallback...');
+            params.fields = fallbackFields;
+            const retryRes = await axios.get(endpoint, { params });
+            return retryRes.data;
+        }
+        throw err;
+    }
 }
 
 async function getSingleMedia(token, mediaId) {

@@ -8,13 +8,18 @@ const router = express.Router();
 router.get('/instagram', (req, res) => {
     const appId = getConfig('meta_app_id');
     if (!appId) {
-        return res.status(400).send('Meta App ID not configured');
+        return res.status(400).send('Meta App ID not configured. Please save your Meta App ID in Settings first.');
     }
 
-    const redirectUri = config.BASE_URL + '/auth/instagram/callback';
-    const scope = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments';
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    const redirectUri = (config.BASE_URL && !config.BASE_URL.includes('localhost'))
+        ? `${config.BASE_URL.replace(/\/$/, '')}/auth/instagram/callback`
+        : `${protocol}://${host}/auth/instagram/callback`;
+
+    const scope = 'instagram_basic,instagram_manage_comments,instagram_manage_messages,pages_show_list,pages_read_engagement';
     
-    const authUrl = `https://api.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
+    const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
     res.redirect(authUrl);
 });
 
