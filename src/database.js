@@ -29,6 +29,7 @@ function getDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       ig_media_id TEXT UNIQUE,
       media_type TEXT,
+      media_product_type TEXT DEFAULT 'FEED',
       caption TEXT,
       thumbnail_url TEXT,
       media_url TEXT,
@@ -36,7 +37,8 @@ function getDb() {
       timestamp TEXT,
       synced_at TEXT,
       views_count INTEGER DEFAULT 0,
-      comments_count INTEGER DEFAULT 0
+      comments_count INTEGER DEFAULT 0,
+      like_count INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS reel_stats_history (
@@ -60,6 +62,8 @@ function getDb() {
       link_url TEXT,
       follow_prompt TEXT,
       public_reply TEXT,
+      delay_seconds INTEGER DEFAULT 0,
+      variations_json TEXT,
       is_active INTEGER DEFAULT 1,
       created_at TEXT,
       updated_at TEXT
@@ -104,6 +108,8 @@ function getDb() {
   try { db.exec(`ALTER TABLE rules ADD COLUMN variations_json TEXT;`); } catch (e) {}
   try { db.exec(`ALTER TABLE media ADD COLUMN views_count INTEGER DEFAULT 0;`); } catch (e) {}
   try { db.exec(`ALTER TABLE media ADD COLUMN comments_count INTEGER DEFAULT 0;`); } catch (e) {}
+  try { db.exec(`ALTER TABLE media ADD COLUMN media_product_type TEXT DEFAULT 'FEED';`); } catch (e) {}
+  try { db.exec(`ALTER TABLE media ADD COLUMN like_count INTEGER DEFAULT 0;`); } catch (e) {}
 
   return db;
 }

@@ -1,7 +1,7 @@
 const express = require('express');
 const { getConfig, setConfig } = require('../database');
 const auth = require('../middleware/auth');
-const { subscribeWebhook } = require('../services/instagram');
+const { subscribeWebhook, getUserProfile } = require('../services/instagram');
 const { seedDemoData } = require('../seedData');
 const { syncMedia } = require('../services/mediaSync');
 const config = require('../config');
@@ -61,13 +61,33 @@ router.post('/setup/connect-token', auth, async (req, res) => {
             return res.status(400).json({ error: 'Access token is required' });
         }
 
-        const igUsername = (username || 'creator.studio').replace('@', '').trim();
+        const trimmedToken = accessToken.trim();
+        let igUsername = (username || 'creator.studio').replace('@', '').trim();
         const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
 
-        setConfig('access_token', accessToken.trim());
-        setConfig('ig_username', igUsername);
+        setConfig('access_token', trimmedToken);
         setConfig('token_expires_at', expiresAt);
-        setConfig('ig_user_id', '17841400000000000');
+
+        // Attempt to auto-resolve real Instagram profile details
+        try {
+            const profile = await getUserProfile(trimmedToken);
+            if (profile && profile.id) {
+                setConfig('ig_user_id', profile.id);
+            }
+            if (profile && profile.username) {
+                igUsername = profile.username;
+            }
+            if (profile && profile.profile_picture_url) {
+                setConfig('ig_profile_pic', profile.profile_picture_url);
+            }
+        } catch (profileErr) {
+            console.log('[Setup] Optional profile resolution notice:', profileErr.message);
+            if (!getConfig('ig_user_id')) {
+                setConfig('ig_user_id', '17841400000000000');
+            }
+        }
+
+        setConfig('ig_username', igUsername);
 
         // Trigger media sync in background
         try {

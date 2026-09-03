@@ -3,6 +3,7 @@ window['new-automation'] = {
     selectedMediaId: 'global',
     mediaList: [],
     searchQuery: '',
+    step1Filter: 'reels',
 
     async render(container) {
         container.innerHTML = `
@@ -207,17 +208,56 @@ window['new-automation'] = {
         this.renderStep1(document.getElementById('new-automation-content'));
     },
 
+    setStep1Filter(filter) {
+        this.step1Filter = filter;
+        this.renderStep1(document.getElementById('new-automation-content'));
+    },
+
+    async refreshMedia() {
+        const btn = document.getElementById('btn-refresh-step1-reels');
+        if (btn) {
+            btn.innerHTML = '<span class="spinner"></span> Syncing from Instagram...';
+            btn.disabled = true;
+        }
+        try {
+            const res = await App.apiCall('POST', '/api/media/sync');
+            this.mediaList = await App.apiCall('GET', '/api/media') || [];
+            const count = res.count !== undefined ? res.count : 'latest';
+            App.showToast(`✅ Synced ${count} items from Instagram!`, 'success');
+            this.renderStep1(document.getElementById('new-automation-content'));
+        } catch (err) {
+            App.showToast(err.message, 'error');
+        } finally {
+            if (btn) {
+                btn.innerHTML = '<span>🔄 Refresh Latest Reels</span>';
+                btn.disabled = false;
+            }
+        }
+    },
+
     renderStep1(container) {
-        const filtered = this.mediaList.filter(m => {
+        let filtered = (this.mediaList || []).filter(m => {
             const cap = (m.caption || '').toLowerCase();
             return !this.searchQuery || cap.includes(this.searchQuery.toLowerCase());
         });
 
+        if (this.step1Filter === 'reels') {
+            filtered = filtered.filter(m => 
+                m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED')
+            );
+        }
+
+        const reelsCount = (this.mediaList || []).filter(m => 
+            m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED')
+        ).length;
+        const totalCount = (this.mediaList || []).length;
+
         let gridHtml = `
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.85rem; width: 100%;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.85rem; width: 100%;">
                 
+                <!-- GLOBAL OPTION -->
                 <div class="reel-card-item" onclick="window['new-automation'].selectReel('global', this)" style="
-                    border-radius: 12px;
+                    border-radius: 14px;
                     border: ${this.selectedMediaId === 'global' ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)'};
                     background: ${this.selectedMediaId === 'global' ? '#FDF8F6' : '#FFFFFF'};
                     box-shadow: ${this.selectedMediaId === 'global' ? '0 4px 14px rgba(217, 119, 87, 0.16)' : '0 1px 4px rgba(0,0,0,0.02)'};
@@ -228,29 +268,31 @@ window['new-automation'] = {
                     flex-direction: column;
                     transition: all 0.15s ease-in-out;
                 ">
-                    ${this.selectedMediaId === 'global' ? `<div style="position:absolute; top:8px; right:8px; width:22px; height:22px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.75rem; z-index:2;">✓</div>` : ''}
+                    ${this.selectedMediaId === 'global' ? `<div style="position:absolute; top:8px; right:8px; width:22px; height:22px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.75rem; z-index:3;">✓</div>` : ''}
                     
-                    <div style="height: 105px; background: linear-gradient(135deg, #FAF8F5 0%, #E6E1D8 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.65rem; text-align: center;">
-                        <div style="font-size: 1.3rem; margin-bottom: 0.1rem;">🌐</div>
-                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.85rem; color: var(--accent-primary);">Global Account Rule</div>
-                        <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.1rem;">Monitors all current & future posts</div>
+                    <div style="height: 120px; background: linear-gradient(135deg, #FAF8F5 0%, #E6E1D8 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.65rem; text-align: center;">
+                        <div style="font-size: 1.5rem; margin-bottom: 0.15rem;">🌐</div>
+                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.88rem; color: var(--accent-primary);">Account-Wide Rule</div>
+                        <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.1rem;">Applies to all current & newly posted Reels</div>
                     </div>
 
-                    <div style="padding: 0.75rem;">
-                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.82rem; color: var(--text-primary);">Account-Wide Automation</div>
-                        <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.15rem;">Triggers on any post across whole account</div>
+                    <div style="padding: 0.75rem; flex: 1;">
+                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.82rem; color: var(--text-primary);">Global Account Rule</div>
+                        <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.15rem; line-height: 1.35;">Triggers on comments across your entire Instagram profile</div>
                     </div>
                 </div>
         `;
 
         filtered.forEach(m => {
             const isSelected = this.selectedMediaId === m.id;
+            const isReel = m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED');
             const thumbUrl = m.thumbnail_url || m.media_url || '';
-            const captionCut = m.caption ? (m.caption.slice(0, 45) + '...') : 'Untitled Post';
+            const captionCut = m.caption ? (m.caption.slice(0, 45) + '...') : 'Instagram Content';
+            const comments = m.comments_count || 0;
 
             gridHtml += `
                 <div class="reel-card-item" onclick="window['new-automation'].selectReel('${m.id}', this)" style="
-                    border-radius: 12px;
+                    border-radius: 14px;
                     border: ${isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)'};
                     background: ${isSelected ? '#FDF8F6' : '#FFFFFF'};
                     box-shadow: ${isSelected ? '0 4px 14px rgba(217, 119, 87, 0.16)' : '0 1px 4px rgba(0,0,0,0.02)'};
@@ -261,21 +303,33 @@ window['new-automation'] = {
                     flex-direction: column;
                     transition: all 0.15s ease-in-out;
                 ">
-                    ${isSelected ? `<div style="position:absolute; top:8px; right:8px; width:22px; height:22px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.75rem; z-index:2;">✓</div>` : ''}
+                    ${isSelected ? `<div style="position:absolute; top:8px; right:8px; width:22px; height:22px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.75rem; z-index:3;">✓</div>` : ''}
 
-                    <div style="height: 105px; width: 100%; background-size: cover; background-position: center; background-image: url('${thumbUrl}'); position: relative;">
-                        <div style="position: absolute; bottom: 6px; left: 6px; font-size: 0.65rem; font-weight: 800; color: #FFFFFF; background: rgba(0,0,0,0.65); padding: 0.15rem 0.45rem; border-radius: 4px;">
-                            ${m.media_type}
+                    <!-- 9:16 VERTICAL COVER FOR REELS -->
+                    <div style="
+                        position: relative;
+                        width: 100%;
+                        padding-top: ${isReel ? '125%' : '85%'};
+                        background-color: #171514;
+                        background-size: cover;
+                        background-position: center;
+                        background-image: url('${thumbUrl}');
+                    ">
+                        <div style="position: absolute; top: 6px; left: 6px; font-size: 0.65rem; font-weight: 800; color: #FFFFFF; background: rgba(0,0,0,0.7); backdrop-filter: blur(6px); padding: 0.2rem 0.5rem; border-radius: 6px; display: flex; align-items: center; gap: 4px;">
+                            ${isReel ? '▶ REEL' : '📸 POST'}
+                        </div>
+
+                        <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 1.25rem 0.5rem 0.4rem 0.5rem; background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%); color: #FFF; font-size: 0.68rem; font-weight: 700;">
+                            💬 ${comments} comments
                         </div>
                     </div>
 
-                    <div style="padding: 0.75rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
-                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.82rem; color: var(--text-primary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                    <div style="padding: 0.65rem 0.75rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--text-primary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                             ${captionCut}
                         </div>
-                        <div style="font-size: 0.72rem; color: var(--text-secondary); display: flex; gap: 0.6rem; margin-top: 0.35rem; font-weight: 600;">
-                            <span>Views: <strong>${(m.views_count || 48500).toLocaleString()}</strong></span>
-                            <span>Comments: <strong>${(m.comments_count || 1420).toLocaleString()}</strong></span>
+                        <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.35rem; font-weight: 600;">
+                            ${new Date(m.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                         </div>
                     </div>
                 </div>
@@ -286,18 +340,35 @@ window['new-automation'] = {
 
         container.innerHTML = `
             <div style="width: 100%;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.75rem; flex-wrap:wrap; gap:0.5rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.85rem; flex-wrap:wrap; gap:0.65rem;">
                     <div>
-                        <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.1rem; font-weight: 800; color: var(--text-primary); margin: 0;">Step 1: Pick a Target Reel or Post</h2>
+                        <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">Step 1: Pick a Target Reel or Post</h2>
                         <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.1rem;">Select which specific Instagram content item this comment-to-DM automation rule will monitor.</p>
                     </div>
 
-                    <div style="min-width: 220px;">
-                        <input type="text" value="${this.searchQuery}" onkeyup="window['new-automation'].filterReels(this.value)" placeholder="Search reels..." style="padding: 0.45rem 0.85rem; font-size: 0.82rem; font-weight: 500; border-radius: 8px; border: 1px solid var(--border-color); background: #FAF8F5; outline: none; width: 100%;">
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                        <!-- INSTANT REFRESH BUTTON -->
+                        <button type="button" id="btn-refresh-step1-reels" class="btn btn-secondary btn-sm" onclick="window['new-automation'].refreshMedia()" style="font-weight: 700; font-size: 0.78rem; background: #FFFFFF; border: 1px solid var(--border-color); padding: 0.45rem 0.85rem;" title="Fetch newly posted Reels from Instagram immediately">
+                            <span>🔄 Refresh Latest Reels</span>
+                        </button>
+
+                        <div style="min-width: 180px;">
+                            <input type="text" value="${this.searchQuery}" onkeyup="window['new-automation'].filterReels(this.value)" placeholder="Search reels..." style="padding: 0.42rem 0.75rem; font-size: 0.8rem; font-weight: 500; border-radius: 8px; border: 1px solid var(--border-color); background: #FAF8F5; outline: none; width: 100%;">
+                        </div>
                     </div>
                 </div>
 
-                <div style="max-height: 280px; overflow-y: auto; border-radius: 12px; border: 1px solid var(--border-color); padding: 0.75rem; background: #FAF8F5;">
+                <!-- SUB TABS FOR STEP 1 -->
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                    <button type="button" onclick="window['new-automation'].setStep1Filter('reels')" style="padding: 0.35rem 0.85rem; font-size: 0.78rem; font-weight: ${this.step1Filter === 'reels' ? '800' : '600'}; border-radius: 8px; background: ${this.step1Filter === 'reels' ? 'var(--accent-primary)' : '#FFFFFF'}; color: ${this.step1Filter === 'reels' ? '#FFFFFF' : 'var(--text-secondary)'}; border: ${this.step1Filter === 'reels' ? 'none' : '1px solid var(--border-color)'}; cursor: pointer;">
+                        🎬 Reels Only (${reelsCount})
+                    </button>
+                    <button type="button" onclick="window['new-automation'].setStep1Filter('all')" style="padding: 0.35rem 0.85rem; font-size: 0.78rem; font-weight: ${this.step1Filter === 'all' ? '800' : '600'}; border-radius: 8px; background: ${this.step1Filter === 'all' ? 'var(--accent-primary)' : '#FFFFFF'}; color: ${this.step1Filter === 'all' ? '#FFFFFF' : 'var(--text-secondary)'}; border: ${this.step1Filter === 'all' ? 'none' : '1px solid var(--border-color)'}; cursor: pointer;">
+                        📁 All Content (${totalCount})
+                    </button>
+                </div>
+
+                <div style="max-height: 380px; overflow-y: auto; border-radius: 12px; border: 1px solid var(--border-color); padding: 0.85rem; background: #FAF8F5;">
                     ${gridHtml}
                 </div>
             </div>

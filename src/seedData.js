@@ -63,18 +63,20 @@ function seedDemoData() {
     ];
 
     const insertMedia = db.prepare(`
-        INSERT INTO media (ig_media_id, media_type, caption, thumbnail_url, media_url, permalink, timestamp, synced_at, views_count, comments_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO media (ig_media_id, media_type, media_product_type, caption, thumbnail_url, media_url, permalink, timestamp, synced_at, views_count, comments_count)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(ig_media_id) DO UPDATE SET 
             caption=excluded.caption, 
             thumbnail_url=excluded.thumbnail_url,
+            media_product_type=excluded.media_product_type,
             views_count=excluded.views_count,
             comments_count=excluded.comments_count
     `);
 
     const mediaIds = {};
     for (const m of mediaItems) {
-        insertMedia.run(m.ig_media_id, m.media_type, m.caption, m.thumbnail_url, m.media_url, m.permalink, m.timestamp, new Date().toISOString(), m.views_count, m.comments_count);
+        const productType = m.media_type === 'REEL' ? 'REELS' : 'FEED';
+        insertMedia.run(m.ig_media_id, m.media_type, productType, m.caption, m.thumbnail_url, m.media_url, m.permalink, m.timestamp, new Date().toISOString(), m.views_count, m.comments_count);
         const row = db.prepare('SELECT id FROM media WHERE ig_media_id = ?').get(m.ig_media_id);
         mediaIds[m.ig_media_id] = row.id;
     }

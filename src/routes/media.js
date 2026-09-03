@@ -8,12 +8,24 @@ const router = express.Router();
 router.get('/media', auth, (req, res) => {
     try {
         const db = getDb();
-        const media = db.prepare(`
+        const type = req.query.type; // 'reels', 'feed', or all
+
+        let query = `
             SELECT m.*, 
                    (SELECT COUNT(*) FROM rules r WHERE r.media_id = m.id AND r.is_active = 1) as rulesCount
             FROM media m
-            ORDER BY m.timestamp DESC
-        `).all();
+        `;
+        const params = [];
+
+        if (type === 'reels') {
+            query += ` WHERE m.media_product_type = 'REELS' OR m.media_type = 'REEL' OR (m.media_type = 'VIDEO' AND m.media_product_type != 'FEED') `;
+        } else if (type === 'feed') {
+            query += ` WHERE m.media_product_type != 'REELS' AND m.media_type != 'REEL' `;
+        }
+
+        query += ` ORDER BY m.timestamp DESC `;
+
+        const media = db.prepare(query).all(...params);
         res.json(media);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -88,10 +100,10 @@ router.get('/media/automated', auth, (req, res) => {
 
 router.post('/media/sync', auth, async (req, res) => {
     try {
-        await syncMedia();
-        res.json({ success: true });
+        const result = await syncMedia();
+        res.json({ success: true, count: result?.synced || 0, pages: result?.pages || 1 });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: err.response?.data?.error?.message || err.message });
     }
 });
 

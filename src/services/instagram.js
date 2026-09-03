@@ -45,7 +45,9 @@ async function refreshToken(token) {
 }
 
 async function getUserProfile(token) {
-    const res = await axios.get(`${IG_API_BASE}/me`, {
+    const isFbToken = token && token.startsWith('EAA');
+    const base = isFbToken ? FB_API_BASE : IG_API_BASE;
+    const res = await axios.get(`${base}/me`, {
         params: {
             fields: 'id,username,profile_picture_url,name',
             access_token: token
@@ -54,19 +56,43 @@ async function getUserProfile(token) {
     return res.data;
 }
 
-async function getMedia(token, limit = 50) {
-    const res = await axios.get(`${IG_API_BASE}/me/media`, {
+async function getMedia(token, after = null, limit = 50) {
+    const isFbToken = token && token.startsWith('EAA');
+    const base = isFbToken ? FB_API_BASE : IG_API_BASE;
+    const igUserId = getConfig('ig_user_id');
+    const endpoint = isFbToken && igUserId && igUserId !== '17841400000000000'
+        ? `${base}/${igUserId}/media`
+        : `${base}/me/media`;
+
+    const params = {
+        fields: 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count',
+        access_token: token,
+        limit: limit
+    };
+    if (after) {
+        params.after = after;
+    }
+
+    const res = await axios.get(endpoint, { params });
+    return res.data;
+}
+
+async function getSingleMedia(token, mediaId) {
+    const isFbToken = token && token.startsWith('EAA');
+    const base = isFbToken ? FB_API_BASE : IG_API_BASE;
+    const res = await axios.get(`${base}/${mediaId}`, {
         params: {
-            fields: 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp',
-            access_token: token,
-            limit: limit
+            fields: 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count',
+            access_token: token
         }
     });
     return res.data;
 }
 
 async function sendPrivateReply(token, commentId, messageText) {
-    const res = await axios.post(`${IG_API_BASE}/${commentId}/replies`, {
+    const isFbToken = token && token.startsWith('EAA');
+    const base = isFbToken ? FB_API_BASE : IG_API_BASE;
+    const res = await axios.post(`${base}/${commentId}/replies`, {
         message: messageText
     }, {
         headers: {
@@ -78,7 +104,14 @@ async function sendPrivateReply(token, commentId, messageText) {
 }
 
 async function sendDirectMessage(token, recipientId, messageText) {
-    const res = await axios.post(`${IG_API_BASE}/me/messages`, {
+    const isFbToken = token && token.startsWith('EAA');
+    const base = isFbToken ? FB_API_BASE : IG_API_BASE;
+    const igUserId = getConfig('ig_user_id');
+    const endpoint = isFbToken && igUserId && igUserId !== '17841400000000000'
+        ? `${base}/${igUserId}/messages`
+        : `${base}/me/messages`;
+
+    const res = await axios.post(endpoint, {
         recipient: { id: recipientId },
         message: { text: messageText }
     }, {
@@ -112,6 +145,7 @@ module.exports = {
     refreshToken,
     getUserProfile,
     getMedia,
+    getSingleMedia,
     sendPrivateReply,
     sendDirectMessage,
     subscribeWebhook

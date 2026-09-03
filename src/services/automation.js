@@ -1,7 +1,51 @@
-const { getDb } = require('../database');
+const { getDb, getConfig } = require('../database');
+const { getSingleMedia } = require('./instagram');
 const { enqueue } = require('./queue');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
+
+async function ensureMediaExists(mediaIgId) {
+    if (!mediaIgId) return null;
+    const db = getDb();
+    const existing = db.prepare("SELECT id FROM media WHERE ig_media_id = ?").get(mediaIgId);
+    if (existing) return existing.id;
+
+    const token = getConfig('access_token');
+    if (!token) return null;
+
+    try {
+        const item = await getSingleMedia(token, mediaIgId);
+        if (item && item.id) {
+            const productType = item.media_product_type || (item.media_type === 'VIDEO' ? 'REELS' : 'FEED');
+            const res = db.prepare(`
+                INSERT INTO media (
+                    ig_media_id, media_type, media_product_type, caption, 
+                    thumbnail_url, media_url, permalink, timestamp, 
+                    comments_count, like_count, synced_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(ig_media_id) DO NOTHING
+            `).run(
+                item.id,
+                item.media_type || '',
+                productType,
+                item.caption || '',
+                item.thumbnail_url || item.media_url || '',
+                item.media_url || item.thumbnail_url || '',
+                item.permalink || '',
+                item.timestamp || '',
+                item.comments_count || 0,
+                item.like_count || 0,
+                new Date().toISOString()
+            );
+            console.log(`[Automation] Auto-synced new media item ${mediaIgId} on comment event`);
+            return res.lastInsertRowid;
+        }
+    } catch(err) {
+        console.log(`[Automation] Notice: Could not auto-fetch media ${mediaIgId}:`, err.message);
+    }
+    return null;
+}
 
 function checkDedupComment(commentId) {
     const row = getDb().prepare("SELECT id FROM events WHERE comment_id = ?").get(commentId);
@@ -104,6 +148,11 @@ async function processCommentEvent(payload) {
                         console.log(`[Automation] Skipping old comment: ${commentId}`);
                         continue;
                     }
+                }
+
+                // Auto-fetch media record if freshly posted and not yet in local DB
+                if (mediaId) {
+                    await ensureMediaExists(mediaId);
                 }
 
                 const rule = findMatchingRule(mediaId, text);
