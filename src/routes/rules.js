@@ -1,6 +1,10 @@
 const express = require('express');
-const { getDb } = require('../database');
+const { getDb, getConfig } = require('../database');
 const auth = require('../middleware/auth');
+const { getMediaComments } = require('../services/instagram');
+const { enqueue } = require('../services/queue');
+const { v4: uuidv4 } = require('uuid');
+const config = require('../config');
 
 const router = express.Router();
 
@@ -208,6 +212,116 @@ router.delete('/rules/:id', auth, (req, res) => {
         db.prepare('DELETE FROM rules WHERE id = ?').run(id);
         res.json({ success: true });
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/rules/:id/backfill', auth, async (req, res) => {
+    try {
+        const db = getDb();
+        const rule = db.prepare(`
+            SELECT r.*, 
+                   COALESCE(m.ig_media_id, (SELECT ig_media_id FROM media WHERE id = r.media_id OR ig_media_id = r.media_id LIMIT 1)) as ig_media_id
+            FROM rules r 
+            LEFT JOIN media m ON (r.media_id = m.id OR r.media_id = m.ig_media_id)
+            WHERE r.id = ?
+        `).get(req.params.id);
+
+        if (!rule) {
+            return res.status(404).json({ error: 'Automation rule not found' });
+        }
+
+        const token = getConfig('access_token');
+        if (!token) {
+            return res.status(400).json({ error: 'Instagram access token is not connected in Settings' });
+        }
+
+        const targetMediaId = rule.ig_media_id;
+        if (!targetMediaId) {
+            return res.status(400).json({ error: 'This rule is not linked to a specific Reel ID' });
+        }
+
+        console.log(`[Backfill] Fetching existing comments for Reel ${targetMediaId}...`);
+        const comments = await getMediaComments(token, targetMediaId, 100);
+        console.log(`[Backfill] Found ${comments.length} existing comments on Instagram`);
+
+        let matchedCount = 0;
+        let queuedCount = 0;
+
+        // Process from oldest to newest (first user to last user)
+        const sortedComments = [...comments].reverse();
+
+        for (let i = 0; i < sortedComments.length; i++) {
+            const comment = sortedComments[i];
+            const commentId = comment.id;
+            const text = (comment.text || '').trim();
+            const from = comment.from;
+
+            if (!from) continue;
+
+            // Skip if already processed in events
+            const alreadyProcessed = db.prepare("SELECT id FROM events WHERE comment_id = ?").get(commentId);
+            if (alreadyProcessed) continue;
+
+            // Check keyword match
+            const textClean = text.toLowerCase();
+            const keywords = (rule.trigger_keyword || '').split(',').map(k => k.replace(/['"]/g, '').trim().toLowerCase()).filter(Boolean);
+            const isMatch = keywords.length === 0 || keywords.some(kw => kw === '*' || kw === 'any' || textClean.includes(kw));
+
+            if (isMatch) {
+                matchedCount++;
+
+                // Space out by 1.5 seconds per message so Meta anti-spam won't throttle
+                const delayMs = queuedCount * 1500;
+                const processAt = Date.now() + delayMs;
+
+                let messageToSend = rule.response_text || 'Here is your resource link!';
+                let trackingId = null;
+
+                if (rule.action_type === 'link_dm') {
+                    trackingId = uuidv4();
+                    messageToSend = `${messageToSend}\n${config.BASE_URL}/r/${trackingId}`;
+                } else if (rule.action_type === 'follow_first') {
+                    messageToSend = rule.follow_prompt || `Hey @${from.username || 'friend'}! Please follow us first, then reply "DONE" to unlock your link!`;
+                }
+
+                const eventRes = db.prepare(`
+                    INSERT INTO events (rule_id, comment_id, comment_text, commenter_ig_id, commenter_username, media_ig_id, tracking_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                `).run(rule.id, commentId, text, from.id, from.username || 'user', targetMediaId, trackingId, new Date().toISOString());
+
+                const eventId = eventRes.lastInsertRowid;
+
+                if (rule.action_type === 'follow_first') {
+                    db.prepare(`
+                        INSERT INTO conversations (commenter_ig_id, rule_id, event_id, state, created_at)
+                        VALUES (?, ?, ?, 'awaiting_reply', ?)
+                    `).run(from.id, rule.id, eventId, new Date().toISOString());
+                }
+
+                enqueue({
+                    type: 'private_reply',
+                    commentId: commentId,
+                    commenterId: from.id,
+                    messageText: messageToSend,
+                    publicReply: rule.public_reply || null,
+                    eventId: eventId,
+                    processAt
+                });
+
+                queuedCount++;
+            }
+        }
+
+        res.json({
+            success: true,
+            totalComments: comments.length,
+            matched: matchedCount,
+            queued: queuedCount,
+            message: `Found ${comments.length} existing comments. Successfully queued DMs for ${queuedCount} commenters (paced safely over ${(queuedCount * 1.5).toFixed(0)} seconds)!`
+        });
+    } catch (err) {
+        console.error('[Backfill] Error processing past comments:', err);
         res.status(500).json({ error: err.message });
     }
 });

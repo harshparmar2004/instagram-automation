@@ -216,7 +216,10 @@ window.workflows = {
                                 </span>
                             </div>
 
-                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                                <button class="btn btn-secondary btn-sm" style="font-size:0.8rem; font-weight:700; padding:0.35rem 0.85rem; color: #2E7D32; background: #F4FBF7; border-color: #A3D9B1;" onclick="workflows.backfillPastComments(${rule.id})" title="Auto-DM followers who commented before this automation was created">
+                                    ⚡ Catch-Up Past Comments
+                                </button>
                                 <button class="btn btn-secondary btn-sm" style="font-size:0.8rem; font-weight:700; padding:0.35rem 0.85rem; color: #0369A1; background: #F0F9FF; border-color: #BAE6FD;" onclick="workflows.testRuleTrigger(${rule.id}, '${item.ig_media_id || ''}', '${rule.trigger_keyword || ''}')">
                                     🧪 Test Trigger
                                 </button>
@@ -422,6 +425,22 @@ window.workflows = {
             }, 1500);
         } catch(err) {
             App.showToast('Test failed: ' + err.message, 'error');
+        }
+    },
+
+    async backfillPastComments(ruleId) {
+        if (!confirm('Scan all existing comments on this Reel and send automated DMs to anyone who commented before this rule was set up?')) return;
+        App.showToast('Scanning past comments on Instagram...', 'info');
+        try {
+            const res = await App.apiCall('POST', `/api/rules/${ruleId}/backfill`);
+            App.showToast(res.message || 'Past comments queued successfully!', 'success');
+            setTimeout(() => {
+                this.refresh();
+                if (window.activity && window.activity.refresh) window.activity.refresh();
+                if (window.dashboard && window.dashboard.refresh) window.dashboard.refresh();
+            }, 1500);
+        } catch(err) {
+            App.showToast('Catch-up failed: ' + err.message, 'error');
         }
     }
 };

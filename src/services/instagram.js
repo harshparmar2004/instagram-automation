@@ -346,6 +346,24 @@ async function subscribeWebhook(appId, appSecret, callbackUrl, verifyToken) {
     return appSub || { success: true };
 }
 
+async function getMediaComments(token, mediaId, limit = 100) {
+    const isFbToken = token && token.startsWith('EAA');
+    const base = isFbToken ? FB_API_BASE : IG_API_BASE;
+    try {
+        const res = await axios.get(`${base}/${mediaId}/comments`, {
+            params: {
+                fields: 'id,text,from,timestamp',
+                limit: limit,
+                access_token: token
+            }
+        });
+        return res.data?.data || [];
+    } catch (err) {
+        console.warn(`[Instagram] Failed to fetch comments for media ${mediaId}:`, err.response?.data?.error?.message || err.message);
+        return [];
+    }
+}
+
 module.exports = {
     exchangeCodeForToken,
     exchangeLongLivedToken,
@@ -353,6 +371,7 @@ module.exports = {
     getUserProfile,
     getMedia,
     getSingleMedia,
+    getMediaComments,
     sendPrivateReply,
     replyToComment,
     sendDirectMessage,
