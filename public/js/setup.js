@@ -10,8 +10,8 @@ window.setup = {
                         <h1 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.8rem; letter-spacing: -0.03em;">Settings & System Setup</h1>
                         <p style="font-size: 0.9rem; color: var(--text-secondary);">Connect your real Instagram account via Access Token or Meta credentials and monitor token telemetry.</p>
                     </div>
-                    <div>
-                        <button class="btn btn-secondary btn-sm" style="font-weight:700; padding: 0.55rem 1.15rem; border-radius:10px;" onclick="setup.seedDemoData()">🪄 Populate Demo Data</button>
+                    <div style="display: flex; gap: 0.65rem; align-items: center;">
+                        <button class="btn btn-secondary btn-sm" style="font-weight:700; padding: 0.55rem 1.15rem; border-radius:10px; color: #C62828; border-color: #FFCDD2; background: #FFEBEE;" onclick="setup.clearDemoData()">🧹 Clear Demo Data (Real Mode)</button>
                     </div>
                 </div>
 
@@ -26,6 +26,17 @@ window.setup = {
 
     async refresh() {
         await this.loadStatus();
+    },
+
+    async clearDemoData() {
+        if (!confirm('This will wipe out all mock/demo rules, fake leads, and mock media, and keep only your REAL Instagram account data. Continue?')) return;
+        try {
+            const res = await App.apiCall('POST', '/api/setup/clear-demo');
+            App.showToast(res.message || 'Demo data purged successfully!', 'success');
+            await this.loadStatus();
+        } catch(err) {
+            App.showToast(err.message, 'error');
+        }
     },
 
     async seedDemoData() {

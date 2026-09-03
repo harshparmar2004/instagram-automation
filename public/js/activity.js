@@ -89,22 +89,15 @@ window.activity = {
             'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
         ];
 
-        // DEMO DATA ENRICHMENT IF NEEDED
-        const eventsList = (this.rawEvents && this.rawEvents.length > 0) ? this.rawEvents : [
-            { id: 1, username: 'sarah_creator', comment_text: 'PLAYBOOK, PDF, AI', trigger_word: 'PLAYBOOK, PDF, AI', action_taken: 'Sent Link', action_type: 'link_dm', link_clicked: true, status: 'delivered', created_at: new Date(Date.now() - 10*60*1000).toISOString() },
-            { id: 2, username: 'dev_alex', comment_text: 'TOOLS, WEBSITE', trigger_word: 'TOOLS, WEBSITE', action_taken: 'Sent Link', action_type: 'link_dm', link_clicked: false, status: 'sent', created_at: new Date(Date.now() - 25*60*1000).toISOString() },
-            { id: 3, username: 'tech_founder', comment_text: 'PLAYBOOK, PDF, AI', trigger_word: 'PLAYBOOK, PDF, AI', action_taken: 'Sent Link', action_type: 'link_dm', link_clicked: true, status: 'delivered', created_at: new Date(Date.now() - 60*60*1000).toISOString() },
-            { id: 4, username: 'marketing_pro', comment_text: 'GUIDE, SCALING', trigger_word: 'GUIDE, SCALING', action_taken: 'Asked to Follow', action_type: 'follow_first', link_clicked: false, status: 'sent', created_at: new Date(Date.now() - 120*60*1000).toISOString() },
-            { id: 5, username: 'growth_hacker', comment_text: 'PLAYBOOK, PDF, AI', trigger_word: 'PLAYBOOK, PDF, AI', action_taken: 'Sent Link', action_type: 'link_dm', link_clicked: true, status: 'delivered', created_at: new Date(Date.now() - 240*60*1000).toISOString() },
-            { id: 6, username: 'design_master', comment_text: 'TOOLS, WEBSITE', trigger_word: 'TOOLS, WEBSITE', action_taken: 'Sent Text DM', action_type: 'direct_dm', link_clicked: false, status: 'failed', created_at: new Date(Date.now() - 24*60*60*1000).toISOString() }
-        ];
+        // REAL EVENTS FROM DATABASE
+        const eventsList = this.rawEvents || [];
 
-        // STAT STRIP TOTALS
-        const totalCount = 1450;
-        const deliveredCount = 1280;
-        const sentCount = 140;
-        const clickedCount = 890;
-        const failedCount = 30;
+        // REAL STAT STRIP TOTALS
+        const totalCount = eventsList.length;
+        const deliveredCount = eventsList.filter(ev => ev.status === 'delivered').length;
+        const sentCount = eventsList.filter(ev => ev.status === 'sent' || ev.status === 'pending').length;
+        const clickedCount = eventsList.filter(ev => ev.link_clicked).length;
+        const failedCount = eventsList.filter(ev => ev.status === 'failed').length;
 
         // FILTERING
         let filtered = eventsList.filter(ev => {
@@ -204,9 +197,9 @@ window.activity = {
                     <div style="flex: 1; min-width: 160px;">
                         <select onchange="activity.setFilter('triggerFilter', this.value)" style="width: 100%; padding: 0.55rem 0.95rem; font-size: 0.85rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FFFFFF; outline: none;">
                             <option value="all" ${this.triggerFilter==='all'?'selected':''}>All Keywords</option>
-                            <option value="PLAYBOOK, PDF, AI" ${this.triggerFilter==='PLAYBOOK, PDF, AI'?'selected':''}>PLAYBOOK, PDF, AI</option>
-                            <option value="TOOLS, WEBSITE" ${this.triggerFilter==='TOOLS, WEBSITE'?'selected':''}>TOOLS, WEBSITE</option>
-                            <option value="GUIDE, SCALING" ${this.triggerFilter==='GUIDE, SCALING'?'selected':''}>GUIDE, SCALING</option>
+                            ${Array.from(new Set(eventsList.map(e => e.trigger_word).filter(Boolean))).map(kw => `
+                                <option value="${kw}" ${this.triggerFilter===kw?'selected':''}>${kw}</option>
+                            `).join('')}
                         </select>
                     </div>
 

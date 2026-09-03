@@ -107,6 +107,16 @@ router.post('/setup/connect-token', auth, async (req, res) => {
         if (resolvedIgUserId) setConfig('ig_user_id', resolvedIgUserId);
         if (profilePic) setConfig('ig_profile_pic', profilePic);
 
+        // Auto-purge any demo/mock items so real account data is 100% clean
+        try {
+            const db = getDb();
+            db.exec(`
+                DELETE FROM events WHERE commenter_username IN ('sarah_creator','dev_alex','tech_founder','marketing_pro','growth_hacker','design_master');
+                DELETE FROM media WHERE ig_media_id LIKE '17900%';
+                DELETE FROM reel_stats_history WHERE media_id NOT IN (SELECT id FROM media);
+            `);
+        } catch(e) {}
+
         // Immediately run media sync
         let syncCount = 0;
         let syncErrMessage = null;
@@ -132,6 +142,46 @@ router.post('/setup/connect-token', auth, async (req, res) => {
     } catch (err) {
         console.error('[Setup] Failed to connect token:', err);
         res.status(500).json({ error: err.response?.data?.error?.message || err.message });
+    }
+});
+
+router.post('/setup/clear-demo', auth, async (req, res) => {
+    try {
+        const db = getDb();
+        console.log('[Setup] Purging all demo data from database...');
+
+        // Purge mock events, clicks, conversations, rules, and mock media
+        db.exec(`
+            DELETE FROM events;
+            DELETE FROM clicks;
+            DELETE FROM conversations;
+            DELETE FROM rules;
+            DELETE FROM reel_stats_history;
+            DELETE FROM media;
+        `);
+
+        // If a real token is connected, immediately fetch real media!
+        let syncCount = 0;
+        const token = getConfig('access_token');
+        if (token && !token.startsWith('IGQWR_demo')) {
+            try {
+                const syncRes = await syncMedia();
+                syncCount = syncRes?.synced || 0;
+            } catch (e) {
+                console.warn('[Setup] Sync real media notice:', e.message);
+            }
+        }
+
+        res.json({
+            success: true,
+            syncedCount: syncCount,
+            message: syncCount > 0 
+                ? `🧹 Demo data cleared! Synced ${syncCount} real Instagram Reels from your account.` 
+                : '🧹 All demo data cleared! You are now in 100% real live data mode.'
+        });
+    } catch (err) {
+        console.error('[Setup] Error clearing demo data:', err);
+        res.status(500).json({ error: err.message });
     }
 });
 

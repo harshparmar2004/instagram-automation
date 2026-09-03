@@ -75,68 +75,17 @@ window.analytics = {
         if (!content) return;
 
         const s = this.rawStats || {};
-        const totalTriggers = s.total || 3200;
-        const todayDispatches = s.today || 142;
-        const dmsDelivered = s.dms_delivered || 24890;
-        const totalClicks = s.clicks || 14320;
+        const totalTriggers = s.total !== undefined ? s.total : 0;
+        const todayDispatches = s.today !== undefined ? s.today : 0;
+        const dmsDelivered = s.dms_delivered !== undefined ? s.dms_delivered : 0;
+        const totalClicks = s.clicks !== undefined ? s.clicks : 0;
 
         // ACCURATE SCOPED CTR (CAPPED AT 100%)
-        const rawCtr = dmsDelivered > 0 ? (totalClicks / dmsDelivered) * 100 : 57;
+        const rawCtr = dmsDelivered > 0 ? (totalClicks / dmsDelivered) * 100 : 0;
         const aggregateCtr = Math.min(100, Math.round(rawCtr));
 
-        // MOCK / REAL POSTS DATA
-        const postsList = (s.top_posts && s.top_posts.length > 0) ? s.top_posts : [
-            {
-                id: '17992019201',
-                caption: 'Free 2026 AI Growth Playbook PDF 📚 Comment PLAYBOOK',
-                thumbnail_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80',
-                media_type: 'REEL',
-                status: 'active',
-                total_triggers: 1450,
-                clicks: 980,
-                is_trending: true
-            },
-            {
-                id: '17992019202',
-                caption: 'How I scaled to 100k followers in 6 months 🚀 Comment LINK',
-                thumbnail_url: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=400&auto=format&fit=crop&q=80',
-                media_type: 'REEL',
-                status: 'active',
-                total_triggers: 920,
-                clicks: 580,
-                is_trending: true
-            },
-            {
-                id: '17992019203',
-                caption: 'Top 10 Coding & Design Tools Every Creator Needs 💻 Comment TOOLS',
-                thumbnail_url: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=400&auto=format&fit=crop&q=80',
-                media_type: 'IMAGE',
-                status: 'active',
-                total_triggers: 480,
-                clicks: 290,
-                is_trending: false
-            },
-            {
-                id: '17992019204',
-                caption: 'Exclusive Creator Masterclass Signup 🎓 Comment VIP',
-                thumbnail_url: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=400&auto=format&fit=crop&q=80',
-                media_type: 'REEL',
-                status: 'paused',
-                total_triggers: 310,
-                clicks: 185,
-                is_trending: false
-            },
-            {
-                id: '17992019205',
-                caption: 'Monetize Audience With Comment-to-DM Automation 💸 Comment AUTO',
-                thumbnail_url: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&auto=format&fit=crop&q=80',
-                media_type: 'REEL',
-                status: 'active',
-                total_triggers: 1120,
-                clicks: 790,
-                is_trending: true
-            }
-        ];
+        // REAL TOP POSTS FROM DATABASE
+        const postsList = (s.top_posts && s.top_posts.length > 0) ? s.top_posts : [];
 
         // FILTERING LOGIC
         let filtered = postsList.filter(p => {
@@ -298,10 +247,10 @@ window.analytics = {
             filtered.forEach((post, idx) => {
                 const rank = idx + 1;
                 const isTop1 = rank === 1;
-                const triggers = post.total_triggers || 1150;
-                const clicks = post.clicks || Math.round(triggers * 0.65);
-                const postCtr = triggers > 0 ? Math.min(100, Math.round((clicks / triggers) * 100)) : 65;
-                const proportion = Math.round((triggers / maxTriggers) * 100);
+                const triggers = post.total_triggers || 0;
+                const clicks = post.clicks || 0;
+                const postCtr = triggers > 0 ? Math.min(100, Math.round((clicks / triggers) * 100)) : 0;
+                const proportion = maxTriggers > 0 ? Math.round((triggers / maxTriggers) * 100) : 0;
                 const thumbUrl = post.thumbnail_url || post.media_url || '';
 
                 html += `
