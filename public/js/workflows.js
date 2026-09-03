@@ -187,8 +187,9 @@ window.workflows = {
             const thumbUrl = item.thumbnail_url || item.media_url || '';
             this.storedData[item.id] = item;
 
-            const views = item.views_count || 48500;
-            const comments = item.comments_count || 1420;
+            const views = item.views_count !== undefined && item.views_count !== null ? item.views_count : 0;
+            const comments = item.comments_count !== undefined && item.comments_count !== null ? item.comments_count : 0;
+            const likes = item.like_count !== undefined && item.like_count !== null ? item.like_count : 0;
 
             item.rules.forEach(rule => {
                 let actionText = 'Send Resource Link in DM';
@@ -196,8 +197,8 @@ window.workflows = {
                 if (rule.action_type === 'follow_first') { actionText = 'Ask to Follow First Gate'; }
 
                 const keywords = (rule.trigger_keyword || '').split(',').map(k => k.trim());
-                const dmsSent = rule.total_triggers || 1150;
-                const clicks = rule.total_clicks || 680;
+                const dmsSent = rule.total_triggers !== undefined && rule.total_triggers !== null ? rule.total_triggers : 0;
+                const clicks = rule.total_clicks !== undefined && rule.total_clicks !== null ? rule.total_clicks : 0;
                 const ctr = dmsSent > 0 ? Math.round((clicks / dmsSent) * 100) : 0;
                 const isActive = rule.is_active !== 0;
 
@@ -330,26 +331,24 @@ window.workflows = {
 
                         </div>
 
-                        <!-- SUMMARY FOOTER (CLEAN METRICS LINE) -->
+                        <!-- SUMMARY FOOTER (100% REAL LIVE METRICS) -->
                         <div style="background: #FFFFFF; border-top: 1px solid var(--border-color); padding: 0.85rem 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; width: 100%;">
                             
                             <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; font-size: 0.85rem; color: var(--text-primary);">
-                                <span><span style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem;">Views:</span> <strong>${views.toLocaleString()}</strong></span>
+                                <span><span style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem;">Likes:</span> <strong id="likes-${rule.id}">${likes.toLocaleString()}</strong></span>
                                 <span style="color:var(--border-color);">•</span>
-                                <span><span style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem;">Comments:</span> <strong>${comments.toLocaleString()}</strong></span>
+                                <span><span style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem;">Comments:</span> <strong id="comments-${rule.id}">${comments.toLocaleString()}</strong></span>
                                 <span style="color:var(--border-color);">•</span>
-                                <span><span style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem;">DMs Sent:</span> <strong style="color:var(--accent-primary);">${dmsSent.toLocaleString()}</strong></span>
+                                <span><span style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem;">DMs Dispatched:</span> <strong id="dms-${rule.id}" style="color:var(--accent-primary);">${dmsSent.toLocaleString()}</strong></span>
                                 <span style="color:var(--border-color);">•</span>
-                                <span><span style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem;">Link Clicks:</span> <strong style="color:#2E7D32;">${clicks.toLocaleString()} (${ctr}% CTR)</strong></span>
+                                <span><span style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem;">Link Clicks:</span> <strong id="clicks-${rule.id}" style="color:#2E7D32;">${clicks.toLocaleString()} (${ctr}% CTR)</strong></span>
                             </div>
                             
                             <div style="display: flex; align-items: center; gap: 0.6rem;">
-                                <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">History:</span>
-                                <select class="select" style="padding: 0.3rem 0.65rem; font-size: 0.8rem; min-width: 160px; background:#FFFFFF; font-weight: 600;" onchange="workflows.switchMonthHistory('${item.id}', this.value, ${dmsSent}, ${clicks})">
-                                    <option value="current">Current Month (Aug 2026)</option>
-                                    <option value="2026-07">July 2026 (Saved)</option>
-                                    <option value="2026-06">June 2026 (Saved)</option>
-                                </select>
+                                <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Status:</span>
+                                <span style="font-size: 0.8rem; font-weight: 700; color: ${isActive ? '#2E7D32' : 'var(--text-secondary)'};">
+                                    ${isActive ? '🟢 Active & Listening' : '⏸️ Paused'}
+                                </span>
                             </div>
                         </div>
 
@@ -371,10 +370,10 @@ window.workflows = {
         const item = this.storedData[itemId];
         if (!item) return;
 
-        let views = item.views_count || 48500;
-        let comments = item.comments_count || 1420;
-        let dms = currentDms;
-        let clicks = currentClicks;
+        let views = item.views_count || 0;
+        let comments = item.comments_count || 0;
+        let dms = currentDms || 0;
+        let clicks = currentClicks || 0;
 
         if (selectedMonth !== 'current' && item.history) {
             const h = item.history.find(rec => rec.month_year === selectedMonth);
