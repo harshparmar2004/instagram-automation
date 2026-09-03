@@ -7,6 +7,18 @@ const router = express.Router();
 router.get('/rules', auth, (req, res) => {
     try {
         const db = getDb();
+
+        // Auto-link any rules whose media_id no longer matches
+        try {
+            const orphanRules = db.prepare("SELECT id FROM rules WHERE media_id IS NOT NULL AND media_id NOT IN (SELECT id FROM media)").all();
+            if (orphanRules.length > 0) {
+                const targetMedia = db.prepare("SELECT id FROM media ORDER BY id ASC LIMIT 1").get();
+                if (targetMedia) {
+                    db.prepare("UPDATE rules SET media_id = ? WHERE media_id IS NOT NULL AND media_id NOT IN (SELECT id FROM media)").run(targetMedia.id);
+                }
+            }
+        } catch(e) {}
+
         const { media_id } = req.query;
         let query = `
             SELECT r.*, r.trigger_keyword as trigger_word, m.ig_media_id, m.thumbnail_url 
@@ -41,7 +53,11 @@ router.post('/rules', auth, (req, res) => {
             return res.status(400).json({ error: 'trigger_keyword and action_type are required' });
         }
 
-        const resolvedMediaId = (media_id === 'global' || !media_id) ? null : media_id;
+        let resolvedMediaId = null;
+        if (media_id && media_id !== 'global') {
+            const mRow = db.prepare("SELECT id FROM media WHERE id = ? OR ig_media_id = ?").get(media_id, media_id);
+            resolvedMediaId = mRow ? mRow.id : media_id;
+        }
 
         const result = db.prepare(`
             INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, created_at, updated_at)

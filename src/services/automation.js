@@ -96,13 +96,16 @@ function getRandomResponseText(rule) {
 function findMatchingRule(mediaIgId, commentText) {
     const db = getDb();
     const rules = db.prepare(`
-        SELECT r.*, m.ig_media_id 
+        SELECT r.*, 
+               COALESCE(m.ig_media_id, (SELECT ig_media_id FROM media WHERE id = r.media_id OR ig_media_id = r.media_id LIMIT 1)) as ig_media_id
         FROM rules r 
-        LEFT JOIN media m ON r.media_id = m.id 
+        LEFT JOIN media m ON (r.media_id = m.id OR r.media_id = m.ig_media_id)
         WHERE r.is_active = 1
     `).all();
 
-    // 1. Try matching rule attached to this specific media ID
+    console.log(`[Automation] Searching rule for media: "${mediaIgId}", found ${rules.length} active rule(s)`);
+
+    // 1. Try matching rule attached to this specific Instagram media ID
     for (const rule of rules) {
         if (rule.ig_media_id && mediaIgId && String(rule.ig_media_id) === String(mediaIgId)) {
             if (matchKeyword(rule.trigger_keyword, commentText)) {
@@ -111,12 +114,29 @@ function findMatchingRule(mediaIgId, commentText) {
         }
     }
 
-    // 2. Try global rules (media_id is null / applies to all reels)
+    // 2. Try matching by local DB media ID or raw ID
     for (const rule of rules) {
-        if (!rule.media_id) {
+        if (rule.media_id && mediaIgId && (String(rule.media_id) === String(mediaIgId) || String(rule.ig_media_id) === String(mediaIgId))) {
             if (matchKeyword(rule.trigger_keyword, commentText)) {
                 return rule;
             }
+        }
+    }
+
+    // 3. Try global rules (media_id is null / 'global' / applies to all reels)
+    for (const rule of rules) {
+        if (!rule.media_id || rule.media_id === 'global') {
+            if (matchKeyword(rule.trigger_keyword, commentText)) {
+                return rule;
+            }
+        }
+    }
+
+    // 4. Smart Fallback: If keyword matches and rule exists on creator's account
+    for (const rule of rules) {
+        if (matchKeyword(rule.trigger_keyword, commentText)) {
+            console.log(`[Automation] ⚡ Keyword matched rule #${rule.id} ("${rule.trigger_keyword}") via creator account fallback`);
+            return rule;
         }
     }
 
