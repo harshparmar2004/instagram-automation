@@ -57,16 +57,19 @@ function checkDedupUserForMedia(commenterIgId, mediaIgId) {
     return !!row;
 }
 
-function matchKeyword(ruleTrigger, textLower) {
+function matchKeyword(ruleTrigger, text) {
     if (!ruleTrigger || ruleTrigger.trim() === '' || ruleTrigger.trim() === '*' || ruleTrigger.trim().toLowerCase() === 'any') {
         return true; // Matches ANY comment on this Reel!
     }
-    const keywords = ruleTrigger.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+    const textClean = (text || '').toLowerCase().trim();
+    // Split by comma and strip quotes and extra whitespace
+    const keywords = ruleTrigger.split(',').map(k => k.replace(/['"]/g, '').trim().toLowerCase()).filter(Boolean);
     if (keywords.length === 0) return true;
     for (const kw of keywords) {
         if (kw === '*' || kw === 'any') return true;
+        if (textClean.includes(kw)) return true;
         const escaped = kw.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
-        if (textLower.match(new RegExp(`\\b${escaped}\\b`, 'i'))) {
+        if (textClean.match(new RegExp(`(^|\\W)${escaped}(\\W|$)`, 'i'))) {
             return true;
         }
     }
@@ -99,19 +102,19 @@ function findMatchingRule(mediaIgId, commentText) {
         WHERE r.is_active = 1
     `).all();
 
-    const textLower = commentText.toLowerCase();
-
+    // 1. Try matching rule attached to this specific media ID
     for (const rule of rules) {
-        if (rule.ig_media_id === mediaIgId) {
-            if (matchKeyword(rule.trigger_keyword, textLower)) {
+        if (rule.ig_media_id && mediaIgId && String(rule.ig_media_id) === String(mediaIgId)) {
+            if (matchKeyword(rule.trigger_keyword, commentText)) {
                 return rule;
             }
         }
     }
 
+    // 2. Try global rules (media_id is null / applies to all reels)
     for (const rule of rules) {
         if (!rule.media_id) {
-            if (matchKeyword(rule.trigger_keyword, textLower)) {
+            if (matchKeyword(rule.trigger_keyword, commentText)) {
                 return rule;
             }
         }
@@ -128,12 +131,21 @@ async function processCommentEvent(payload) {
             if (change.field === 'comments') {
                 const comment = change.value;
                 const commentId = comment.id || comment.comment_id;
-                const text = comment.text;
+                const text = comment.text || '';
                 const from = comment.from;
                 const mediaId = comment.media_id || (comment.media && comment.media.id);
 
-                if (!from || from.id === entry.id) {
-                    continue; // Skip own comments
+                console.log(`[Automation] 📩 Incoming comment: "${text}" from @${from?.username || from?.id || 'unknown'} on media ${mediaId}`);
+
+                if (!from) {
+                    console.log('[Automation] Skipping comment with no sender info');
+                    continue;
+                }
+
+                // Check self-comment: Meta API doesn't allow private reply to self, but log clearly
+                if (from.id === entry.id) {
+                    console.log(`[Automation] Notice: Comment is from own account (@${from.username || from.id}). Meta prevents sending DMs to self.`);
+                    // We allow public reply testing even for own comments!
                 }
 
                 if (checkDedupComment(commentId)) {
@@ -141,7 +153,7 @@ async function processCommentEvent(payload) {
                     continue;
                 }
 
-                if (checkDedupUserForMedia(from.id, mediaId)) {
+                if (from.id !== entry.id && checkDedupUserForMedia(from.id, mediaId)) {
                     console.log(`[Automation] Skipping duplicate user ${from.id} for media ${mediaId}`);
                     continue;
                 }
@@ -160,9 +172,12 @@ async function processCommentEvent(payload) {
                 }
 
                 const rule = findMatchingRule(mediaId, text);
-                if (!rule) continue;
+                if (!rule) {
+                    console.log(`[Automation] No active rule matched keyword for text: "${text}" on media ${mediaId}`);
+                    continue;
+                }
 
-                console.log(`[Automation] Rule ${rule.id} (${rule.action_type}) matched for comment ${commentId}`);
+                console.log(`[Automation] 🎯 Rule #${rule.id} ("${rule.trigger_keyword}") matched for comment ${commentId}! Action: ${rule.action_type}`);
 
                 let trackingId = null;
                 let messageToSend = '';
@@ -175,8 +190,7 @@ async function processCommentEvent(payload) {
                     const trackedUrl = `${config.BASE_URL}/r/${trackingId}`;
                     messageToSend = `${baseResponse}\n${trackedUrl}`;
                 } else if (rule.action_type === 'follow_first') {
-                    // FOLLOW-FIRST GATE PROMPT
-                    messageToSend = rule.follow_prompt || `Hey @${from.username || 'friend'}! 🚀 Thanks for commenting! Please follow @creator.studio first, then reply "I FOLLOWED" or "DONE" in this DM to instantly unlock your free PDF link!`;
+                    messageToSend = rule.follow_prompt || `Hey @${from.username || 'friend'}! 🚀 Thanks for commenting! Please follow us first, then reply "DONE" in this DM to unlock your link!`;
                 }
 
                 const insertEvent = db.prepare(`
@@ -185,7 +199,7 @@ async function processCommentEvent(payload) {
                 `);
                 
                 const eventResult = insertEvent.run(
-                    rule.id, commentId, text, from.id, from.username, mediaId, trackingId, new Date().toISOString()
+                    rule.id, commentId, text, from.id, from.username || 'user', mediaId, trackingId, new Date().toISOString()
                 );
                 
                 const eventId = eventResult.lastInsertRowid;
@@ -203,10 +217,13 @@ async function processCommentEvent(payload) {
                 enqueue({
                     type: 'private_reply',
                     commentId: commentId,
+                    commenterId: from.id,
                     messageText: messageToSend,
+                    publicReply: rule.public_reply || null,
                     eventId: eventId,
                     processAt
                 });
+                console.log(`[Automation] 🚀 Queued DM & public reply for event #${eventId} (scheduled in ${delayMs}ms)`);
             }
         }
     }

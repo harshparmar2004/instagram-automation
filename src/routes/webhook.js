@@ -1,5 +1,6 @@
 const express = require('express');
 const { getConfig, setConfig } = require('../database');
+const auth = require('../middleware/auth');
 const webhookVerify = require('../middleware/webhookVerify');
 const { processCommentEvent, processMessageEvent } = require('../services/automation');
 const router = express.Router();
@@ -42,6 +43,42 @@ router.post('/', webhookVerify, async (req, res) => {
         }
     } catch (err) {
         console.error('[Webhook] Error processing payload:', err);
+    }
+});
+
+router.post('/simulate', auth, async (req, res) => {
+    try {
+        const { media_id, comment_text, username } = req.body;
+        const fakeCommentId = 'test_' + Date.now();
+        const payload = {
+            object: 'instagram',
+            entry: [{
+                id: getConfig('ig_user_id') || '17841400000000000',
+                time: Math.floor(Date.now() / 1000),
+                changes: [{
+                    field: 'comments',
+                    value: {
+                        from: {
+                            id: 'tester_' + Math.floor(Math.random() * 100000),
+                            username: username || 'test_fan'
+                        },
+                        media: {
+                            id: media_id || '18622844845054711'
+                        },
+                        id: fakeCommentId,
+                        text: comment_text || 'GOOGLE'
+                    }
+                }]
+            }]
+        };
+
+        await processCommentEvent(payload);
+        res.json({
+            success: true,
+            message: `Test comment "${comment_text || 'GOOGLE'}" processed through automation engine!`
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 

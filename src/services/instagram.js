@@ -207,18 +207,76 @@ async function getSingleMedia(token, mediaId) {
     return res.data;
 }
 
-async function sendPrivateReply(token, commentId, messageText) {
+async function sendPrivateReply(token, commentId, commenterId, messageText) {
     const isFbToken = token && token.startsWith('EAA');
     const base = isFbToken ? FB_API_BASE : IG_API_BASE;
-    const res = await axios.post(`${base}/${commentId}/replies`, {
-        message: messageText
-    }, {
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+    const igUserId = getConfig('ig_user_id');
+    const endpoint = isFbToken && igUserId && igUserId !== '17841400000000000'
+        ? `${base}/${igUserId}/messages`
+        : `${base}/me/messages`;
+
+    // Strategy 1: Official Instagram Private Reply using recipient: { comment_id }
+    try {
+        console.log(`[Instagram] Dispatching Private Reply DM for comment ${commentId} to ${endpoint}...`);
+        const res = await axios.post(endpoint, {
+            recipient: { comment_id: commentId },
+            message: { text: messageText }
+        }, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        console.log(`[Instagram] ✅ Private Reply DM delivered successfully!`, res.data);
+        return res.data;
+    } catch (err) {
+        const errorMsg = err.response?.data?.error?.message || err.message;
+        console.warn(`[Instagram] Strategy 1 (comment_id) notice: ${errorMsg}`);
+
+        // Strategy 2: If commenterId is provided, fallback to direct message by recipient: { id }
+        if (commenterId) {
+            try {
+                console.log(`[Instagram] Strategy 2: Fallback DM to recipient id ${commenterId}...`);
+                const res2 = await axios.post(endpoint, {
+                    recipient: { id: commenterId },
+                    message: { text: messageText }
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                console.log(`[Instagram] ✅ DM delivered via user ID!`, res2.data);
+                return res2.data;
+            } catch (err2) {
+                console.warn(`[Instagram] Strategy 2 notice:`, err2.response?.data?.error?.message || err2.message);
+            }
         }
-    });
-    return res.data;
+
+        throw new Error(`Meta API Error: ${errorMsg}`);
+    }
+}
+
+async function replyToComment(token, commentId, messageText) {
+    if (!messageText) return null;
+    const isFbToken = token && token.startsWith('EAA');
+    const base = isFbToken ? FB_API_BASE : IG_API_BASE;
+    try {
+        console.log(`[Instagram] Posting public comment reply on comment ${commentId}...`);
+        const res = await axios.post(`${base}/${commentId}/replies`, {
+            message: messageText
+        }, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        console.log(`[Instagram] ✅ Public comment reply published:`, res.data);
+        return res.data;
+    } catch (err) {
+        console.warn(`[Instagram] Public comment reply notice:`, err.response?.data?.error?.message || err.message);
+        return null;
+    }
 }
 
 async function sendDirectMessage(token, recipientId, messageText) {
@@ -243,18 +301,49 @@ async function sendDirectMessage(token, recipientId, messageText) {
 
 async function subscribeWebhook(appId, appSecret, callbackUrl, verifyToken) {
     const appAccessToken = `${appId}|${appSecret}`;
-    
-    // Attempting to subscribe to Instagram messaging and comments
-    const res = await axios.post(`${FB_API_BASE}/${appId}/subscriptions`, null, {
-        params: {
-            object: 'instagram',
-            callback_url: callbackUrl,
-            fields: 'comments,messages',
-            verify_token: verifyToken,
-            access_token: appAccessToken
-        }
-    });
-    return res.data;
+    let appSub = null;
+
+    // 1. Subscribe App to Instagram webhooks
+    try {
+        const res = await axios.post(`${FB_API_BASE}/${appId}/subscriptions`, null, {
+            params: {
+                object: 'instagram',
+                callback_url: callbackUrl,
+                fields: 'comments,messages',
+                verify_token: verifyToken,
+                access_token: appAccessToken
+            }
+        });
+        appSub = res.data;
+        console.log('[Instagram] App webhook subscribed:', appSub);
+    } catch (e) {
+        console.warn('[Instagram] App subscriptions notice:', e.response?.data?.error?.message || e.message);
+    }
+
+    // 2. Also install app on connected Facebook Page so comment webhooks deliver
+    const token = getConfig('access_token');
+    if (token && token.startsWith('EAA')) {
+        try {
+            const pagesRes = await axios.get(`${FB_API_BASE}/me/accounts`, {
+                params: { access_token: token }
+            });
+            for (const page of pagesRes.data?.data || []) {
+                try {
+                    await axios.post(`${FB_API_BASE}/${page.id}/subscribed_apps`, null, {
+                        params: {
+                            subscribed_fields: 'feed,comments,messages',
+                            access_token: page.access_token || token
+                        }
+                    });
+                    console.log(`[Instagram] ✅ Subscribed page ${page.name} (${page.id}) to webhooks!`);
+                } catch(pe) {
+                    console.warn(`[Instagram] Page subscription notice for ${page.id}:`, pe.response?.data?.error?.message || pe.message);
+                }
+            }
+        } catch(e) {}
+    }
+
+    return appSub || { success: true };
 }
 
 module.exports = {
@@ -265,6 +354,7 @@ module.exports = {
     getMedia,
     getSingleMedia,
     sendPrivateReply,
+    replyToComment,
     sendDirectMessage,
     subscribeWebhook
 };

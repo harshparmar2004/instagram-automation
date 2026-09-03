@@ -217,6 +217,9 @@ window.workflows = {
                             </div>
 
                             <div style="display:flex; align-items:center; gap:0.5rem;">
+                                <button class="btn btn-secondary btn-sm" style="font-size:0.8rem; font-weight:700; padding:0.35rem 0.85rem; color: #0369A1; background: #F0F9FF; border-color: #BAE6FD;" onclick="workflows.testRuleTrigger(${rule.id}, '${item.ig_media_id || ''}', '${rule.trigger_keyword || ''}')">
+                                    🧪 Test Trigger
+                                </button>
                                 <button class="btn btn-secondary btn-sm" style="font-size:0.8rem; font-weight:600; padding:0.35rem 0.85rem;" onclick="workflows.toggleRuleStatus(${rule.id})">
                                     ${isActive ? 'Pause' : 'Activate'}
                                 </button>
@@ -400,5 +403,25 @@ window.workflows = {
         if (ctrEl) ctrEl.textContent = `${ctr}%`;
 
         App.showToast(`Showing ${selectedMonth === 'current' ? 'Current Month' : selectedMonth} stats`, 'info');
+    },
+
+    async testRuleTrigger(ruleId, mediaIgId, triggerKeyword) {
+        const kw = (triggerKeyword || 'GOOGLE').split(',')[0].replace(/['"]/g, '').trim();
+        App.showToast(`⚡ Simulating follower comment "${kw}"...`, 'info');
+        try {
+            const res = await App.apiCall('POST', '/api/webhook/simulate', {
+                media_id: mediaIgId,
+                comment_text: kw,
+                username: 'live_test_follower'
+            });
+            App.showToast(res.message || 'Test trigger executed successfully!', 'success');
+            setTimeout(() => {
+                this.refresh();
+                if (window.activity && window.activity.refresh) window.activity.refresh();
+                if (window.dashboard && window.dashboard.refresh) window.dashboard.refresh();
+            }, 1500);
+        } catch(err) {
+            App.showToast('Test failed: ' + err.message, 'error');
+        }
     }
 };
