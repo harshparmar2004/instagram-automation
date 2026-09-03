@@ -56,7 +56,17 @@ router.post('/rules', auth, (req, res) => {
         let resolvedMediaId = null;
         if (media_id && media_id !== 'global') {
             const mRow = db.prepare("SELECT id FROM media WHERE id = ? OR ig_media_id = ?").get(media_id, media_id);
-            resolvedMediaId = mRow ? mRow.id : media_id;
+            if (mRow) {
+                resolvedMediaId = mRow.id;
+            } else if (typeof media_id === 'string' && media_id.length > 5) {
+                try {
+                    db.prepare("INSERT INTO media (ig_media_id, caption, synced_at) VALUES (?, 'Instagram Content', ?) ON CONFLICT(ig_media_id) DO NOTHING").run(media_id, new Date().toISOString());
+                    const mNew = db.prepare("SELECT id FROM media WHERE ig_media_id = ?").get(media_id);
+                    resolvedMediaId = mNew ? mNew.id : null;
+                } catch(e) {
+                    resolvedMediaId = null;
+                }
+            }
         }
 
         const result = db.prepare(`

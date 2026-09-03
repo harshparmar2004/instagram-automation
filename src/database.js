@@ -114,18 +114,58 @@ function getDb() {
   return db;
 }
 
-// Config table helpers
+// Config helpers with process.env and file persistence fallback
 function getConfig(key) {
-  const row = getDb().prepare('SELECT value FROM config WHERE key = ?').get(key);
-  return row ? row.value : null;
+  try {
+    const row = getDb().prepare('SELECT value FROM config WHERE key = ?').get(key);
+    if (row && row.value) return row.value;
+  } catch (e) {}
+
+  const envMap = {
+    'meta_app_id': 'META_APP_ID',
+    'meta_app_secret': 'META_APP_SECRET',
+    'webhook_verify_token': 'WEBHOOK_VERIFY_TOKEN',
+    'access_token': 'INSTAGRAM_ACCESS_TOKEN',
+    'ig_user_id': 'INSTAGRAM_USER_ID',
+    'ig_username': 'INSTAGRAM_USERNAME'
+  };
+  if (envMap[key] && process.env[envMap[key]]) {
+    return process.env[envMap[key]];
+  }
+
+  // File fallback
+  try {
+    const fs = require('fs');
+    const settingsPath = path.join(__dirname, '..', 'data', 'settings.json');
+    if (fs.existsSync(settingsPath)) {
+      const data = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      if (data[key]) return data[key];
+    }
+  } catch(e) {}
+
+  return null;
 }
 
 function setConfig(key, value) {
-  getDb().prepare(`
-    INSERT INTO config (key, value, updated_at) 
-    VALUES (?, ?, ?) 
-    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-  `).run(key, value, new Date().toISOString());
+  try {
+    getDb().prepare(`
+      INSERT INTO config (key, value, updated_at) 
+      VALUES (?, ?, ?) 
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `).run(key, value, new Date().toISOString());
+  } catch (e) {}
+
+  // Also persist to settings.json
+  try {
+    const fs = require('fs');
+    const settingsPath = path.join(__dirname, '..', 'data', 'settings.json');
+    let current = {};
+    if (fs.existsSync(settingsPath)) {
+      try { current = JSON.parse(fs.readFileSync(settingsPath, 'utf8')); } catch(e) {}
+    }
+    current[key] = value;
+    fs.writeFileSync(settingsPath, JSON.stringify(current, null, 2), 'utf8');
+  } catch(e) {}
 }
 
 module.exports = {
