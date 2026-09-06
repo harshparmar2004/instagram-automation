@@ -47,6 +47,26 @@ router.get('/rules', auth, (req, res) => {
     }
 });
 
+router.get('/rules/:id', auth, (req, res) => {
+    try {
+        const db = getDb();
+        const { id } = req.params;
+        const rule = db.prepare(`
+            SELECT r.*, r.trigger_keyword as trigger_word, m.ig_media_id, m.thumbnail_url 
+            FROM rules r 
+            LEFT JOIN media m ON (r.media_id = m.id OR r.media_id = m.ig_media_id)
+            WHERE r.id = ?
+        `).get(id);
+
+        if (!rule) {
+            return res.status(404).json({ error: 'Rule not found' });
+        }
+        res.json(rule);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.post('/rules', auth, (req, res) => {
     try {
         const db = getDb();
