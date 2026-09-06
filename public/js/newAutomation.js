@@ -158,6 +158,11 @@ window['new-automation'] = {
     },
 
     goToNextStep() {
+        if (this.currentStep === 1 && !this.selectedMediaId) {
+            App.showToast('Please select a target post or choose Account-Wide Rule to continue', 'warning');
+            return;
+        }
+
         if (this.currentStep === 2 && this.keywordMode !== 'any') {
             const pendingInput = document.getElementById('input-new-keyword');
             if (pendingInput && pendingInput.value.trim()) {
@@ -297,23 +302,27 @@ window['new-automation'] = {
         ).length;
         const totalCount = (this.mediaList || []).length;
 
+        const isGlobalSelected = String(this.selectedMediaId) === 'global';
+
         let gridHtml = `
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.85rem; width: 100%;">
                 
                 <!-- GLOBAL OPTION -->
-                <div class="reel-card-item" onclick="window['new-automation'].selectReel('global', this)" style="
+                <div class="reel-card-item ${isGlobalSelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('global', this)" style="
                     border-radius: 14px;
-                    border: ${this.selectedMediaId === 'global' ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)'};
-                    background: ${this.selectedMediaId === 'global' ? '#FDF8F6' : '#FFFFFF'};
-                    box-shadow: ${this.selectedMediaId === 'global' ? '0 4px 14px rgba(217, 119, 87, 0.16)' : '0 1px 4px rgba(0,0,0,0.02)'};
+                    border: ${isGlobalSelected ? '2.5px solid var(--accent-primary)' : '1.5px solid var(--border-color)'};
+                    outline: ${isGlobalSelected ? '3px solid var(--accent-primary)' : 'none'};
+                    outline-offset: ${isGlobalSelected ? '3px' : '0'};
+                    background: ${isGlobalSelected ? '#FDF8F6' : '#FFFFFF'};
+                    box-shadow: ${isGlobalSelected ? '0 0 0 4px rgba(217, 119, 87, 0.28), 0 8px 24px rgba(217, 119, 87, 0.2)' : '0 1px 4px rgba(0,0,0,0.02)'};
                     cursor: pointer;
                     overflow: hidden;
                     position: relative;
                     display: flex;
                     flex-direction: column;
-                    transition: all 0.15s ease-in-out;
+                    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                 ">
-                    ${this.selectedMediaId === 'global' ? `<div style="position:absolute; top:8px; right:8px; width:22px; height:22px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.75rem; z-index:3;">✓</div>` : ''}
+                    ${isGlobalSelected ? `<div style="position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.85rem; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.25); border: 2px solid #FFFFFF;">✓</div>` : ''}
                     
                     <div style="height: 120px; background: linear-gradient(135deg, #FAF8F5 0%, #E6E1D8 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.65rem; text-align: center;">
                         <div style="font-size: 1.5rem; margin-bottom: 0.15rem;">🌐</div>
@@ -325,30 +334,38 @@ window['new-automation'] = {
                         <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.82rem; color: var(--text-primary);">Global Account Rule</div>
                         <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.15rem; line-height: 1.35;">Triggers on comments across your entire Instagram profile</div>
                     </div>
+
+                    ${isGlobalSelected ? `
+                        <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.7rem; font-weight: 800; text-align: center; padding: 4px 8px; letter-spacing: 0.04em;">
+                            ✓ SELECTED
+                        </div>
+                    ` : ''}
                 </div>
         `;
 
         filtered.forEach(m => {
-            const isSelected = this.selectedMediaId === m.id;
+            const isSelected = String(this.selectedMediaId) === String(m.id);
             const isReel = m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED');
             const thumbUrl = m.thumbnail_url || m.media_url || '';
             const captionCut = m.caption ? (m.caption.slice(0, 45) + '...') : 'Instagram Content';
             const comments = m.comments_count || 0;
 
             gridHtml += `
-                <div class="reel-card-item" onclick="window['new-automation'].selectReel('${m.id}', this)" style="
+                <div class="reel-card-item ${isSelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('${m.id}', this)" style="
                     border-radius: 14px;
-                    border: ${isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)'};
+                    border: ${isSelected ? '2.5px solid var(--accent-primary)' : '1.5px solid var(--border-color)'};
+                    outline: ${isSelected ? '3px solid var(--accent-primary)' : 'none'};
+                    outline-offset: ${isSelected ? '3px' : '0'};
                     background: ${isSelected ? '#FDF8F6' : '#FFFFFF'};
-                    box-shadow: ${isSelected ? '0 4px 14px rgba(217, 119, 87, 0.16)' : '0 1px 4px rgba(0,0,0,0.02)'};
+                    box-shadow: ${isSelected ? '0 0 0 4px rgba(217, 119, 87, 0.28), 0 8px 24px rgba(217, 119, 87, 0.2)' : '0 1px 4px rgba(0,0,0,0.02)'};
                     cursor: pointer;
                     overflow: hidden;
                     position: relative;
                     display: flex;
                     flex-direction: column;
-                    transition: all 0.15s ease-in-out;
+                    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                 ">
-                    ${isSelected ? `<div style="position:absolute; top:8px; right:8px; width:22px; height:22px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.75rem; z-index:3;">✓</div>` : ''}
+                    ${isSelected ? `<div style="position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.85rem; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.25); border: 2px solid #FFFFFF;">✓</div>` : ''}
 
                     <!-- 9:16 VERTICAL COVER FOR REELS -->
                     <div style="
@@ -377,6 +394,12 @@ window['new-automation'] = {
                             ${new Date(m.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                         </div>
                     </div>
+
+                    ${isSelected ? `
+                        <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.7rem; font-weight: 800; text-align: center; padding: 4px 8px; letter-spacing: 0.04em;">
+                            ✓ SELECTED
+                        </div>
+                    ` : ''}
                 </div>
             `;
         });
@@ -421,7 +444,7 @@ window['new-automation'] = {
     },
 
     selectReel(id, el) {
-        this.selectedMediaId = id;
+        this.selectedMediaId = String(id);
         this.renderStep1(document.getElementById('new-automation-content'));
     },
 
