@@ -266,10 +266,19 @@ function restoreRules(dbInstance) {
     for (const r of data) {
       const existing = checkStmt.get(r.id, r.trigger_keyword, r.response_text);
       if (!existing) {
+        // Safely verify if media_id exists in media table to avoid foreign key errors on fresh deploys
+        let resolvedMediaId = null;
+        if (r.media_id) {
+          try {
+            const m = database.prepare('SELECT id FROM media WHERE id = ? OR ig_media_id = ?').get(r.media_id, r.media_id);
+            if (m) resolvedMediaId = m.id;
+          } catch(e) {}
+        }
+
         try {
           insertStmtWithId.run(
             r.id,
-            r.media_id || null,
+            resolvedMediaId,
             r.trigger_keyword,
             r.action_type || 'link_dm',
             r.response_text || null,
@@ -284,24 +293,26 @@ function restoreRules(dbInstance) {
           );
           restoredCount++;
         } catch (insertErr) {
-          database.prepare(`
-            INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(
-            r.media_id || null,
-            r.trigger_keyword,
-            r.action_type || 'link_dm',
-            r.response_text || null,
-            r.link_url || null,
-            r.follow_prompt || null,
-            r.public_reply || null,
-            r.delay_seconds || 0,
-            r.variations_json || null,
-            r.is_active !== undefined ? r.is_active : 1,
-            r.created_at || new Date().toISOString(),
-            r.updated_at || new Date().toISOString()
-          );
-          restoredCount++;
+          try {
+            database.prepare(`
+              INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(
+              resolvedMediaId,
+              r.trigger_keyword,
+              r.action_type || 'link_dm',
+              r.response_text || null,
+              r.link_url || null,
+              r.follow_prompt || null,
+              r.public_reply || null,
+              r.delay_seconds || 0,
+              r.variations_json || null,
+              r.is_active !== undefined ? r.is_active : 1,
+              r.created_at || new Date().toISOString(),
+              r.updated_at || new Date().toISOString()
+            );
+            restoredCount++;
+          } catch (e2) {}
         }
       }
     }
