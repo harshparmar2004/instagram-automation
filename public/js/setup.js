@@ -206,6 +206,15 @@ window.setup = {
                     Configure your Instagram credentials below. You can <strong>Save</strong> your information permanently to the server, and <strong>Connect, Scan & Save All</strong> to verify with Meta and sync your live Reels automatically.
                 </p>
 
+                ${hasSavedToken ? `
+                    <div style="padding: 0.9rem 1.25rem; background: #E8F5E9; border: 1.5px solid #4CAF50; border-radius: 12px; color: #1B5E20; font-size: 0.88rem; font-weight: 600; display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.15rem;">
+                        <span style="font-size: 1.4rem;">🛡️</span>
+                        <div>
+                            <strong>Account & Automations Permanently Saved:</strong> Your Instagram account, credentials, and all automation rules are securely saved in the database. You <strong>do NOT need to reconnect</strong> when you log in!
+                        </div>
+                    </div>
+                ` : ''}
+
                 <!-- CONNECT ERROR DISPLAY BOX -->
                 <div id="connect-error-box" style="display: none; padding: 0.85rem 1rem; background: #FFEBEE; border: 1.5px solid #E53935; border-radius: 10px; color: #C62828; font-size: 0.84rem; font-weight: 600; margin-bottom: 1rem; line-height: 1.45;"></div>
 
@@ -244,7 +253,7 @@ window.setup = {
                     <!-- ACTION BUTTONS: SAVE vs CONNECT, SCAN & SAVE -->
                     <div style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap; margin-top: 0.25rem;">
                         <button type="submit" id="btn-connect-scan" class="btn btn-primary" style="padding: 0.75rem 1.65rem; font-size: 0.9rem; font-weight: 800; border-radius: 10px; white-space: nowrap;">
-                            🚀 Connect, Scan & Save All
+                            ${hasSavedToken ? '🔄 Re-Verify & Scan Reels' : '🚀 Connect, Scan & Save All'}
                         </button>
 
                         <button type="button" id="btn-save-credentials" onclick="setup.saveCredentials()" class="btn btn-secondary" style="padding: 0.75rem 1.5rem; font-size: 0.9rem; font-weight: 800; border-radius: 10px; background: #FFFFFF; border: 1.5px solid #D1C9BE; color: var(--text-primary); white-space: nowrap;">

@@ -41,7 +41,7 @@ window.monthlyHistory = {
                 App.apiCall('GET', '/api/media').catch(() => ({ media: [] })),
                 App.apiCall('GET', '/api/events/stats').catch(() => ({}))
             ]);
-            this.reelsData = mediaRes.media || [];
+            this.reelsData = Array.isArray(mediaRes) ? mediaRes : (mediaRes?.media || []);
             this.statsData = statsRes || {};
             this.renderHistoryData();
         } catch (err) {

@@ -37,45 +37,71 @@ router.get('/media/automated', auth, (req, res) => {
     try {
         const db = getDb();
         
-        const mediaWithRules = db.prepare(`
-            SELECT DISTINCT m.*
-            FROM media m
-            JOIN rules r ON r.media_id = m.id
-            ORDER BY m.timestamp DESC
-        `).all();
-
-        const ruleStmt = db.prepare(`
+        // 1. Fetch ALL rules with trigger and click counts
+        const allRules = db.prepare(`
             SELECT r.*, 
                    (SELECT COUNT(*) FROM events e WHERE e.rule_id = r.id) as total_triggers,
                    (SELECT COUNT(*) FROM clicks c JOIN events e ON c.event_id = e.id WHERE e.rule_id = r.id) as total_clicks
             FROM rules r
-            WHERE r.media_id = ?
             ORDER BY r.created_at DESC
-        `);
+        `).all();
+
+        // 2. Fetch all media from DB
+        const allMedia = db.prepare(`SELECT * FROM media ORDER BY timestamp DESC`).all();
 
         const historyStmt = db.prepare(`
             SELECT * FROM reel_stats_history WHERE media_id = ? ORDER BY month_year DESC
         `);
 
-        const result = mediaWithRules.map(m => {
-            const rules = ruleStmt.all(m.id);
-            const history = historyStmt.all(m.id);
-            return {
-                ...m,
-                rules,
-                history
-            };
-        });
+        // Group rules by media
+        const mediaMap = new Map();
+        const globalRules = [];
 
-        // Global rules
-        const globalRules = db.prepare(`
-            SELECT r.*, 
-                   (SELECT COUNT(*) FROM events e WHERE e.rule_id = r.id) as total_triggers,
-                   (SELECT COUNT(*) FROM clicks c JOIN events e ON c.event_id = e.id WHERE e.rule_id = r.id) as total_clicks
-            FROM rules r
-            WHERE r.media_id IS NULL
-            ORDER BY r.created_at DESC
-        `).all();
+        for (const rule of allRules) {
+            if (!rule.media_id || rule.media_id === 'global') {
+                globalRules.push(rule);
+                continue;
+            }
+
+            // Match media row by either DB id or Instagram media ID
+            const matchedMedia = allMedia.find(m => 
+                m.id === rule.media_id || 
+                String(m.id) === String(rule.media_id) || 
+                m.ig_media_id === String(rule.media_id)
+            );
+
+            if (matchedMedia) {
+                if (!mediaMap.has(matchedMedia.id)) {
+                    mediaMap.set(matchedMedia.id, {
+                        ...matchedMedia,
+                        rules: [],
+                        history: historyStmt.all(matchedMedia.id)
+                    });
+                }
+                mediaMap.get(matchedMedia.id).rules.push(rule);
+            } else {
+                // Rule linked to a media ID not currently in media table — never drop it!
+                const placeholderKey = `orphan_${rule.media_id}`;
+                if (!mediaMap.has(placeholderKey)) {
+                    mediaMap.set(placeholderKey, {
+                        id: rule.media_id,
+                        ig_media_id: String(rule.media_id),
+                        caption: `Automation (Reel / Media #${rule.media_id})`,
+                        media_type: 'REEL',
+                        thumbnail_url: '',
+                        permalink: '',
+                        timestamp: rule.created_at || new Date().toISOString(),
+                        views_count: 0,
+                        comments_count: 0,
+                        history: [],
+                        rules: []
+                    });
+                }
+                mediaMap.get(placeholderKey).rules.push(rule);
+            }
+        }
+
+        const result = Array.from(mediaMap.values());
 
         if (globalRules.length > 0) {
             result.unshift({

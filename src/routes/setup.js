@@ -1,5 +1,5 @@
 const express = require('express');
-const { getDb, getConfig, setConfig } = require('../database');
+const { getDb, getConfig, setConfig, backupRules, backupEvents } = require('../database');
 const auth = require('../middleware/auth');
 const { subscribeWebhook, getUserProfile } = require('../services/instagram');
 const { seedDemoData } = require('../seedData');
@@ -91,13 +91,18 @@ router.post('/setup/save-credentials', auth, (req, res) => {
         const currentToken = getConfig('access_token');
         const hasToken = !!(currentToken && currentToken.trim() && !currentToken.includes('•'));
 
+        try {
+            const db = getDb();
+            backupRules(db);
+        } catch(e) {}
+
         res.json({
             success: true,
             hasToken,
             tokenSaved,
             username: getConfig('ig_username') || '',
             igUserId: getConfig('ig_user_id') || '',
-            message: '💾 All credentials saved permanently to system config & .env file!'
+            message: '💾 All credentials and automations saved permanently to system config & backup file!'
         });
     } catch (err) {
         console.error('[Setup] Error saving credentials:', err);
@@ -156,13 +161,11 @@ async function handleConnectAndScan(req, res) {
         if (resolvedIgUserId) setConfig('ig_user_id', resolvedIgUserId);
         if (profilePic) setConfig('ig_profile_pic', profilePic);
 
-        // Auto-purge any demo/mock items so real account data is 100% clean
+        // Clean up only known mock commenter usernames (non-destructive to real media or rules)
         try {
             const db = getDb();
             db.exec(`
                 DELETE FROM events WHERE commenter_username IN ('sarah_creator','dev_alex','tech_founder','marketing_pro','growth_hacker','design_master');
-                DELETE FROM media WHERE ig_media_id LIKE '17900%';
-                DELETE FROM reel_stats_history WHERE media_id NOT IN (SELECT id FROM media);
             `);
         } catch(e) {}
 
@@ -177,15 +180,23 @@ async function handleConnectAndScan(req, res) {
             syncErrMessage = syncErr.message;
         }
 
+        try {
+            const db = getDb();
+            backupRules(db);
+            backupEvents(db);
+        } catch(e) {}
+
+        const commentsCount = syncRes?.commentsSynced || 0;
         res.json({
             success: true,
             username: targetUsername || 'Instagram Creator',
             igUserId: resolvedIgUserId,
             syncedCount: syncCount,
+            commentsSynced: commentsCount,
             syncError: syncErrMessage,
             tokenExpiresAt: expiresAt,
             message: syncCount > 0 
-                ? `🎉 Saved & Synced! @${targetUsername || 'account'} connected and ${syncCount} live Instagram Reels scanned!`
+                ? `🎉 Saved & Synced! @${targetUsername || 'account'} connected: ${syncCount} Reels synced and ${commentsCount} real follower interactions/leads restored!`
                 : `✅ Credentials saved and token connected for @${targetUsername || 'account'}!${syncErrMessage ? ` (Sync notice: ${syncErrMessage})` : ''}`
         });
     } catch (err) {
@@ -202,14 +213,12 @@ router.post('/setup/clear-demo', auth, async (req, res) => {
         const db = getDb();
         console.log('[Setup] Purging all demo data from database...');
 
-        // Purge mock events, clicks, conversations, rules, and mock media
+        // Purge mock events, clicks, conversations, and demo stats (preserves rules and real media)
         db.exec(`
             DELETE FROM events;
             DELETE FROM clicks;
             DELETE FROM conversations;
-            DELETE FROM rules;
             DELETE FROM reel_stats_history;
-            DELETE FROM media;
         `);
 
         // If a real token is connected, immediately fetch real media!

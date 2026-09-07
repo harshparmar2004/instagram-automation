@@ -125,6 +125,12 @@ function getDb() {
         }
       }
     }
+  } catch (err) {}
+
+  // Startup sync: Restore automations & events from JSON backup if needed
+  try {
+    restoreRules(db);
+    restoreEvents(db);
   } catch (e) {}
 
   return db;
@@ -226,8 +232,175 @@ function setConfig(key, value) {
   updateEnvFile(key, strVal);
 }
 
+function backupRules(dbInstance) {
+  try {
+    const database = dbInstance || getDb();
+    const rules = database.prepare('SELECT * FROM rules ORDER BY id ASC').all();
+    const fs = require('fs');
+    const rulesPath = path.join(__dirname, '..', 'data', 'rules.json');
+    fs.writeFileSync(rulesPath, JSON.stringify(rules, null, 2), 'utf8');
+    return rules;
+  } catch (e) {
+    console.warn('[Database] Failed to backup rules:', e.message);
+    return [];
+  }
+}
+
+function restoreRules(dbInstance) {
+  try {
+    const fs = require('fs');
+    const rulesPath = path.join(__dirname, '..', 'data', 'rules.json');
+    if (!fs.existsSync(rulesPath)) return;
+
+    const database = dbInstance || getDb();
+    const data = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
+    if (!Array.isArray(data) || data.length === 0) return 0;
+
+    let restoredCount = 0;
+    const checkStmt = database.prepare('SELECT id FROM rules WHERE id = ? OR (trigger_keyword = ? AND response_text = ?)');
+    const insertStmtWithId = database.prepare(`
+      INSERT INTO rules (id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const r of data) {
+      const existing = checkStmt.get(r.id, r.trigger_keyword, r.response_text);
+      if (!existing) {
+        try {
+          insertStmtWithId.run(
+            r.id,
+            r.media_id || null,
+            r.trigger_keyword,
+            r.action_type || 'link_dm',
+            r.response_text || null,
+            r.link_url || null,
+            r.follow_prompt || null,
+            r.public_reply || null,
+            r.delay_seconds || 0,
+            r.variations_json || null,
+            r.is_active !== undefined ? r.is_active : 1,
+            r.created_at || new Date().toISOString(),
+            r.updated_at || new Date().toISOString()
+          );
+          restoredCount++;
+        } catch (insertErr) {
+          database.prepare(`
+            INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            r.media_id || null,
+            r.trigger_keyword,
+            r.action_type || 'link_dm',
+            r.response_text || null,
+            r.link_url || null,
+            r.follow_prompt || null,
+            r.public_reply || null,
+            r.delay_seconds || 0,
+            r.variations_json || null,
+            r.is_active !== undefined ? r.is_active : 1,
+            r.created_at || new Date().toISOString(),
+            r.updated_at || new Date().toISOString()
+          );
+          restoredCount++;
+        }
+      }
+    }
+    return restoredCount;
+  } catch (e) {
+    console.warn('[Database] Failed to restore rules from rules.json:', e.message);
+    return 0;
+  }
+}
+
+function backupEvents(dbInstance) {
+  try {
+    const fs = require('fs');
+    const database = dbInstance || getDb();
+    const events = database.prepare('SELECT * FROM events ORDER BY created_at DESC').all();
+    const dataDir = path.join(__dirname, '..', 'data');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    const eventsPath = path.join(dataDir, 'events.json');
+    fs.writeFileSync(eventsPath, JSON.stringify(events, null, 2), 'utf8');
+    return events;
+  } catch (e) {
+    console.warn('[Database] Failed to backup events:', e.message);
+    return [];
+  }
+}
+
+function restoreEvents(dbInstance) {
+  try {
+    const fs = require('fs');
+    const eventsPath = path.join(__dirname, '..', 'data', 'events.json');
+    if (!fs.existsSync(eventsPath)) return 0;
+
+    const database = dbInstance || getDb();
+    const data = JSON.parse(fs.readFileSync(eventsPath, 'utf8'));
+    if (!Array.isArray(data) || data.length === 0) return 0;
+
+    let restoredCount = 0;
+    const checkStmt = database.prepare('SELECT id FROM events WHERE comment_id = ?');
+    const insertStmt = database.prepare(`
+      INSERT INTO events (id, rule_id, comment_id, comment_text, commenter_ig_id, commenter_username, media_ig_id, dm_status, dm_message_id, tracking_id, created_at, synced_to_sheet)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const ev of data) {
+      if (!ev.comment_id) continue;
+      const existing = checkStmt.get(ev.comment_id);
+      if (!existing) {
+        try {
+          insertStmt.run(
+            ev.id,
+            ev.rule_id || null,
+            ev.comment_id,
+            ev.comment_text || '',
+            ev.commenter_ig_id || '',
+            ev.commenter_username || '',
+            ev.media_ig_id || '',
+            ev.dm_status || 'delivered',
+            ev.dm_message_id || null,
+            ev.tracking_id || null,
+            ev.created_at || new Date().toISOString(),
+            ev.synced_to_sheet || 0
+          );
+          restoredCount++;
+        } catch (insertErr) {
+          database.prepare(`
+            INSERT INTO events (rule_id, comment_id, comment_text, commenter_ig_id, commenter_username, media_ig_id, dm_status, dm_message_id, tracking_id, created_at, synced_to_sheet)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            ev.rule_id || null,
+            ev.comment_id,
+            ev.comment_text || '',
+            ev.commenter_ig_id || '',
+            ev.commenter_username || '',
+            ev.media_ig_id || '',
+            ev.dm_status || 'delivered',
+            ev.dm_message_id || null,
+            ev.tracking_id || null,
+            ev.created_at || new Date().toISOString(),
+            ev.synced_to_sheet || 0
+          );
+          restoredCount++;
+        }
+      }
+    }
+    return restoredCount;
+  } catch (e) {
+    console.warn('[Database] Failed to restore events from events.json:', e.message);
+    return 0;
+  }
+}
+
 module.exports = {
   getDb,
   getConfig,
-  setConfig
+  setConfig,
+  backupRules,
+  restoreRules,
+  backupEvents,
+  restoreEvents
 };

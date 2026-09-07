@@ -1,5 +1,5 @@
 const express = require('express');
-const { getDb, getConfig } = require('../database');
+const { getDb, getConfig, backupRules } = require('../database');
 const auth = require('../middleware/auth');
 const { getMediaComments } = require('../services/instagram');
 const { enqueue } = require('../services/queue');
@@ -12,14 +12,11 @@ router.get('/rules', auth, (req, res) => {
     try {
         const db = getDb();
 
-        // Auto-link any rules whose media_id no longer matches
+        // If any rule has an IG media ID string as media_id, resolve it to local media.id if present
         try {
-            const orphanRules = db.prepare("SELECT id FROM rules WHERE media_id IS NOT NULL AND media_id NOT IN (SELECT id FROM media)").all();
-            if (orphanRules.length > 0) {
-                const targetMedia = db.prepare("SELECT id FROM media ORDER BY id ASC LIMIT 1").get();
-                if (targetMedia) {
-                    db.prepare("UPDATE rules SET media_id = ? WHERE media_id IS NOT NULL AND media_id NOT IN (SELECT id FROM media)").run(targetMedia.id);
-                }
+            const rulesWithIgId = db.prepare("SELECT r.id, m.id as real_media_id FROM rules r JOIN media m ON r.media_id = m.ig_media_id WHERE r.media_id != m.id").all();
+            for (const r of rulesWithIgId) {
+                db.prepare("UPDATE rules SET media_id = ? WHERE id = ?").run(r.real_media_id, r.id);
             }
         } catch(e) {}
 
@@ -27,15 +24,15 @@ router.get('/rules', auth, (req, res) => {
         let query = `
             SELECT r.*, r.trigger_keyword as trigger_word, m.ig_media_id, m.thumbnail_url 
             FROM rules r 
-            LEFT JOIN media m ON r.media_id = m.id
+            LEFT JOIN media m ON (r.media_id = m.id OR r.media_id = m.ig_media_id)
         `;
         const params = [];
 
         if (media_id === 'global') {
             query += ' WHERE r.media_id IS NULL';
         } else if (media_id) {
-            query += ' WHERE r.media_id = ?';
-            params.push(media_id);
+            query += ' WHERE (r.media_id = ? OR m.ig_media_id = ?)';
+            params.push(media_id, media_id);
         }
 
         query += ' ORDER BY r.created_at DESC';
@@ -122,6 +119,8 @@ router.post('/rules', auth, (req, res) => {
             new Date().toISOString()
         );
 
+        try { backupRules(db); } catch(e) { console.error('Error backing up rules:', e); }
+
         res.json({ id: result.lastInsertRowid, success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -160,6 +159,8 @@ router.put('/rules/:id', auth, (req, res) => {
             new Date().toISOString(), 
             id
         );
+
+        try { backupRules(db); } catch(e) { console.error('Error backing up rules:', e); }
 
         res.json({ success: true });
     } catch (err) {
@@ -232,6 +233,8 @@ router.patch('/rules/:id/toggle', auth, (req, res) => {
         const newStatus = rule.is_active === 1 ? 0 : 1;
         db.prepare('UPDATE rules SET is_active = ?, updated_at = ? WHERE id = ?').run(newStatus, new Date().toISOString(), id);
 
+        try { backupRules(db); } catch(e) { console.error('Error backing up rules:', e); }
+
         res.json({ success: true, is_active: newStatus });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -243,6 +246,9 @@ router.delete('/rules/:id', auth, (req, res) => {
         const db = getDb();
         const { id } = req.params;
         db.prepare('DELETE FROM rules WHERE id = ?').run(id);
+
+        try { backupRules(db); } catch(e) { console.error('Error backing up rules:', e); }
+
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
