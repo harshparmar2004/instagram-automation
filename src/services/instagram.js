@@ -6,8 +6,13 @@ const IG_API_BASE = `https://graph.instagram.com/${GRAPH_VERSION}`;
 const FB_API_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
 
 async function exchangeCodeForToken(code) {
-    const appId = getConfig('meta_app_id');
-    const appSecret = getConfig('meta_app_secret');
+    let appId = process.env.META_APP_ID || getConfig('meta_app_id');
+    if (appId) appId = String(appId).replace(/['"\s]/g, '').trim();
+    if (!appId || appId === '9876543210123') appId = '28028411953483811';
+
+    let appSecret = process.env.META_APP_SECRET || getConfig('meta_app_secret');
+    if (appSecret) appSecret = String(appSecret).replace(/['"\s]/g, '').trim();
+
     const redirectUri = getConfig('redirect_uri') || require('../config').BASE_URL + '/auth/instagram/callback';
 
     const form = new URLSearchParams();
@@ -22,7 +27,8 @@ async function exchangeCodeForToken(code) {
 }
 
 async function exchangeLongLivedToken(shortToken) {
-    const appSecret = getConfig('meta_app_secret');
+    let appSecret = process.env.META_APP_SECRET || getConfig('meta_app_secret');
+    if (appSecret) appSecret = String(appSecret).replace(/['"\s]/g, '').trim();
     
     const res = await axios.get(`${IG_API_BASE}/access_token`, {
         params: {
