@@ -1,5 +1,6 @@
 const express = require('express');
 const { getDb } = require('../database');
+const { syncClickToSheet } = require('../services/googleSheets');
 
 const router = express.Router();
 
@@ -19,11 +20,14 @@ router.get('/r/:trackingId', (req, res) => {
             return res.status(404).send('Link not found');
         }
 
-        // Log click
+        // Log click in local DB
         db.prepare(`
             INSERT INTO clicks (event_id, tracking_id, clicked_at, user_agent) 
             VALUES (?, ?, ?, ?)
         `).run(event.event_id, trackingId, new Date().toISOString(), req.get('User-Agent') || '');
+
+        // Asynchronously update Google Sheet
+        try { syncClickToSheet(trackingId).catch(() => {}); } catch(e) {}
 
         res.redirect(event.link_url);
     } catch (err) {

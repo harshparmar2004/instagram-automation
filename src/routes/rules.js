@@ -67,6 +67,16 @@ router.get('/rules/:id', auth, (req, res) => {
     }
 });
 
+function cleanUrl(url) {
+    if (!url) return null;
+    let trimmed = String(url).trim();
+    if (!trimmed) return null;
+    if (!/^https?:\/\//i.test(trimmed)) {
+        trimmed = 'https://' + trimmed;
+    }
+    return trimmed;
+}
+
 router.post('/rules', auth, (req, res) => {
     try {
         const db = getDb();
@@ -93,6 +103,8 @@ router.post('/rules', auth, (req, res) => {
             }
         }
 
+        const sanitizedUrl = cleanUrl(link_url);
+
         const result = db.prepare(`
             INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -101,7 +113,7 @@ router.post('/rules', auth, (req, res) => {
             keyword, 
             action_type, 
             response_text || null, 
-            link_url || null, 
+            sanitizedUrl, 
             follow_prompt || null, 
             public_reply || null,
             parseInt(delay_seconds || 0),
@@ -122,6 +134,7 @@ router.put('/rules/:id', auth, (req, res) => {
         const { id } = req.params;
         const { trigger_keyword, trigger_word, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json } = req.body;
         const keyword = trigger_keyword || trigger_word;
+        const sanitizedUrl = cleanUrl(link_url);
 
         db.prepare(`
             UPDATE rules SET 
@@ -139,7 +152,7 @@ router.put('/rules/:id', auth, (req, res) => {
             keyword, 
             action_type, 
             response_text || null, 
-            link_url || null, 
+            sanitizedUrl, 
             follow_prompt || null, 
             public_reply || null, 
             parseInt(delay_seconds || 0),
@@ -295,12 +308,20 @@ router.post('/rules/:id/backfill', auth, async (req, res) => {
                 const delayMs = queuedCount * 1500;
                 const processAt = Date.now() + delayMs;
 
-                let messageToSend = rule.response_text || 'Here is your resource link!';
+                let messageToSend = (rule.response_text || '').trim();
+                const directLink = (rule.link_url || '').trim();
                 let trackingId = null;
 
                 if (rule.action_type === 'link_dm') {
-                    trackingId = uuidv4();
-                    messageToSend = `${messageToSend}\n${config.BASE_URL}/r/${trackingId}`;
+                    if (directLink) {
+                        if (messageToSend.includes(directLink)) {
+                            // Link already embedded in text
+                        } else {
+                            messageToSend = messageToSend ? `${messageToSend}\n${directLink}` : directLink;
+                        }
+                    } else if (!messageToSend) {
+                        messageToSend = 'Here is your resource link!';
+                    }
                 } else if (rule.action_type === 'follow_first') {
                     messageToSend = rule.follow_prompt || `Hey @${from.username || 'friend'}! Please follow us first, then reply "DONE" to unlock your link!`;
                 }

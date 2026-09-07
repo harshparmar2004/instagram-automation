@@ -25,7 +25,7 @@ router.get('/status', auth, (req, res) => {
         tokenHealth = daysLeft > 10 ? 'healthy' : daysLeft > 0 ? 'expiring' : 'expired';
     }
 
-    const isConnected = !!(accessToken && accessToken.trim());
+    const isConnected = !!(accessToken && accessToken.trim() && !accessToken.includes('•'));
     let mediaCount = 0;
     try {
         const row = db.prepare('SELECT COUNT(*) as cnt FROM media').get();
@@ -35,6 +35,8 @@ router.get('/status', auth, (req, res) => {
     res.json({
         configured: !!appId,
         connected: isConnected,
+        hasToken: isConnected,
+        tokenPreview: isConnected ? `${accessToken.slice(0, 8)}••••••••${accessToken.slice(-4)}` : '',
         username: igUsername || (isConnected ? 'connected.creator' : ''),
         igUserId: igUserId || '',
         profilePic: getConfig('ig_profile_pic') || '',
@@ -56,32 +58,79 @@ router.post('/setup', auth, (req, res) => {
     const token = verifyToken || webhook_verify_token;
 
     if (id) setConfig('meta_app_id', id.trim());
-    if (secret && secret !== '********') setConfig('meta_app_secret', secret.trim());
+    if (secret && secret !== '********' && !secret.includes('•')) setConfig('meta_app_secret', secret.trim());
     if (token) setConfig('webhook_verify_token', token.trim());
     
     res.json({ success: true, message: 'Meta credentials saved successfully' });
 });
 
 /**
- * ⚡ Creator 1-Click Token Connection Endpoint
- * Allows creators to enter their Instagram Access Token directly!
+ * 💾 Save Credentials Endpoint (Local & Persistent)
+ * Saves Instagram Access Token, Username, and Account ID permanently without breaking on network calls.
  */
-router.post('/setup/connect-token', auth, async (req, res) => {
+router.post('/setup/save-credentials', auth, (req, res) => {
     try {
         const { accessToken, username, igUserId } = req.body;
-        if (!accessToken || !accessToken.trim()) {
-            return res.status(400).json({ error: 'Access token is required' });
+        let tokenSaved = false;
+
+        if (accessToken && accessToken.trim() && !accessToken.includes('•') && !accessToken.includes('***')) {
+            setConfig('access_token', accessToken.trim());
+            setConfig('token_expires_at', new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString());
+            tokenSaved = true;
         }
 
-        const trimmedToken = accessToken.trim();
-        let targetUsername = (username || '').replace('@', '').trim();
-        let resolvedIgUserId = (igUserId || '').trim();
+        if (username) {
+            const cleanUser = username.replace('@', '').trim();
+            if (cleanUser) setConfig('ig_username', cleanUser);
+        }
+
+        if (igUserId && igUserId.trim()) {
+            setConfig('ig_user_id', igUserId.trim());
+        }
+
+        const currentToken = getConfig('access_token');
+        const hasToken = !!(currentToken && currentToken.trim() && !currentToken.includes('•'));
+
+        res.json({
+            success: true,
+            hasToken,
+            tokenSaved,
+            username: getConfig('ig_username') || '',
+            igUserId: getConfig('ig_user_id') || '',
+            message: '💾 All credentials saved permanently to system config & .env file!'
+        });
+    } catch (err) {
+        console.error('[Setup] Error saving credentials:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * ⚡ Creator 1-Click Token Connection & Sync Endpoint
+ * Connects, validates with Meta, syncs Reels, and saves everything permanently.
+ */
+async function handleConnectAndScan(req, res) {
+    try {
+        const { accessToken, username, igUserId } = req.body;
+        
+        let tokenToUse = (accessToken || '').trim();
+        // Fallback to saved token if empty or masked with dots
+        if (!tokenToUse || tokenToUse.includes('•') || tokenToUse.includes('***')) {
+            tokenToUse = getConfig('access_token');
+        }
+
+        if (!tokenToUse || !tokenToUse.trim()) {
+            return res.status(400).json({ error: 'Instagram Access Token is required. Please paste your token.' });
+        }
+
+        let targetUsername = (username || getConfig('ig_username') || '').replace('@', '').trim();
+        let resolvedIgUserId = (igUserId || getConfig('ig_user_id') || '').trim();
         let profilePic = '';
 
         console.log('[Setup] Verifying access token with Meta API...');
 
         try {
-            const profile = await getUserProfile(trimmedToken);
+            const profile = await getUserProfile(tokenToUse);
             if (profile?.id) {
                 resolvedIgUserId = profile.id;
             }
@@ -101,7 +150,7 @@ router.post('/setup/connect-token', auth, async (req, res) => {
         }
 
         const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
-        setConfig('access_token', trimmedToken);
+        setConfig('access_token', tokenToUse);
         setConfig('token_expires_at', expiresAt);
         if (targetUsername) setConfig('ig_username', targetUsername);
         if (resolvedIgUserId) setConfig('ig_user_id', resolvedIgUserId);
@@ -136,14 +185,17 @@ router.post('/setup/connect-token', auth, async (req, res) => {
             syncError: syncErrMessage,
             tokenExpiresAt: expiresAt,
             message: syncCount > 0 
-                ? `🎉 Success! @${targetUsername || 'account'} connected and ${syncCount} live Instagram Reels synced!`
-                : `✅ Token connected for @${targetUsername || 'account'}!${syncErrMessage ? ` (Sync notice: ${syncErrMessage})` : ''}`
+                ? `🎉 Saved & Synced! @${targetUsername || 'account'} connected and ${syncCount} live Instagram Reels scanned!`
+                : `✅ Credentials saved and token connected for @${targetUsername || 'account'}!${syncErrMessage ? ` (Sync notice: ${syncErrMessage})` : ''}`
         });
     } catch (err) {
-        console.error('[Setup] Failed to connect token:', err);
+        console.error('[Setup] Failed to connect & scan:', err);
         res.status(500).json({ error: err.response?.data?.error?.message || err.message });
     }
-});
+}
+
+router.post('/setup/connect-token', auth, handleConnectAndScan);
+router.post('/setup/connect-scan-save', auth, handleConnectAndScan);
 
 router.post('/setup/clear-demo', auth, async (req, res) => {
     try {

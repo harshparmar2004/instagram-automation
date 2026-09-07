@@ -1,6 +1,7 @@
 const { getDb, getConfig } = require('../database');
 const { getSingleMedia } = require('./instagram');
 const { enqueue } = require('./queue');
+const { syncLeadToSheet } = require('./googleSheets');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
 
@@ -201,14 +202,29 @@ async function processCommentEvent(payload) {
 
                 let trackingId = null;
                 let messageToSend = '';
-                const baseResponse = getRandomResponseText(rule);
+                const baseResponse = (getRandomResponseText(rule) || '').trim();
+                let finalLink = (rule.link_url || '').trim();
+                if (finalLink && !/^https?:\/\//i.test(finalLink)) {
+                    finalLink = 'https://' + finalLink;
+                }
 
                 if (rule.action_type === 'direct_dm') {
                     messageToSend = baseResponse;
                 } else if (rule.action_type === 'link_dm') {
-                    trackingId = uuidv4();
-                    const trackedUrl = `${config.BASE_URL}/r/${trackingId}`;
-                    messageToSend = `${baseResponse}\n${trackedUrl}`;
+                    // Send the real, direct link URL configured by creator (no broken redirect cloaks)
+                    if (finalLink) {
+                        if (baseResponse.includes('{link}')) {
+                            messageToSend = baseResponse.replace(/\{link\}/gi, finalLink);
+                        } else if (baseResponse.includes('{url}')) {
+                            messageToSend = baseResponse.replace(/\{url\}/gi, finalLink);
+                        } else if (baseResponse.includes(finalLink)) {
+                            messageToSend = baseResponse;
+                        } else {
+                            messageToSend = baseResponse ? `${baseResponse}\n${finalLink}` : finalLink;
+                        }
+                    } else {
+                        messageToSend = baseResponse || 'Here is your requested link!';
+                    }
                 } else if (rule.action_type === 'follow_first') {
                     messageToSend = rule.follow_prompt || `Hey @${from.username || 'friend'}! 🚀 Thanks for commenting! Please follow us first, then reply "DONE" in this DM to unlock your link!`;
                 }
@@ -223,6 +239,19 @@ async function processCommentEvent(payload) {
                 );
                 
                 const eventId = eventResult.lastInsertRowid;
+
+                // Asynchronously sync lead to Google Sheet (non-blocking)
+                syncLeadToSheet({
+                    eventId,
+                    date: new Date().toLocaleString(),
+                    username: from.username || 'user',
+                    comment: text,
+                    keyword: rule.trigger_keyword,
+                    action_type: rule.action_type,
+                    status: 'delivered',
+                    mediaIgId: mediaId,
+                    linkClicked: false
+                }).catch(() => {});
 
                 if (rule.action_type === 'follow_first') {
                     db.prepare(`
@@ -290,10 +319,21 @@ async function processMessageEvent(payload) {
                 const rule = db.prepare("SELECT * FROM rules WHERE id = ?").get(conv.rule_id);
                 if (!rule) continue;
 
-                const trackingId = uuidv4();
-                const trackedUrl = `${config.BASE_URL}/r/${trackingId}`;
-                const baseResponse = getRandomResponseText(rule);
-                const messageToSend = `🎉 Thank you for following @creator.studio! Here is your requested resource link:\n${trackedUrl}`;
+                const directLink = (rule.link_url || '').trim();
+                const baseResponse = (getRandomResponseText(rule) || '').trim();
+                let messageToSend = '';
+                if (directLink) {
+                    if (baseResponse && !baseResponse.includes(directLink)) {
+                        messageToSend = `${baseResponse}\n${directLink}`;
+                    } else if (baseResponse) {
+                        messageToSend = baseResponse;
+                    } else {
+                        messageToSend = `🎉 Thank you for following! Here is your requested link:\n${directLink}`;
+                    }
+                } else {
+                    messageToSend = baseResponse || '🎉 Thank you for following!';
+                }
+                const trackingId = null;
 
                 const prevEvent = db.prepare("SELECT media_ig_id, commenter_username FROM events WHERE id = ?").get(conv.event_id);
                 const mediaIgId = prevEvent ? prevEvent.media_ig_id : null;

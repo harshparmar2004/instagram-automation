@@ -67,6 +67,7 @@ router.get('/events', auth, (req, res) => {
                 link_clicked: hasClicks,
                 media_caption: ev.media_caption,
                 media_thumbnail: ev.media_thumbnail,
+                synced_to_sheet: !!ev.synced_to_sheet,
                 created_at: ev.created_at
             };
         });

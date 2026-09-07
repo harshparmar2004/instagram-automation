@@ -294,6 +294,20 @@ window.activity = {
                                             🎯 Deliverable Link Clicked ✓
                                         </span>
                                     ` : ''}
+
+                                    ${ev.synced_to_sheet ? `
+                                        <span style="
+                                            color: #2E7D32;
+                                            font-weight: 800;
+                                            background: #F4FBF7;
+                                            padding: 0.15rem 0.55rem;
+                                            border-radius: 6px;
+                                            border: 1px solid #A3D9B1;
+                                            font-size: 0.76rem;
+                                        ">
+                                            📊 Sheet Synced ✓
+                                        </span>
+                                    ` : ''}
                                 </div>
                             </div>
 

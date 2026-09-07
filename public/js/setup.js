@@ -69,10 +69,44 @@ window.setup = {
         }
     },
 
+    async saveCredentials() {
+        const btn = document.getElementById('btn-save-credentials');
+        if (btn) {
+            btn.innerHTML = '<span class="spinner"></span> Saving...';
+            btn.disabled = true;
+        }
+        try {
+            const tokenInput = document.getElementById('creator_token_input');
+            const tokenVal = tokenInput ? tokenInput.value.trim() : '';
+            const payload = {
+                accessToken: tokenVal,
+                username: document.getElementById('creator_handle_input')?.value || '',
+                igUserId: document.getElementById('creator_ig_user_id')?.value || ''
+            };
+            const res = await App.apiCall('POST', '/api/setup/save-credentials', payload);
+            App.showToast(res.message || '💾 Credentials saved successfully!', 'success');
+            if (tokenInput && tokenVal) {
+                tokenInput.value = '';
+            }
+            await this.loadStatus();
+        } catch(err) {
+            App.showToast(err.message, 'error');
+        } finally {
+            if (btn) {
+                btn.innerHTML = '💾 Save Credentials';
+                btn.disabled = false;
+            }
+        }
+    },
+
     async loadStatus() {
         try {
             const status = await App.apiCall('GET', '/api/status');
-            this.renderContent(status);
+            let sheetInfo = {};
+            try {
+                sheetInfo = await App.apiCall('GET', '/api/integrations/sheets');
+            } catch(e) {}
+            this.renderContent(status, sheetInfo);
         } catch (err) {
             document.getElementById('setup-content').innerHTML = `
                 <div class="card" style="border-color: var(--error); padding: 2rem;">
@@ -109,7 +143,7 @@ window.setup = {
         }
     },
 
-    renderContent(status) {
+    renderContent(status, sheetInfo = {}) {
         const content = document.getElementById('setup-content');
         let html = '';
 
@@ -152,26 +186,46 @@ window.setup = {
         `;
 
         // 2. FAST CREATOR TOKEN CONNECT CARD
+        const hasSavedToken = !!status.hasToken;
         html += `
             <div class="card" style="padding: 1.5rem 1.75rem; border-radius: 18px; background: #FAF8F5; border: 2px solid var(--accent-primary); box-shadow: 0 4px 20px rgba(217,119,87,0.08); width: 100%;">
-                <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
-                    <span style="font-size: 1.3rem;">⚡</span>
-                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.2rem; color: var(--accent-primary); margin: 0;">
-                        Fast Creator Token Connect (Connect Real Account)
-                    </h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.35rem;">
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <span style="font-size: 1.3rem;">⚡</span>
+                        <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.2rem; color: var(--accent-primary); margin: 0;">
+                            Fast Creator Token Connect & Reel Sync
+                        </h2>
+                    </div>
+                    <div>
+                        <span class="badge ${hasSavedToken ? 'badge-green' : 'badge-orange'}" style="font-size: 0.8rem; font-weight: 800; padding: 0.35rem 0.75rem;">
+                            ${hasSavedToken ? `🟢 Token Stored (${status.tokenPreview || 'Active'})` : '⚠️ Token Required'}
+                        </span>
+                    </div>
                 </div>
                 <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 1.15rem; line-height: 1.45;">
-                    Paste your Instagram Access Token below. InstaAuto will query Meta to auto-detect your Instagram Business Account, link your handle, and immediately sync all your live Reels!
+                    Configure your Instagram credentials below. You can <strong>Save</strong> your information permanently to the server, and <strong>Connect, Scan & Save All</strong> to verify with Meta and sync your live Reels automatically.
                 </p>
 
                 <!-- CONNECT ERROR DISPLAY BOX -->
                 <div id="connect-error-box" style="display: none; padding: 0.85rem 1rem; background: #FFEBEE; border: 1.5px solid #E53935; border-radius: 10px; color: #C62828; font-size: 0.84rem; font-weight: 600; margin-bottom: 1rem; line-height: 1.45;"></div>
 
-                <form id="creator-token-form" style="display: flex; flex-direction: column; gap: 0.95rem;">
-                    <div style="display: grid; grid-template-columns: 1fr 220px; gap: 0.85rem;">
+                <form id="creator-token-form" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div style="display: grid; grid-template-columns: 1fr 240px; gap: 0.85rem;">
                         <div style="display: flex; flex-direction: column; gap: 0.35rem;">
-                            <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">Instagram Access Token (Required)</label>
-                            <input type="password" id="creator_token_input" placeholder="Paste your EAA... or IG... access token here" required style="width: 100%; padding: 0.7rem 1rem; font-size: 0.88rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FFFFFF; outline: none;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">
+                                    Instagram Access Token ${hasSavedToken ? '<span style="color:#2E7D32; font-weight:700;">(✓ Stored & Saved)</span>' : '<span style="color:#E53935; font-weight:700;">(Required)</span>'}
+                                </label>
+                                ${hasSavedToken ? `
+                                    <span style="font-size: 0.76rem; color: #2E7D32; font-weight: 700;">
+                                        ✓ Saved in config & .env
+                                    </span>
+                                ` : ''}
+                            </div>
+                            <input type="password" id="creator_token_input" 
+                                placeholder="${hasSavedToken ? '•••••••••••••••• (Saved — leave empty to keep)' : 'Paste your EAA... or IG... access token here'}" 
+                                ${hasSavedToken ? '' : 'required'} 
+                                style="width: 100%; padding: 0.7rem 1rem; font-size: 0.88rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FFFFFF; outline: none;">
                         </div>
 
                         <div style="display: flex; flex-direction: column; gap: 0.35rem;">
@@ -180,17 +234,28 @@ window.setup = {
                         </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.85rem; align-items: end;">
-                        <div style="display: flex; flex-direction: column; gap: 0.35rem;">
-                            <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">
-                                Instagram Account ID (Optional — auto-detected if left empty)
-                            </label>
-                            <input type="text" id="creator_ig_user_id" value="${status.igUserId || ''}" placeholder="e.g. 17841400000000000 (Optional)" style="width: 100%; padding: 0.65rem 1rem; font-size: 0.84rem; font-weight: 500; border-radius: 10px; border: 1px solid #D1C9BE; background: #FFFFFF; outline: none;">
-                        </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                        <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">
+                            Instagram Account ID (Optional — auto-detected if left empty)
+                        </label>
+                        <input type="text" id="creator_ig_user_id" value="${status.igUserId || ''}" placeholder="e.g. 17841400000000000 (Optional)" style="width: 100%; padding: 0.65rem 1rem; font-size: 0.84rem; font-weight: 500; border-radius: 10px; border: 1px solid #D1C9BE; background: #FFFFFF; outline: none;">
+                    </div>
 
-                        <button type="submit" class="btn btn-primary" style="padding: 0.75rem 1.65rem; font-size: 0.9rem; font-weight: 800; border-radius: 10px; white-space: nowrap;">
-                            ⚡ Connect & Sync Reels
+                    <!-- ACTION BUTTONS: SAVE vs CONNECT, SCAN & SAVE -->
+                    <div style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap; margin-top: 0.25rem;">
+                        <button type="submit" id="btn-connect-scan" class="btn btn-primary" style="padding: 0.75rem 1.65rem; font-size: 0.9rem; font-weight: 800; border-radius: 10px; white-space: nowrap;">
+                            🚀 Connect, Scan & Save All
                         </button>
+
+                        <button type="button" id="btn-save-credentials" onclick="setup.saveCredentials()" class="btn btn-secondary" style="padding: 0.75rem 1.5rem; font-size: 0.9rem; font-weight: 800; border-radius: 10px; background: #FFFFFF; border: 1.5px solid #D1C9BE; color: var(--text-primary); white-space: nowrap;">
+                            💾 Save Credentials
+                        </button>
+
+                        ${hasSavedToken ? `
+                            <button type="button" id="btn-quick-scan" class="btn btn-secondary" onclick="setup.syncNow()" style="padding: 0.75rem 1.35rem; font-size: 0.88rem; font-weight: 700; border-radius: 10px; background: #FAF8F5; border: 1px solid var(--border-color); color: #0369A1; margin-left: auto;">
+                                🔄 Rescan Reels (${mediaCount} Synced)
+                            </button>
+                        ` : ''}
                     </div>
                 </form>
             </div>
@@ -345,35 +410,124 @@ window.setup = {
             </div>
         `;
 
+        // 6. GOOGLE SHEETS LIVE SYNC SECTION
+        const isSheetActive = !!(sheetInfo.configured && sheetInfo.enabled);
+        html += `
+            <div class="card" style="border-radius:18px; padding: 1.65rem 1.85rem; border: 1.5px solid ${isSheetActive ? '#2E7D32' : 'var(--border-color)'}; background:#FFFFFF; box-shadow: 0 4px 20px rgba(0,0,0,0.03); width: 100%;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom: 0.85rem;">
+                    <div style="display:flex; align-items:center; gap:0.75rem;">
+                        <span style="font-size:1.5rem;">📊</span>
+                        <div>
+                            <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.22rem; color: var(--text-primary); margin: 0;">
+                                Google Sheets Real-Time Live Sync
+                            </h2>
+                            <div style="font-size: 0.86rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                                Auto-append every follower who comments and triggers a DM directly into your Google Sheet in real time.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span class="badge ${isSheetActive ? 'badge-green' : 'badge-gray'}" style="font-size: 0.82rem; font-weight: 800; padding: 0.4rem 0.85rem;">
+                            ${isSheetActive ? '🟢 Active & Syncing' : '⚪ Not Connected'}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- STATS STRIP -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.85rem; margin-bottom: 1.25rem;">
+                    <div style="padding: 0.85rem 1rem; background: #FAF8F5; border-radius: 12px; border: 1px solid var(--border-color);">
+                        <div style="font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase;">Total Leads in App</div>
+                        <div style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;">${sheetInfo.total_leads || 0}</div>
+                    </div>
+                    <div style="padding: 0.85rem 1rem; background: #FAF8F5; border-radius: 12px; border: 1px solid var(--border-color);">
+                        <div style="font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase;">Synced to Google Sheet</div>
+                        <div style="font-size: 1.15rem; font-weight: 800; color: #2E7D32; margin-top: 0.2rem;">${sheetInfo.synced_leads || 0}</div>
+                    </div>
+                    <div style="padding: 0.85rem 1rem; background: #FAF8F5; border-radius: 12px; border: 1px solid var(--border-color);">
+                        <div style="font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase;">Sync Mode</div>
+                        <div style="font-size: 0.95rem; font-weight: 800; color: var(--text-primary); margin-top: 0.35rem;">⚡ Real-Time Instant</div>
+                    </div>
+                </div>
+
+                <!-- 3-STEP SETUP GUIDE ACCORDION / BOX -->
+                <div style="background: #FDF8F6; border: 1.5px solid #F0D3C9; border-radius: 14px; padding: 1.1rem 1.35rem; margin-bottom: 1.35rem;">
+                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.88rem; color: var(--accent-primary); margin-bottom: 0.45rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                        <span>⚡ 3-Step Setup (Takes 60 Seconds — Zero Google Cloud API needed):</span>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="setup.copyGoogleAppsScript()" style="font-size: 0.78rem; font-weight: 800; padding: 0.35rem 0.85rem; background: #FFFFFF; border-color: var(--accent-primary); color: var(--accent-primary);">
+                            📋 Copy Apps Script Code
+                        </button>
+                    </div>
+                    <ol style="margin: 0; padding-left: 1.25rem; font-size: 0.84rem; color: var(--text-secondary); line-height: 1.55;">
+                        <li>Create a new Google Sheet, click <strong>Extensions → Apps Script</strong>, and delete any default code.</li>
+                        <li>Click <strong>"📋 Copy Apps Script Code"</strong> above, paste it into the Apps Script editor, and click Save.</li>
+                        <li>Click <strong>Deploy → New deployment → Select type: Web app</strong>, set <em>"Who has access"</em> to <strong>Anyone</strong>, click Deploy, and paste your Web app URL below!</li>
+                    </ol>
+                </div>
+
+                <!-- WEBHOOK URL INPUT FORM -->
+                <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+                    <div>
+                        <label style="font-size: 0.84rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.35rem; display: block;">
+                            Google Sheet Web App URL
+                        </label>
+                        <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
+                            <input type="url" id="input-sheet-webhook" value="${sheetInfo.webhook_url || ''}" placeholder="https://script.google.com/macros/s/AKfycb.../exec" style="flex: 1; min-width: 260px; padding: 0.7rem 1rem; font-size: 0.88rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none;">
+                            <button type="button" id="btn-save-sheet-url" class="btn btn-primary" onclick="setup.saveGoogleSheets()" style="font-weight: 800; padding: 0.7rem 1.45rem; border-radius: 10px; white-space: nowrap;">
+                                💾 Save URL
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.35rem;">
+                        <button type="button" id="btn-test-sheet-sync" class="btn btn-secondary" onclick="setup.testGoogleSheets()" style="font-weight: 700; font-size: 0.85rem; padding: 0.55rem 1.15rem; background: #FFFFFF; border: 1px solid var(--border-color); color: #0369A1;">
+                            🧪 Test Connection & Send Sample Lead
+                        </button>
+                        <button type="button" id="btn-bulk-sheet-sync" class="btn btn-secondary" onclick="setup.bulkSyncGoogleSheets()" style="font-weight: 700; font-size: 0.85rem; padding: 0.55rem 1.15rem; background: #FFFFFF; border: 1px solid var(--border-color); color: #2E7D32;">
+                            ⚡ Sync Past Captured Leads (${sheetInfo.total_leads || 0})
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
         content.innerHTML = html;
 
         // BIND CREATOR TOKEN FAST CONNECT FORM
         document.getElementById('creator-token-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const btn = e.target.querySelector('button[type="submit"]');
+            const btn = document.getElementById('btn-connect-scan') || e.target.querySelector('button[type="submit"]');
             const errorBox = document.getElementById('connect-error-box');
-            errorBox.style.display = 'none';
+            if (errorBox) errorBox.style.display = 'none';
 
-            btn.innerHTML = '<span class="spinner"></span> Connecting & Syncing...';
-            btn.disabled = true;
+            if (btn) {
+                btn.innerHTML = '<span class="spinner"></span> Connecting, Scanning & Saving...';
+                btn.disabled = true;
+            }
 
+            const tokenInput = document.getElementById('creator_token_input');
             const payload = {
-                accessToken: document.getElementById('creator_token_input').value,
-                username: document.getElementById('creator_handle_input').value,
-                igUserId: document.getElementById('creator_ig_user_id').value
+                accessToken: tokenInput ? tokenInput.value.trim() : '',
+                username: document.getElementById('creator_handle_input')?.value || '',
+                igUserId: document.getElementById('creator_ig_user_id')?.value || ''
             };
 
             try {
-                const res = await App.apiCall('POST', '/api/setup/connect-token', payload);
-                App.showToast(res.message || '✅ Account connected successfully!', 'success');
+                const res = await App.apiCall('POST', '/api/setup/connect-scan-save', payload);
+                App.showToast(res.message || '✅ Account connected and Reels scanned successfully!', 'success');
+                if (tokenInput) tokenInput.value = '';
                 await this.loadStatus();
             } catch (err) {
-                errorBox.innerHTML = `⚠️ <strong>Connection Notice:</strong> ${err.message}`;
-                errorBox.style.display = 'block';
+                if (errorBox) {
+                    errorBox.innerHTML = `⚠️ <strong>Connection Notice:</strong> ${err.message}`;
+                    errorBox.style.display = 'block';
+                }
                 App.showToast(err.message, 'error');
             } finally {
-                btn.innerHTML = '⚡ Connect & Sync Reels';
-                btn.disabled = false;
+                if (btn) {
+                    btn.innerHTML = '🚀 Connect, Scan & Save All';
+                    btn.disabled = false;
+                }
             }
         });
 
@@ -401,5 +555,127 @@ window.setup = {
                 btn.disabled = false;
             }
         });
+    },
+
+    copyGoogleAppsScript() {
+        const scriptCode = `function doPost(e) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    
+    // Auto-create styled headers on first run
+    if (sheet.getLastRow() === 0) {
+      var headers = ["Date", "Username", "Comment Text", "Trigger Keyword", "Action Taken", "Delivery Status", "Reel Link", "Link Clicked"];
+      sheet.appendRow(headers);
+      var headerRange = sheet.getRange(1, 1, 1, headers.length);
+      headerRange.setFontWeight("bold").setBackground("#D97757").setFontColor("#FFFFFF");
+      sheet.setFrozenRows(1);
+    }
+
+    var data = JSON.parse(e.postData.contents);
+
+    // Update link click if existing lead
+    if (data.action === "link_clicked") {
+      var rows = sheet.getDataRange().getValues();
+      for (var i = 1; i < rows.length; i++) {
+        if (rows[i][1] === data.username) {
+          sheet.getRange(i + 1, 8).setValue("YES (" + data.clicked_at + ")");
+          break;
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({result: "success", updated: true})).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Append new lead row
+    sheet.appendRow([
+      data.date || new Date().toLocaleString(),
+      data.username || "",
+      data.comment || "",
+      data.keyword || "",
+      data.action_type || "Direct Message",
+      data.delivery_status || "delivered",
+      data.reel_url || "",
+      data.link_clicked || "NO"
+    ]);
+
+    return ContentService.createTextOutput(JSON.stringify({result: "success"})).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({result: "error", message: err.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
+        navigator.clipboard.writeText(scriptCode);
+        App.showToast('📋 Google Apps Script code copied to clipboard! Paste it into your Google Sheet Apps Script.', 'success');
+    },
+
+    async saveGoogleSheets() {
+        const input = document.getElementById('input-sheet-webhook');
+        const url = input ? input.value.trim() : '';
+        const btn = document.getElementById('btn-save-sheet-url');
+        if (btn) {
+            btn.innerHTML = '<span class="spinner"></span> Saving...';
+            btn.disabled = true;
+        }
+        try {
+            const res = await App.apiCall('POST', '/api/integrations/sheets/save', {
+                webhook_url: url,
+                enabled: true
+            });
+            App.showToast(res.message || 'Google Sheet settings saved!', 'success');
+            await this.loadStatus();
+        } catch(err) {
+            App.showToast(err.message, 'error');
+        } finally {
+            if (btn) {
+                btn.innerHTML = '💾 Save URL';
+                btn.disabled = false;
+            }
+        }
+    },
+
+    async testGoogleSheets() {
+        const input = document.getElementById('input-sheet-webhook');
+        const url = input ? input.value.trim() : '';
+        if (!url) {
+            App.showToast('Please enter your Google Sheet Web App URL first', 'warning');
+            return;
+        }
+
+        const btn = document.getElementById('btn-test-sheet-sync');
+        if (btn) {
+            btn.innerHTML = '<span class="spinner"></span> Testing Connection...';
+            btn.disabled = true;
+        }
+        try {
+            const res = await App.apiCall('POST', '/api/integrations/sheets/test', { webhook_url: url });
+            App.showToast(`✅ ${res.message || 'Connected to Google Sheet successfully!'}`, 'success');
+            await this.loadStatus();
+        } catch(err) {
+            App.showToast(`Test failed: ${err.message}`, 'error');
+        } finally {
+            if (btn) {
+                btn.innerHTML = '🧪 Test Connection & Send Sample Lead';
+                btn.disabled = false;
+            }
+        }
+    },
+
+    async bulkSyncGoogleSheets() {
+        if (!confirm('This will send all historical captured leads from your database into your Google Sheet. Continue?')) return;
+        const btn = document.getElementById('btn-bulk-sheet-sync');
+        if (btn) {
+            btn.innerHTML = '<span class="spinner"></span> Syncing Past Leads...';
+            btn.disabled = true;
+        }
+        try {
+            const res = await App.apiCall('POST', '/api/integrations/sheets/bulk-sync');
+            App.showToast(res.message || 'Leads synced successfully!', 'success');
+            await this.loadStatus();
+        } catch(err) {
+            App.showToast(err.message, 'error');
+        } finally {
+            if (btn) {
+                btn.innerHTML = '⚡ Sync Past Captured Leads';
+                btn.disabled = false;
+            }
+        }
     }
 };

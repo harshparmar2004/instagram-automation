@@ -46,6 +46,7 @@ const oauthRoutes = require('./src/routes/oauth');
 const mediaRoutes = require('./src/routes/media');
 const rulesRoutes = require('./src/routes/rules');
 const eventsRoutes = require('./src/routes/events');
+const integrationsRoutes = require('./src/routes/integrations');
 const redirectRoutes = require('./src/routes/redirect');
 
 // Mount routes
@@ -61,6 +62,7 @@ app.use('/api', setupRoutes);
 app.use('/api', mediaRoutes);
 app.use('/api', rulesRoutes);
 app.use('/api', eventsRoutes);
+app.use('/api', integrationsRoutes);
 app.use('/auth', oauthRoutes);
 app.use('/', redirectRoutes);
 
@@ -91,6 +93,11 @@ cron.schedule('*/30 * * * *', async () => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+
+module.exports = app;
+
