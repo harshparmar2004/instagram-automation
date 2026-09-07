@@ -6,7 +6,16 @@ const config = require('../config');
 const router = express.Router();
 
 router.get('/instagram', (req, res) => {
-    const appId = getConfig('meta_app_id');
+    let appId = process.env.META_APP_ID || getConfig('meta_app_id');
+    if (appId) {
+        appId = String(appId).replace(/['"\s]/g, '').trim();
+    }
+
+    // Ignore placeholder dummy seed and fallback to user's real App ID
+    if (!appId || appId === '9876543210123') {
+        appId = '28028411953483811';
+    }
+
     if (!appId) {
         return res.status(400).send('Meta App ID not configured. Please save your Meta App ID in Settings first.');
     }
@@ -20,6 +29,7 @@ router.get('/instagram', (req, res) => {
     const scope = 'instagram_basic,instagram_manage_comments,instagram_manage_messages,pages_show_list,pages_read_engagement';
     
     const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
+    console.log(`[OAuth] Launching Meta OAuth with client_id: "${appId}", redirect_uri: "${redirectUri}"`);
     res.redirect(authUrl);
 });
 
