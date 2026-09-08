@@ -40,11 +40,11 @@ router.get('/instagram', (req, res) => {
 
     setConfig('redirect_uri', redirectUri);
 
-    const scope = 'instagram_basic,instagram_manage_comments,instagram_manage_messages,pages_show_list,pages_read_engagement';
+    const scope = req.query.scope || 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,pages_show_list,pages_read_engagement';
     
     // Using display=popup tells Meta Facebook dialog to format for a popup modal window
-    const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&display=popup`;
-    console.log(`[OAuth] Launching Meta OAuth with client_id: "${appId}", redirect_uri: "${redirectUri}"`);
+    const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code&display=popup`;
+    console.log(`[OAuth] Launching Meta OAuth with client_id: "${appId}", redirect_uri: "${redirectUri}", scope: "${scope}"`);
     res.redirect(authUrl);
 });
 
