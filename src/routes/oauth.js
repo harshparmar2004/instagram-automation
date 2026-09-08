@@ -42,14 +42,17 @@ router.get('/instagram', (req, res) => {
 
     const scope = req.query.scope || 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments';
     
-    // Using display=popup tells Meta Facebook dialog to format for a popup modal window
-    const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code&display=popup`;
-    console.log(`[OAuth] Launching Meta OAuth with client_id: "${appId}", redirect_uri: "${redirectUri}", scope: "${scope}"`);
+    // Official Instagram API with Instagram Login OAuth endpoint
+    const authUrl = `https://api.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code`;
+    console.log(`[OAuth] Launching Instagram Business OAuth with client_id: "${appId}", redirect_uri: "${redirectUri}", scope: "${scope}"`);
     res.redirect(authUrl);
 });
 
 router.get('/instagram/callback', async (req, res) => {
-    const { code, error, error_description } = req.query;
+    let { code, error, error_description } = req.query;
+    if (code) {
+        code = String(code).replace(/#_.*$/, '').replace(/#_$/, '').trim();
+    }
 
     const renderPopupResult = (success, title, message, extraData = {}) => {
         return `<!DOCTYPE html>

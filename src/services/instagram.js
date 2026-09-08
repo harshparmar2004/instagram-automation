@@ -35,16 +35,22 @@ async function exchangeCodeForToken(code, customRedirectUri = null) {
     }
 
     // Strategy 2: Instagram API exchange (for api.instagram.com/oauth/authorize)
-    console.log('[OAuth] Strategy 2: Exchanging code with api.instagram.com...');
-    const form = new URLSearchParams();
-    form.append('client_id', appId);
-    form.append('client_secret', appSecret);
-    form.append('grant_type', 'authorization_code');
-    form.append('redirect_uri', redirectUri);
-    form.append('code', code);
+    try {
+        console.log('[OAuth] Strategy 2: Exchanging code with api.instagram.com...');
+        const form = new URLSearchParams();
+        form.append('client_id', appId);
+        form.append('client_secret', appSecret);
+        form.append('grant_type', 'authorization_code');
+        form.append('redirect_uri', redirectUri);
+        form.append('code', code);
 
-    const res = await axios.post('https://api.instagram.com/oauth/access_token', form);
-    return res.data; // { access_token, user_id }
+        const res = await axios.post('https://api.instagram.com/oauth/access_token', form);
+        return res.data; // { access_token, user_id }
+    } catch (igErr) {
+        const errorMsg = igErr.response?.data?.error_message || igErr.response?.data?.error?.message || igErr.message;
+        console.error('[OAuth] Instagram token exchange error:', igErr.response?.data || igErr.message);
+        throw new Error(`Token exchange failed: ${errorMsg}`);
+    }
 }
 
 async function exchangeLongLivedToken(shortToken) {
