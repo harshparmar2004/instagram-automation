@@ -33,14 +33,16 @@ window.setup = {
         const height = 750;
         const left = window.screenX + (window.outerWidth - width) / 2;
         const top = window.screenY + (window.outerHeight - height) / 2;
+        const callbackUrl = window.location.origin + '/auth/instagram/callback';
+        const targetUrl = `/auth/instagram?redirect_uri=${encodeURIComponent(callbackUrl)}`;
         const popup = window.open(
-            '/auth/instagram',
+            targetUrl,
             'meta_oauth_popup',
             `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,status=yes`
         );
 
         if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-            window.location.href = '/auth/instagram';
+            window.location.href = targetUrl;
             return;
         }
 

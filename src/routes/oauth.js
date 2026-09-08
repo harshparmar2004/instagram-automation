@@ -21,11 +21,22 @@ router.get('/instagram', (req, res) => {
         return res.status(400).send('Meta App ID not configured. Please save your Meta App ID in Settings first.');
     }
 
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-    const host = req.headers['x-forwarded-host'] || req.get('host');
-    const redirectUri = (config.BASE_URL && !config.BASE_URL.includes('localhost'))
-        ? `${config.BASE_URL.replace(/\/$/, '')}/auth/instagram/callback`
-        : `${protocol}://${host}/auth/instagram/callback`;
+    let redirectUri = req.query.redirect_uri;
+    if (!redirectUri) {
+        if (config.BASE_URL && !config.BASE_URL.includes('localhost')) {
+            redirectUri = `${config.BASE_URL.replace(/\/$/, '')}/auth/instagram/callback`;
+        } else {
+            const protoHeader = req.headers['x-forwarded-proto'];
+            const protocol = (protoHeader ? protoHeader.split(',')[0].trim() : null) || (req.secure ? 'https' : req.protocol) || 'https';
+            const host = req.headers['x-forwarded-host'] || req.get('host');
+            redirectUri = `${protocol}://${host}/auth/instagram/callback`;
+        }
+    }
+
+    // Force https on Render and production domains to strictly match Meta's Enforce HTTPS setting
+    if (redirectUri.includes('onrender.com') || (!redirectUri.includes('localhost') && !redirectUri.includes('127.0.0.1'))) {
+        redirectUri = redirectUri.replace(/^http:\/\//i, 'https://');
+    }
 
     setConfig('redirect_uri', redirectUri);
 
@@ -133,11 +144,16 @@ router.get('/instagram/callback', async (req, res) => {
     }
 
     try {
-        const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-        const host = req.headers['x-forwarded-host'] || req.get('host');
-        const expectedRedirectUri = (config.BASE_URL && !config.BASE_URL.includes('localhost'))
-            ? `${config.BASE_URL.replace(/\/$/, '')}/auth/instagram/callback`
-            : `${protocol}://${host}/auth/instagram/callback`;
+        let expectedRedirectUri = getConfig('redirect_uri');
+        if (!expectedRedirectUri) {
+            const protoHeader = req.headers['x-forwarded-proto'];
+            const protocol = (protoHeader ? protoHeader.split(',')[0].trim() : null) || (req.secure ? 'https' : req.protocol) || 'https';
+            const host = req.headers['x-forwarded-host'] || req.get('host');
+            expectedRedirectUri = `${protocol}://${host}/auth/instagram/callback`;
+            if (expectedRedirectUri.includes('onrender.com') || (!expectedRedirectUri.includes('localhost') && !expectedRedirectUri.includes('127.0.0.1'))) {
+                expectedRedirectUri = expectedRedirectUri.replace(/^http:\/\//i, 'https://');
+            }
+        }
 
         console.log('[OAuth] Exchanging code for token with redirectUri:', expectedRedirectUri);
         const shortTokenData = await exchangeCodeForToken(code, expectedRedirectUri);

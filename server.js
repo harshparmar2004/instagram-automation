@@ -7,6 +7,7 @@ const { checkAndRefreshToken } = require('./src/services/tokenRefresh');
 const { syncMedia } = require('./src/services/mediaSync');
 
 const app = express();
+app.set('trust proxy', true);
 const PORT = process.env.PORT || 3000;
 
 // Initialize database
