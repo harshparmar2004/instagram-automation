@@ -28,6 +28,49 @@ window.setup = {
         await this.loadStatus();
     },
 
+    startMetaOAuth() {
+        const width = 650;
+        const height = 750;
+        const left = window.screenX + (window.outerWidth - width) / 2;
+        const top = window.screenY + (window.outerHeight - height) / 2;
+        const popup = window.open(
+            '/auth/instagram',
+            'meta_oauth_popup',
+            `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,status=yes`
+        );
+
+        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+            window.location.href = '/auth/instagram';
+            return;
+        }
+
+        App.showToast('Connecting with Meta in secure popup...', 'info');
+
+        const handleMessage = async (event) => {
+            if (event.data && event.data.type === 'meta_oauth_success') {
+                window.removeEventListener('message', handleMessage);
+                clearInterval(timer);
+                App.showToast(`🎉 Connected @${event.data.data?.username || 'Instagram'} successfully!`, 'success');
+                await this.loadStatus();
+            } else if (event.data && event.data.type === 'meta_oauth_error') {
+                window.removeEventListener('message', handleMessage);
+                clearInterval(timer);
+                App.showToast(`Connection notice: ${event.data.data?.message || 'Authentication not completed'}`, 'error');
+                await this.loadStatus();
+            }
+        };
+
+        window.addEventListener('message', handleMessage);
+
+        const timer = setInterval(() => {
+            if (popup.closed) {
+                clearInterval(timer);
+                window.removeEventListener('message', handleMessage);
+                this.loadStatus();
+            }
+        }, 1000);
+    },
+
     async clearDemoData() {
         if (!confirm('This will wipe out all mock/demo rules, fake leads, and mock media, and keep only your REAL Instagram account data. Continue?')) return;
         try {
@@ -177,7 +220,7 @@ window.setup = {
                                 🔄 Sync Media Now
                             </button>
                         ` : ''}
-                        <button class="btn btn-secondary" style="font-weight:700; padding:0.55rem 1.15rem; font-size:0.86rem; border-radius:10px;" onclick="window.location.href='/auth/instagram'">
+                        <button class="btn btn-secondary" style="font-weight:700; padding:0.55rem 1.15rem; font-size:0.86rem; border-radius:10px;" onclick="setup.startMetaOAuth()">
                             1-Click Meta OAuth Connect
                         </button>
                     </div>

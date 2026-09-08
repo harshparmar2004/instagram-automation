@@ -5,7 +5,7 @@ const GRAPH_VERSION = 'v22.0';
 const IG_API_BASE = `https://graph.instagram.com/${GRAPH_VERSION}`;
 const FB_API_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
 
-async function exchangeCodeForToken(code) {
+async function exchangeCodeForToken(code, customRedirectUri = null) {
     let appId = process.env.META_APP_ID || getConfig('meta_app_id');
     if (appId) appId = String(appId).replace(/['"\s]/g, '').trim();
     if (!appId || appId === '9876543210123') appId = '28028411953483811';
@@ -13,8 +13,29 @@ async function exchangeCodeForToken(code) {
     let appSecret = process.env.META_APP_SECRET || getConfig('meta_app_secret');
     if (appSecret) appSecret = String(appSecret).replace(/['"\s]/g, '').trim();
 
-    const redirectUri = getConfig('redirect_uri') || require('../config').BASE_URL + '/auth/instagram/callback';
+    const redirectUri = customRedirectUri || getConfig('redirect_uri') || require('../config').BASE_URL + '/auth/instagram/callback';
 
+    // Strategy 1: Facebook Graph API OAuth exchange (for facebook.com/v22.0/dialog/oauth)
+    try {
+        console.log(`[OAuth] Exchanging code with Facebook Graph API (${FB_API_BASE}/oauth/access_token)...`);
+        const fbRes = await axios.get(`${FB_API_BASE}/oauth/access_token`, {
+            params: {
+                client_id: appId,
+                client_secret: appSecret,
+                redirect_uri: redirectUri,
+                code: code
+            }
+        });
+        if (fbRes.data && fbRes.data.access_token) {
+            console.log('[OAuth] ✅ Successfully exchanged code via Facebook Graph API!');
+            return fbRes.data;
+        }
+    } catch (fbErr) {
+        console.warn('[OAuth] Facebook Graph API exchange notice:', fbErr.response?.data?.error?.message || fbErr.message);
+    }
+
+    // Strategy 2: Instagram API exchange (for api.instagram.com/oauth/authorize)
+    console.log('[OAuth] Strategy 2: Exchanging code with api.instagram.com...');
     const form = new URLSearchParams();
     form.append('client_id', appId);
     form.append('client_secret', appSecret);
@@ -27,17 +48,46 @@ async function exchangeCodeForToken(code) {
 }
 
 async function exchangeLongLivedToken(shortToken) {
+    let appId = process.env.META_APP_ID || getConfig('meta_app_id');
+    if (appId) appId = String(appId).replace(/['"\s]/g, '').trim();
+    if (!appId || appId === '9876543210123') appId = '28028411953483811';
+
     let appSecret = process.env.META_APP_SECRET || getConfig('meta_app_secret');
     if (appSecret) appSecret = String(appSecret).replace(/['"\s]/g, '').trim();
-    
-    const res = await axios.get(`${IG_API_BASE}/access_token`, {
-        params: {
-            grant_type: 'ig_exchange_token',
-            client_secret: appSecret,
-            access_token: shortToken
+
+    // If token starts with EAA (Facebook user/page token)
+    if (shortToken && shortToken.startsWith('EAA')) {
+        try {
+            console.log(`[OAuth] Exchanging short Facebook token for 60-day long-lived token...`);
+            const res = await axios.get(`${FB_API_BASE}/oauth/access_token`, {
+                params: {
+                    grant_type: 'fb_exchange_token',
+                    client_id: appId,
+                    client_secret: appSecret,
+                    fb_exchange_token: shortToken
+                }
+            });
+            return res.data;
+        } catch(e) {
+            console.warn('[OAuth] Long-lived FB token exchange notice:', e.response?.data?.error?.message || e.message);
+            return { access_token: shortToken, expires_in: 5184000 };
         }
-    });
-    return res.data; // { access_token, token_type, expires_in }
+    }
+
+    // If token starts with IG (Instagram Basic/Display token)
+    try {
+        const res = await axios.get(`${IG_API_BASE}/access_token`, {
+            params: {
+                grant_type: 'ig_exchange_token',
+                client_secret: appSecret,
+                access_token: shortToken
+            }
+        });
+        return res.data; // { access_token, token_type, expires_in }
+    } catch(e) {
+        console.warn('[OAuth] Long-lived IG token exchange notice:', e.response?.data?.error?.message || e.message);
+        return { access_token: shortToken, expires_in: 5184000 };
+    }
 }
 
 async function refreshToken(token) {
