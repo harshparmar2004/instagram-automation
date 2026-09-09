@@ -43,14 +43,16 @@ router.get('/instagram', (req, res) => {
     const provider = req.query.provider || 'facebook';
     const state = req.query.state || '';
     
+    // Exact permissions configured in Meta App Use Case
+    const defaultScope = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments';
+    const scope = req.query.scope || defaultScope;
+
     let authUrl;
     if (provider === 'instagram') {
-        const scope = req.query.scope || 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments';
         authUrl = `https://api.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code${state ? `&state=${encodeURIComponent(state)}` : ''}`;
     } else {
-        // Official Meta Graph API OAuth dialog for Facebook Platform App IDs (avoids 'Invalid platform app' error)
-        const scope = req.query.scope || 'email,public_profile,instagram_basic,instagram_manage_comments,instagram_manage_messages,pages_show_list,pages_read_engagement';
-        authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code${state ? `&state=${encodeURIComponent(state)}` : ''}`;
+        // Official Meta Graph API OAuth dialog for Facebook Platform App with display=popup
+        authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code&display=popup${state ? `&state=${encodeURIComponent(state)}` : ''}`;
     }
 
     console.log(`[OAuth] Launching Meta OAuth (${provider}) with client_id: "${appId}", redirect_uri: "${redirectUri}"`);
