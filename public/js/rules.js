@@ -135,11 +135,26 @@ window.rules = {
 
     async openFormModal(id = null) {
         let rule = { action_type: 'link_dm', trigger_word: '', response_text: '', link_url: '', follow_prompt: '', public_reply: '', delay_seconds: 0, variations_json: '[]' };
-        if (id && this.rulesList) {
-            rule = this.rulesList.find(r => r.id == id) || rule;
+        
+        if (id) {
+            // Always fetch the latest rule data from the API so the Edit modal is always pre-filled,
+            // even when called from the Workflows tab where this.rulesList may be null.
+            try {
+                const fetched = await App.apiCall('GET', `/api/rules/${id}`);
+                if (fetched && fetched.id) {
+                    rule = fetched;
+                    // Normalise trigger_word field (API returns both trigger_keyword and trigger_word)
+                    rule.trigger_word = fetched.trigger_word || fetched.trigger_keyword || '';
+                }
+            } catch(e) {
+                // Fallback: try rulesList if API fetch fails
+                if (this.rulesList) {
+                    rule = this.rulesList.find(r => r.id == id) || rule;
+                }
+            }
         }
 
-        let mediaOptions = '<option value="global">🌐 All Posts & Reels (Global Rule)</option>';
+        let mediaOptions = '<option value="global">🌐 All Posts &amp; Reels (Global Rule)</option>';
         try {
             const mediaList = await App.apiCall('GET', '/api/media');
             if (Array.isArray(mediaList)) {
@@ -163,6 +178,16 @@ window.rules = {
             <form id="rule-form">
                 <input type="hidden" id="rule_id" value="${id || ''}">
                 
+                ${id && (rule.thumbnail_url || rule.ig_media_id) ? `
+                <div style="display:flex; align-items:center; gap:1rem; padding:0.75rem 1rem; background:#FAF8F5; border:1px solid var(--border-color); border-radius:10px; margin-bottom:1.25rem;">
+                    ${rule.thumbnail_url ? `<img src="${rule.thumbnail_url}" style="width:52px; height:52px; border-radius:8px; object-fit:cover; border:1px solid var(--border-color); flex-shrink:0;">` : '<div style="width:52px;height:52px;border-radius:8px;background:#EDE8E0;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;">🎬</div>'}
+                    <div style="overflow:hidden;">
+                        <div style="font-size:0.7rem;font-weight:800;color:var(--accent-primary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.2rem;">Editing Automation for this Reel</div>
+                        <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px;">${rule.caption ? rule.caption.slice(0,80) + (rule.caption.length > 80 ? '…' : '') : 'Untitled Reel'}</div>
+                        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.1rem;">Rule #${id} • Trigger: <strong>${rule.trigger_keyword || rule.trigger_word || '—'}</strong></div>
+                    </div>
+                </div>` : ''}
+
                 <div class="form-group">
                     <label>1. Apply to Which Post or Reel?</label>
                     <select id="selected_media_id" class="select">

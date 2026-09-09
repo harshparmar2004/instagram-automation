@@ -62,7 +62,7 @@ router.get('/rules/:id', auth, (req, res) => {
         const db = getDb();
         const { id } = req.params;
         const rule = db.prepare(`
-            SELECT r.*, r.trigger_keyword as trigger_word, m.ig_media_id, m.thumbnail_url 
+            SELECT r.*, r.trigger_keyword as trigger_word, m.ig_media_id, m.thumbnail_url, m.caption, m.permalink
             FROM rules r 
             LEFT JOIN media m ON (r.media_id = m.id OR r.media_id = m.ig_media_id)
             WHERE r.id = ?
@@ -147,34 +147,74 @@ router.put('/rules/:id', auth, (req, res) => {
     try {
         const db = getDb();
         const { id } = req.params;
-        const { trigger_keyword, trigger_word, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json } = req.body;
+        const { media_id, trigger_keyword, trigger_word, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json } = req.body;
         const keyword = trigger_keyword || trigger_word;
         const sanitizedUrl = cleanUrl(link_url);
 
-        db.prepare(`
-            UPDATE rules SET 
-                trigger_keyword = ?, 
-                action_type = ?, 
-                response_text = ?, 
-                link_url = ?, 
-                follow_prompt = ?, 
-                public_reply = ?,
-                delay_seconds = ?,
-                variations_json = ?,
-                updated_at = ?
-            WHERE id = ?
-        `).run(
-            keyword, 
-            action_type, 
-            response_text || null, 
-            sanitizedUrl, 
-            follow_prompt || null, 
-            public_reply || null, 
-            parseInt(delay_seconds || 0),
-            variations_json || null,
-            new Date().toISOString(), 
-            id
-        );
+        // Resolve media_id if provided (same logic as POST /rules)
+        let resolvedMediaId = undefined; // undefined = don't update media_id
+        if (media_id !== undefined) {
+            if (!media_id || media_id === 'global') {
+                resolvedMediaId = null;
+            } else {
+                const mRow = db.prepare("SELECT id FROM media WHERE id = ? OR ig_media_id = ?").get(media_id, media_id);
+                resolvedMediaId = mRow ? mRow.id : null;
+            }
+        }
+
+        if (resolvedMediaId !== undefined) {
+            db.prepare(`
+                UPDATE rules SET 
+                    media_id = ?,
+                    trigger_keyword = ?, 
+                    action_type = ?, 
+                    response_text = ?, 
+                    link_url = ?, 
+                    follow_prompt = ?, 
+                    public_reply = ?,
+                    delay_seconds = ?,
+                    variations_json = ?,
+                    updated_at = ?
+                WHERE id = ?
+            `).run(
+                resolvedMediaId,
+                keyword, 
+                action_type, 
+                response_text || null, 
+                sanitizedUrl, 
+                follow_prompt || null, 
+                public_reply || null, 
+                parseInt(delay_seconds || 0),
+                variations_json || null,
+                new Date().toISOString(), 
+                id
+            );
+        } else {
+            db.prepare(`
+                UPDATE rules SET 
+                    trigger_keyword = ?, 
+                    action_type = ?, 
+                    response_text = ?, 
+                    link_url = ?, 
+                    follow_prompt = ?, 
+                    public_reply = ?,
+                    delay_seconds = ?,
+                    variations_json = ?,
+                    updated_at = ?
+                WHERE id = ?
+            `).run(
+                keyword, 
+                action_type, 
+                response_text || null, 
+                sanitizedUrl, 
+                follow_prompt || null, 
+                public_reply || null, 
+                parseInt(delay_seconds || 0),
+                variations_json || null,
+                new Date().toISOString(), 
+                id
+            );
+        }
 
         try { backupRules(db); } catch(e) { console.error('Error backing up rules:', e); }
 
