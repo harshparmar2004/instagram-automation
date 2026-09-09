@@ -39,7 +39,7 @@ router.get('/rules', auth, (req, res) => {
 
         if (media_id === 'global') {
             whereClauses.push('r.media_id IS NULL');
-        } else if (media_id) {
+        } else if (media_id && media_id !== 'all') {
             whereClauses.push('(r.media_id = ? OR m.ig_media_id = ?)');
             params.push(media_id, media_id);
         }
@@ -261,11 +261,13 @@ router.delete('/rules/:id', auth, (req, res) => {
     try {
         const db = getDb();
         const { id } = req.params;
+        db.prepare('DELETE FROM events WHERE rule_id = ?').run(id);
+        db.prepare('DELETE FROM conversations WHERE rule_id = ?').run(id);
         db.prepare('DELETE FROM rules WHERE id = ?').run(id);
 
         try { backupRules(db); } catch(e) { console.error('Error backing up rules:', e); }
 
-        res.json({ success: true });
+        res.json({ success: true, message: 'Rule and its trigger history deleted successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

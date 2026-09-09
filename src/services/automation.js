@@ -176,10 +176,21 @@ async function processCommentEvent(payload) {
                     continue;
                 }
 
-                // Check self-comment: Meta API doesn't allow private reply to self, but log clearly
-                if (from.id === entry.id) {
-                    console.log(`[Automation] Notice: Comment is from own account (@${from.username || from.id}). Meta prevents sending DMs to self.`);
-                    // We allow public reply testing even for own comments!
+                // Identify the commenter and creator credentials
+                const commenterUsername = (from.username || '').toLowerCase().replace('@', '').trim();
+                const commenterId = String(from.id || '').trim();
+                const myUsername = (linkedAccount?.ig_username || getConfig('ig_username') || '').toLowerCase().replace('@', '').trim();
+                const myIgUserId = String(linkedAccount?.ig_user_id || getConfig('ig_user_id') || '').trim();
+                const accountEntryId = String(entry.id || '').trim();
+
+                // 🛑 CRITICAL SHIELD: Ignore comments made by the creator or bot itself to prevent infinite DM loops!
+                if (
+                    (myUsername && commenterUsername === myUsername) ||
+                    (myIgUserId && commenterId === myIgUserId) ||
+                    commenterId === accountEntryId
+                ) {
+                    console.log(`[Automation] 🛑 Skipping comment from own account (@${from.username || from.id}). Account owner comments do NOT trigger DMs.`);
+                    continue;
                 }
 
                 if (checkDedupComment(commentId)) {
@@ -187,7 +198,7 @@ async function processCommentEvent(payload) {
                     continue;
                 }
 
-                if (from.id !== entry.id && checkDedupUserForMedia(from.id, mediaId)) {
+                if (checkDedupUserForMedia(from.id, mediaId)) {
                     console.log(`[Automation] Skipping duplicate user ${from.id} for media ${mediaId}`);
                     continue;
                 }
@@ -304,6 +315,11 @@ async function processMessageEvent(payload) {
         for (const msgEvent of entry.messaging || []) {
             const senderId = msgEvent.sender.id;
             const text = msgEvent.message?.text;
+
+            // Skip self-messages from account itself
+            if (senderId === igAccountId || senderId === linkedAccount?.ig_user_id || senderId === getConfig('ig_user_id')) {
+                continue;
+            }
 
             if (msgEvent.message && msgEvent.message.attachments) {
                 const storyShare = msgEvent.message.attachments.find(a => a.type === 'story_mention' || a.type === 'ig_story');

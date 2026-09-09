@@ -84,19 +84,16 @@ async function syncMedia(userId = null) {
 
         console.log(`[MediaSync] Successfully synced ${allItems.length} media items across ${page + 1} page(s)`);
 
-        // === 1. SMART AUTO-RELINK: Ensure all old automations connect to real synced reels ===
+        // === 1. SMART AUTO-RELINK: Resolve reel IDs cleanly without forcing unrelated rules ===
         try {
-            restoreRules(db);
             const realMediaRows = db.prepare("SELECT * FROM media WHERE ig_media_id NOT LIKE '179001122%' ORDER BY timestamp DESC").all();
             const allRules = db.prepare("SELECT * FROM rules").all();
 
             if (realMediaRows.length > 0 && allRules.length > 0) {
-                console.log(`[MediaSync] Auto-relinking ${allRules.length} automations to ${realMediaRows.length} real synced Instagram reels...`);
-                
                 for (const rule of allRules) {
                     if (rule.media_id === 'global' || rule.media_id === null) continue;
 
-                    // Check if current media_id already exists in media table
+                    // Check if current media_id exists in media table
                     const existingMedia = db.prepare("SELECT id, ig_media_id FROM media WHERE id = ? OR ig_media_id = ?").get(rule.media_id, rule.media_id);
                     
                     if (existingMedia) {
@@ -104,24 +101,8 @@ async function syncMedia(userId = null) {
                         if (rule.media_id !== existingMedia.id) {
                             db.prepare("UPDATE rules SET media_id = ? WHERE id = ?").run(existingMedia.id, rule.id);
                         }
-                    } else if (realMediaRows.length === 1) {
-                        // User has 1 main reel on their Instagram account -> Auto-link automation to it!
-                        console.log(`[MediaSync] Auto-linking rule #${rule.id} ("${rule.trigger_keyword}") to single real Reel ID ${realMediaRows[0].id}`);
-                        db.prepare("UPDATE rules SET media_id = ? WHERE id = ?").run(realMediaRows[0].id, rule.id);
-                    } else {
-                        // Match by keyword in caption or link to latest reel
-                        const matchedByCap = realMediaRows.find(m => {
-                            const cap = (m.caption || '').toLowerCase();
-                            const kw = (rule.trigger_keyword || '').toLowerCase().split(',')[0].trim();
-                            return kw && cap.includes(kw);
-                        });
-                        const targetMedia = matchedByCap || realMediaRows[0];
-                        if (targetMedia) {
-                            db.prepare("UPDATE rules SET media_id = ? WHERE id = ?").run(targetMedia.id, rule.id);
-                        }
                     }
                 }
-                backupRules(db);
             }
         } catch (linkErr) {
             console.warn('[MediaSync] Notice during rule auto-linking:', linkErr.message);
@@ -131,7 +112,8 @@ async function syncMedia(userId = null) {
         let totalCommentsFetched = 0;
         try {
             const mediaToFetch = allItems.length > 0 ? allItems : db.prepare("SELECT * FROM media").all();
-            const currentMonth = new Date().toISOString().slice(0, 7);
+            const myUsername = (userAcct?.ig_username || getConfig('ig_username') || '').toLowerCase().replace('@', '').trim();
+            const myIgUserId = String(userAcct?.ig_user_id || getConfig('ig_user_id') || '').trim();
             
             for (const m of mediaToFetch) {
                 const igMediaId = m.id || m.ig_media_id;
@@ -155,22 +137,30 @@ async function syncMedia(userId = null) {
                         if (alreadyExists) continue;
 
                         const commentText = (comment.text || '').trim();
-                        const fromUsername = comment.from?.username || 'instagram_user';
-                        const fromId = comment.from?.id || 'ig_user';
+                        const fromUsername = (comment.from?.username || 'instagram_user').toLowerCase().replace('@', '').trim();
+                        const fromId = String(comment.from?.id || 'ig_user').trim();
                         const commentTime = comment.timestamp || new Date().toISOString();
 
-                        // Match rule
+                        // 🛑 Ignore comments made by the creator / bot itself
+                        if ((myUsername && fromUsername === myUsername) || (myIgUserId && fromId === myIgUserId)) {
+                            continue;
+                        }
+
+                        // Match rule strictly by trigger keywords
                         let matchedRule = null;
                         const textLower = commentText.toLowerCase();
                         for (const r of mediaRules) {
                             const kws = (r.trigger_keyword || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
-                            if (kws.length === 0 || kws.includes('*') || kws.some(kw => textLower.includes(kw))) {
+                            if (kws.includes('*') || kws.some(kw => textLower.includes(kw))) {
                                 matchedRule = r;
                                 break;
                             }
                         }
 
-                        const ruleIdToAttach = matchedRule ? matchedRule.id : (mediaRules[0]?.id || null);
+                        // Only ingest if a rule actually matched
+                        if (!matchedRule) continue;
+
+                        const ruleIdToAttach = matchedRule.id;
 
                         const eventRes = db.prepare(`
                             INSERT INTO events (rule_id, comment_id, comment_text, commenter_ig_id, commenter_username, media_ig_id, dm_status, created_at)

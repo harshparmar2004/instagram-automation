@@ -1,16 +1,16 @@
 window.rules = {
     async render(container) {
-        const mediaId = window.selectedMediaId || 'global';
+        const mediaId = window.selectedMediaId || 'all';
         
         container.innerHTML = `
             <div class="view" id="rules-view">
                 <div class="page-header">
                     <div class="page-title">
                         <h1>Automation Rules</h1>
-                        <p>${mediaId === 'global' ? 'Global rules applied to all posts.' : 'Rules for selected media.'}</p>
+                        <p>${mediaId === 'all' ? 'All active and configured automation rules.' : (mediaId === 'global' ? 'Global rules applied to all posts.' : 'Rules for selected media.')}</p>
                     </div>
                     <div style="display:flex; gap:0.5rem;">
-                        ${mediaId !== 'global' ? '<button class="btn btn-secondary mr-2" onclick="App.navigate(\'media\')">Back to Media</button>' : ''}
+                        ${mediaId !== 'all' && mediaId !== 'global' ? '<button class="btn btn-secondary mr-2" onclick="App.navigate(\'media\')">Back to Media</button>' : ''}
                         <button class="btn btn-secondary" onclick="rules.openSimulatorModal()">
                             <span>🧪 Test Simulator</span>
                         </button>
@@ -31,7 +31,7 @@ window.rules = {
     async refresh() {
         if(!document.getElementById('rules-content')) return;
         try {
-            const url = this.currentMediaId === 'global' ? '/api/rules?media_id=global' : `/api/rules?media_id=${this.currentMediaId}`;
+            const url = this.currentMediaId === 'all' ? '/api/rules?media_id=all' : (this.currentMediaId === 'global' ? '/api/rules?media_id=global' : `/api/rules?media_id=${this.currentMediaId}`);
             this.rulesList = await App.apiCall('GET', url);
             this.renderList();
         } catch(e) {}
@@ -39,7 +39,7 @@ window.rules = {
 
     async loadRules() {
         try {
-            const url = this.currentMediaId === 'global' ? '/api/rules?media_id=global' : `/api/rules?media_id=${this.currentMediaId}`;
+            const url = this.currentMediaId === 'all' ? '/api/rules?media_id=all' : (this.currentMediaId === 'global' ? '/api/rules?media_id=global' : `/api/rules?media_id=${this.currentMediaId}`);
             this.rulesList = await App.apiCall('GET', url);
             this.renderList();
         } catch (err) {

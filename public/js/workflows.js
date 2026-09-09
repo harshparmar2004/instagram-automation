@@ -30,12 +30,21 @@ window.workflows = {
                         </div>
 
                         <!-- Action Type Filter -->
-                        <div style="flex: 1; min-width: 170px;">
+                        <div style="flex: 1; min-width: 160px;">
                             <select id="workflow-action-filter" class="select" onchange="workflows.applyFilters()" style="padding: 0.65rem 1rem; font-size: 0.88rem; font-weight: 600;">
                                 <option value="">All Action Types</option>
                                 <option value="link_dm" ${this.actionFilter==='link_dm'?'selected':''}>Send Link DM</option>
                                 <option value="direct_dm" ${this.actionFilter==='direct_dm'?'selected':''}>Send Text DM</option>
                                 <option value="follow_first" ${this.actionFilter==='follow_first'?'selected':''}>Follow First Gate</option>
+                            </select>
+                        </div>
+
+                        <!-- Status Filter (Active / Paused) -->
+                        <div style="flex: 1; min-width: 150px;">
+                            <select id="workflow-status-filter" class="select" onchange="workflows.applyFilters()" style="padding: 0.65rem 1rem; font-size: 0.88rem; font-weight: 600;">
+                                <option value="">All Statuses</option>
+                                <option value="active" ${this.statusFilter==='active'?'selected':''}>🟢 Active Only</option>
+                                <option value="paused" ${this.statusFilter==='paused'?'selected':''}>⏸️ Paused Only</option>
                             </select>
                         </div>
 
@@ -91,6 +100,7 @@ window.workflows = {
     applyFilters() {
         this.search = (document.getElementById('workflow-search')?.value || '').toLowerCase();
         this.actionFilter = document.getElementById('workflow-action-filter')?.value || '';
+        this.statusFilter = document.getElementById('workflow-status-filter')?.value || '';
         this.sortBy = document.getElementById('workflow-sort-by')?.value || 'recent';
 
         if (!this.rawItems) return;
@@ -107,8 +117,12 @@ window.workflows = {
 
                 const matchesSearch = !this.search || keyword.includes(this.search) || link.includes(this.search) || caption.includes(this.search) || response.includes(this.search);
                 const matchesAction = !this.actionFilter || rule.action_type === this.actionFilter;
+                const isRuleActive = rule.is_active === 1 || rule.is_active === true || rule.is_active === '1';
+                const matchesStatus = !this.statusFilter || 
+                    (this.statusFilter === 'active' && isRuleActive) || 
+                    (this.statusFilter === 'paused' && !isRuleActive);
 
-                return matchesSearch && matchesAction;
+                return matchesSearch && matchesAction && matchesStatus;
             });
 
             if (matchingRules.length > 0) {
@@ -138,9 +152,15 @@ window.workflows = {
         });
 
         const countBadge = document.getElementById('workflow-count-badge');
-        let totalRulesCount = 0;
-        filtered.forEach(i => totalRulesCount += i.rules.length);
-        if (countBadge) countBadge.textContent = `${totalRulesCount} Active Automations`;
+        let activeCount = 0;
+        let totalCount = 0;
+        filtered.forEach(i => {
+            i.rules.forEach(r => {
+                totalCount++;
+                if (r.is_active === 1 || r.is_active === true || r.is_active === '1') activeCount++;
+            });
+        });
+        if (countBadge) countBadge.textContent = `${activeCount} Active / ${totalCount} Total`;
 
         this.renderBlocks(filtered);
     },
@@ -211,20 +231,21 @@ window.workflows = {
                             <div style="display:flex; align-items:center; gap:0.75rem;">
                                 <span style="font-family:'Plus Jakarta Sans', sans-serif; font-size:0.85rem; font-weight:800; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.04em;">AUTOMATION RULE #${rule.id}</span>
                                 <span style="color:var(--border-color);">•</span>
-                                <span style="font-size:0.85rem; font-weight:700; color:${isActive ? '#2E7D32' : 'var(--text-secondary)'};">
-                                    Status: ${isActive ? 'Active & Listening' : 'Paused'}
+                                <span style="font-size:0.85rem; font-weight:800; color:${isActive ? '#1B5E20' : '#B45309'}; display: inline-flex; align-items: center; gap: 0.35rem; background: ${isActive ? '#E8F5E9' : '#FEF3C7'}; padding: 3px 8px; border-radius: 6px;">
+                                    <span>${isActive ? '🟢' : '⏸️'}</span>
+                                    <span>${isActive ? 'Active & Listening' : 'Paused'}</span>
                                 </span>
                             </div>
 
                             <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                                <button class="btn btn-sm" style="font-size:0.82rem; font-weight:800; padding:0.4rem 1rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; ${isActive ? 'background:#FFFFFF; border:1.5px solid #D1C9BE; color:#4B5563;' : 'background:#2E7D32; border:1.5px solid #2E7D32; color:#FFFFFF;'}" onclick="workflows.toggleRuleStatus(${rule.id})" title="${isActive ? 'Click to Pause this automation' : 'Click to Activate this automation'}">
+                                    ${isActive ? '⏸️ Pause' : '🟢 Activate'}
+                                </button>
                                 <button class="btn btn-secondary btn-sm" style="font-size:0.8rem; font-weight:700; padding:0.35rem 0.85rem; color: #2E7D32; background: #F4FBF7; border-color: #A3D9B1;" onclick="workflows.backfillPastComments(${rule.id})" title="Auto-DM followers who commented before this automation was created">
                                     ⚡ Catch-Up Past Comments
                                 </button>
                                 <button class="btn btn-secondary btn-sm" style="font-size:0.8rem; font-weight:700; padding:0.35rem 0.85rem; color: #0369A1; background: #F0F9FF; border-color: #BAE6FD;" onclick="workflows.testRuleTrigger(${rule.id}, '${item.ig_media_id || ''}', '${rule.trigger_keyword || ''}')">
                                     🧪 Test Trigger
-                                </button>
-                                <button class="btn btn-secondary btn-sm" style="font-size:0.8rem; font-weight:600; padding:0.35rem 0.85rem;" onclick="workflows.toggleRuleStatus(${rule.id})">
-                                    ${isActive ? 'Pause' : 'Activate'}
                                 </button>
                                 <button class="btn btn-secondary btn-sm" style="font-size:0.8rem; font-weight:600; padding:0.35rem 0.85rem;" onclick="rules.openFormModal('${rule.id}')">
                                     Edit Rule
