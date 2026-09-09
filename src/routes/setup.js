@@ -48,6 +48,7 @@ router.get('/status', auth, (req, res) => {
         connected: isConnected,
         hasToken: isConnected,
         tokenPreview: isConnected ? `${accessToken.slice(0, 8)}••••••••${accessToken.slice(-4)}` : '',
+        savedToken: isConnected ? accessToken : '',
         username: igUsername || (isConnected ? 'connected.creator' : ''),
         igUserId: igUserId || '',
         profilePic: profilePic || '',
@@ -83,11 +84,26 @@ router.post('/setup/save-credentials', auth, (req, res) => {
     try {
         const { accessToken, username, igUserId } = req.body;
         const userId = req.user?.id;
+        const userAcct = userId ? getUserInstagramAccount(userId) : null;
         let tokenSaved = false;
 
         let cleanToken = (accessToken && accessToken.trim() && !accessToken.includes('•') && !accessToken.includes('***')) ? accessToken.trim() : null;
-        let cleanUsername = username ? username.replace('@', '').trim() : null;
-        let cleanIgUserId = (igUserId && igUserId.trim()) ? igUserId.trim() : null;
+        
+        // Guard against password manager autofill injecting login password as token
+        if (cleanToken) {
+            const isMetaToken = (cleanToken.startsWith('IG') || cleanToken.startsWith('EAA')) && cleanToken.length >= 30;
+            if (!isMetaToken) {
+                if (userAcct?.access_token || getConfig('access_token')) {
+                    console.warn('[Setup] Ignored non-Meta token input (likely password autofill), preserving existing saved token.');
+                    cleanToken = null;
+                } else {
+                    return res.status(400).json({ error: "Invalid token format. Instagram access tokens must start with 'IG' or 'EAA' and be at least 30 characters." });
+                }
+            }
+        }
+
+        let cleanUsername = username ? username.replace('@', '').trim() : (userAcct?.ig_username || getConfig('ig_username') || null);
+        let cleanIgUserId = (igUserId && igUserId.trim()) ? igUserId.trim() : (userAcct?.ig_user_id || getConfig('ig_user_id') || null);
         const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
 
         if (userId) {
@@ -111,8 +127,8 @@ router.post('/setup/save-credentials', auth, (req, res) => {
             if (cleanIgUserId) setConfig('ig_user_id', cleanIgUserId);
         }
 
-        const userAcct = userId ? getUserInstagramAccount(userId) : null;
-        const currentToken = userAcct?.access_token || getConfig('access_token');
+        const refreshedAcct = userId ? getUserInstagramAccount(userId) : null;
+        const currentToken = refreshedAcct?.access_token || getConfig('access_token');
         const hasToken = !!(currentToken && currentToken.trim() && !currentToken.includes('•'));
 
         try {
@@ -124,8 +140,8 @@ router.post('/setup/save-credentials', auth, (req, res) => {
             success: true,
             hasToken,
             tokenSaved,
-            username: userAcct?.ig_username || getConfig('ig_username') || '',
-            igUserId: userAcct?.ig_user_id || getConfig('ig_user_id') || '',
+            username: refreshedAcct?.ig_username || getConfig('ig_username') || '',
+            igUserId: refreshedAcct?.ig_user_id || getConfig('ig_user_id') || '',
             message: '💾 All credentials and automations saved permanently to system config & backup file!'
         });
     } catch (err) {
@@ -145,8 +161,9 @@ async function handleConnectAndScan(req, res) {
         const userAcct = userId ? getUserInstagramAccount(userId) : null;
         
         let tokenToUse = (accessToken || '').trim();
-        // Fallback to saved token if empty or masked with dots
-        if (!tokenToUse || tokenToUse.includes('•') || tokenToUse.includes('***')) {
+        const isMetaToken = (tokenToUse.startsWith('IG') || tokenToUse.startsWith('EAA')) && tokenToUse.length >= 30;
+        // Fallback to saved token if empty, masked, or not a Meta token (e.g. password autofill)
+        if (!tokenToUse || tokenToUse.includes('•') || tokenToUse.includes('***') || !isMetaToken) {
             tokenToUse = userAcct?.access_token || getConfig('access_token');
         }
 

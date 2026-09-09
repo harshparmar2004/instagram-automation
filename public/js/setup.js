@@ -114,6 +114,19 @@ window.setup = {
         }
     },
 
+    toggleTokenVisibility() {
+        const input = document.getElementById('creator_token_input');
+        const btn = document.getElementById('btn-toggle-token-visibility');
+        if (!input) return;
+        if (input.type === 'password') {
+            input.type = 'text';
+            if (btn) btn.innerHTML = '🙈';
+        } else {
+            input.type = 'password';
+            if (btn) btn.innerHTML = '👁️';
+        }
+    },
+
     async saveCredentials() {
         const btn = document.getElementById('btn-save-credentials');
         if (btn) {
@@ -130,9 +143,6 @@ window.setup = {
             };
             const res = await App.apiCall('POST', '/api/setup/save-credentials', payload);
             App.showToast(res.message || '💾 Credentials saved successfully!', 'success');
-            if (tokenInput && tokenVal) {
-                tokenInput.value = '';
-            }
             await this.loadStatus();
         } catch(err) {
             App.showToast(err.message, 'error');
@@ -272,14 +282,24 @@ window.setup = {
                                 </label>
                                 ${hasSavedToken ? `
                                     <span style="font-size: 0.76rem; color: #2E7D32; font-weight: 700;">
-                                        ✓ Saved in config & .env
+                                        ✓ Saved in database
                                     </span>
                                 ` : ''}
                             </div>
-                            <input type="password" id="creator_token_input" 
-                                placeholder="${hasSavedToken ? '•••••••••••••••• (Saved — leave empty to keep)' : 'Paste your EAA... or IG... access token here'}" 
-                                ${hasSavedToken ? '' : 'required'} 
-                                style="width: 100%; padding: 0.7rem 1rem; font-size: 0.88rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FFFFFF; outline: none;">
+                            <div style="position: relative; display: flex; align-items: center; width: 100%;">
+                                <input type="password" id="creator_token_input" 
+                                    name="ig_access_token_field"
+                                    autocomplete="new-password"
+                                    data-lpignore="true"
+                                    data-1p-ignore="true"
+                                    value="${status.savedToken || ''}"
+                                    placeholder="${hasSavedToken ? 'Saved in database — paste new to update' : 'Paste your EAA... or IG... access token here'}" 
+                                    ${hasSavedToken ? '' : 'required'} 
+                                    style="width: 100%; padding: 0.7rem 2.8rem 0.7rem 1rem; font-size: 0.88rem; font-weight: 600; font-family: monospace; border-radius: 10px; border: 1.5px solid ${hasSavedToken ? '#A7F3D0' : '#D1C9BE'}; background: ${hasSavedToken ? '#F0FDF4' : '#FFFFFF'}; outline: none;">
+                                <button type="button" id="btn-toggle-token-visibility" onclick="setup.toggleTokenVisibility()" style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; font-size: 1.1rem; padding: 2px 6px; line-height: 1;" title="Toggle show/hide token">
+                                    👁️
+                                </button>
+                            </div>
                         </div>
 
                         <div style="display: flex; flex-direction: column; gap: 0.35rem;">
@@ -569,7 +589,6 @@ window.setup = {
             try {
                 const res = await App.apiCall('POST', '/api/setup/connect-scan-save', payload);
                 App.showToast(res.message || '✅ Account connected and Reels scanned successfully!', 'success');
-                if (tokenInput) tokenInput.value = '';
                 await this.loadStatus();
             } catch (err) {
                 if (errorBox) {
