@@ -5,6 +5,7 @@ const cron = require('node-cron');
 const { getDb } = require('./src/database');
 const { checkAndRefreshToken } = require('./src/services/tokenRefresh');
 const { syncMedia } = require('./src/services/mediaSync');
+const { startKeepAlive, getKeepAliveStatus } = require('./src/services/keepAlive');
 
 const app = express();
 app.set('trust proxy', true);
@@ -75,8 +76,16 @@ app.use('/', redirectRoutes);
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: 0 }));
 
-// Health check
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+// Health check & Anti-Sleep Ping Target
+app.get('/health', (req, res) => res.json({ 
+  status: 'ok', 
+  service: 'instagram-automation', 
+  uptime: Math.floor(process.uptime()), 
+  timestamp: new Date().toISOString() 
+}));
+
+// Keep-Alive status monitor
+app.get('/api/keep-alive', (req, res) => res.json(getKeepAliveStatus()));
 
 // Start cron jobs
 // Token refresh every 6 hours
@@ -102,6 +111,7 @@ cron.schedule('*/30 * * * *', async () => {
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+    startKeepAlive();
   });
 }
 
