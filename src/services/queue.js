@@ -41,7 +41,7 @@ async function processNext() {
     }
 
     const [job] = queue.splice(readyIdx, 1);
-    const token = getConfig('access_token');
+    const token = job.accessToken || getConfig('access_token');
 
     try {
         let result;

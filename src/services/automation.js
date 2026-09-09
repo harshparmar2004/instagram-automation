@@ -1,30 +1,30 @@
-const { getDb, getConfig } = require('../database');
+const { getDb, getConfig, getInstagramAccountByIgId } = require('../database');
 const { getSingleMedia } = require('./instagram');
 const { enqueue } = require('./queue');
 const { syncLeadToSheet } = require('./googleSheets');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
 
-async function ensureMediaExists(mediaIgId) {
+async function ensureMediaExists(mediaIgId, token = null, userId = null) {
     if (!mediaIgId) return null;
     const db = getDb();
     const existing = db.prepare("SELECT id FROM media WHERE ig_media_id = ?").get(mediaIgId);
     if (existing) return existing.id;
 
-    const token = getConfig('access_token');
-    if (!token) return null;
+    const activeToken = token || getConfig('access_token');
+    if (!activeToken) return null;
 
     try {
-        const item = await getSingleMedia(token, mediaIgId);
+        const item = await getSingleMedia(activeToken, mediaIgId);
         if (item && item.id) {
             const productType = item.media_product_type || (item.media_type === 'VIDEO' ? 'REELS' : 'FEED');
             const res = db.prepare(`
                 INSERT INTO media (
                     ig_media_id, media_type, media_product_type, caption, 
                     thumbnail_url, media_url, permalink, timestamp, 
-                    comments_count, like_count, synced_at
+                    comments_count, like_count, user_id, synced_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(ig_media_id) DO NOTHING
             `).run(
                 item.id,
@@ -37,9 +37,10 @@ async function ensureMediaExists(mediaIgId) {
                 item.timestamp || '',
                 item.comments_count || 0,
                 item.like_count || 0,
+                userId,
                 new Date().toISOString()
             );
-            console.log(`[Automation] Auto-synced new media item ${mediaIgId} on comment event`);
+            console.log(`[Automation] Auto-synced new media item ${mediaIgId} on comment event for user ${userId || 'default'}`);
             return res.lastInsertRowid;
         }
     } catch(err) {
@@ -94,17 +95,23 @@ function getRandomResponseText(rule) {
     return pool[randomIndex];
 }
 
-function findMatchingRule(mediaIgId, commentText) {
+function findMatchingRule(mediaIgId, commentText, userId = null) {
     const db = getDb();
-    const rules = db.prepare(`
+    let query = `
         SELECT r.*, 
                COALESCE(m.ig_media_id, (SELECT ig_media_id FROM media WHERE id = r.media_id OR ig_media_id = r.media_id LIMIT 1)) as ig_media_id
         FROM rules r 
         LEFT JOIN media m ON (r.media_id = m.id OR r.media_id = m.ig_media_id)
         WHERE r.is_active = 1
-    `).all();
+    `;
+    const params = [];
+    if (userId) {
+        query += ` AND (r.user_id = ? OR r.user_id IS NULL)`;
+        params.push(userId);
+    }
+    const rules = db.prepare(query).all(...params);
 
-    console.log(`[Automation] Searching rule for media: "${mediaIgId}", found ${rules.length} active rule(s)`);
+    console.log(`[Automation] Searching rule for media: "${mediaIgId}" (user: ${userId || 'any'}), found ${rules.length} active rule(s)`);
 
     // 1. Try matching rule attached to this specific Instagram media ID
     for (const rule of rules) {
@@ -148,6 +155,12 @@ async function processCommentEvent(payload) {
     const db = getDb();
 
     for (const entry of payload.entry || []) {
+        // Multi-tenant resolution: Resolve Instagram Business Account to workspace user
+        const igAccountId = entry.id;
+        const linkedAccount = getInstagramAccountByIgId(igAccountId);
+        const targetUserId = linkedAccount ? linkedAccount.user_id : null;
+        const activeToken = linkedAccount ? linkedAccount.access_token : getConfig('access_token');
+
         for (const change of entry.changes || []) {
             if (change.field === 'comments') {
                 const comment = change.value;
@@ -156,7 +169,7 @@ async function processCommentEvent(payload) {
                 const from = comment.from;
                 const mediaId = comment.media_id || (comment.media && comment.media.id);
 
-                console.log(`[Automation] 📩 Incoming comment: "${text}" from @${from?.username || from?.id || 'unknown'} on media ${mediaId}`);
+                console.log(`[Automation] 📩 Incoming comment: "${text}" from @${from?.username || from?.id || 'unknown'} on media ${mediaId} (Account: ${igAccountId}, User: ${targetUserId || 'legacy'})`);
 
                 if (!from) {
                     console.log('[Automation] Skipping comment with no sender info');
@@ -189,10 +202,10 @@ async function processCommentEvent(payload) {
 
                 // Auto-fetch media record if freshly posted and not yet in local DB
                 if (mediaId) {
-                    await ensureMediaExists(mediaId);
+                    await ensureMediaExists(mediaId, activeToken, targetUserId);
                 }
 
-                const rule = findMatchingRule(mediaId, text);
+                const rule = findMatchingRule(mediaId, text, targetUserId);
                 if (!rule) {
                     console.log(`[Automation] No active rule matched keyword for text: "${text}" on media ${mediaId}`);
                     continue;
@@ -230,12 +243,12 @@ async function processCommentEvent(payload) {
                 }
 
                 const insertEvent = db.prepare(`
-                    INSERT INTO events (rule_id, comment_id, comment_text, commenter_ig_id, commenter_username, media_ig_id, tracking_id, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO events (rule_id, comment_id, comment_text, commenter_ig_id, commenter_username, media_ig_id, tracking_id, user_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `);
                 
                 const eventResult = insertEvent.run(
-                    rule.id, commentId, text, from.id, from.username || 'user', mediaId, trackingId, new Date().toISOString()
+                    rule.id, commentId, text, from.id, from.username || 'user', mediaId, trackingId, targetUserId, new Date().toISOString()
                 );
                 
                 const eventId = eventResult.lastInsertRowid;
@@ -255,9 +268,9 @@ async function processCommentEvent(payload) {
 
                 if (rule.action_type === 'follow_first') {
                     db.prepare(`
-                        INSERT INTO conversations (commenter_ig_id, rule_id, event_id, state, created_at)
-                        VALUES (?, ?, ?, 'awaiting_reply', ?)
-                    `).run(from.id, rule.id, eventId, new Date().toISOString());
+                        INSERT INTO conversations (commenter_ig_id, rule_id, event_id, user_id, state, created_at)
+                        VALUES (?, ?, ?, ?, 'awaiting_reply', ?)
+                    `).run(from.id, rule.id, eventId, targetUserId, new Date().toISOString());
                 }
 
                 const delayMs = (rule.delay_seconds || 0) * 1000;
@@ -270,6 +283,7 @@ async function processCommentEvent(payload) {
                     messageText: messageToSend,
                     publicReply: rule.public_reply || null,
                     eventId: eventId,
+                    accessToken: activeToken,
                     processAt
                 });
                 console.log(`[Automation] 🚀 Queued DM & public reply for event #${eventId} (scheduled in ${delayMs}ms)`);
@@ -282,6 +296,11 @@ async function processMessageEvent(payload) {
     const db = getDb();
 
     for (const entry of payload.entry || []) {
+        const igAccountId = entry.id;
+        const linkedAccount = getInstagramAccountByIgId(igAccountId);
+        const targetUserId = linkedAccount ? linkedAccount.user_id : null;
+        const activeToken = linkedAccount ? linkedAccount.access_token : getConfig('access_token');
+
         for (const msgEvent of entry.messaging || []) {
             const senderId = msgEvent.sender.id;
             const text = msgEvent.message?.text;
@@ -290,13 +309,21 @@ async function processMessageEvent(payload) {
                 const storyShare = msgEvent.message.attachments.find(a => a.type === 'story_mention' || a.type === 'ig_story');
                 if (storyShare) {
                     console.log(`[Automation] Story mention received from sender ${senderId}`);
-                    const storyRule = db.prepare("SELECT * FROM rules WHERE trigger_keyword LIKE '%story%' AND is_active = 1 LIMIT 1").get();
+                    let storyQuery = "SELECT * FROM rules WHERE trigger_keyword LIKE '%story%' AND is_active = 1";
+                    const params = [];
+                    if (targetUserId) {
+                        storyQuery += " AND (user_id = ? OR user_id IS NULL)";
+                        params.push(targetUserId);
+                    }
+                    storyQuery += " LIMIT 1";
+                    const storyRule = db.prepare(storyQuery).get(...params);
                     if (storyRule) {
                         const messageToSend = getRandomResponseText(storyRule);
                         enqueue({
                             type: 'direct_message',
                             recipientId: senderId,
                             messageText: messageToSend,
+                            accessToken: activeToken,
                             processAt: Date.now()
                         });
                     }
@@ -306,11 +333,18 @@ async function processMessageEvent(payload) {
             if (!text) continue;
 
             // FOLLOW-FIRST GATE REPLY VERIFICATION STATE MACHINE
-            const conv = db.prepare("SELECT * FROM conversations WHERE commenter_ig_id = ? AND state = 'awaiting_reply' ORDER BY id DESC LIMIT 1").get(senderId);
+            let convQuery = "SELECT * FROM conversations WHERE commenter_ig_id = ? AND state = 'awaiting_reply'";
+            const convParams = [senderId];
+            if (targetUserId) {
+                convQuery += " AND (user_id = ? OR user_id IS NULL)";
+                convParams.push(targetUserId);
+            }
+            convQuery += " ORDER BY id DESC LIMIT 1";
+            const conv = db.prepare(convQuery).get(...convParams);
             if (!conv) continue;
 
             const tLower = text.toLowerCase().trim();
-            // Accept any confirmation string: "i followed", "followed", "following", "done", "i'm following", "following you"
+            // Accept any confirmation string: "done", "followed", etc.
             const isFollowConfirmation = ['done', 'followed', 'following', 'i followed', "i'm following", 'following you', 'ok', 'yes'].some(kw => tLower.includes(kw));
 
             if (isFollowConfirmation) {
@@ -340,12 +374,12 @@ async function processMessageEvent(payload) {
                 const username = prevEvent ? prevEvent.commenter_username : 'follower';
 
                 const insertEvent = db.prepare(`
-                    INSERT INTO events (rule_id, commenter_ig_id, commenter_username, media_ig_id, tracking_id, created_at, dm_status)
-                    VALUES (?, ?, ?, ?, ?, ?, 'pending')
+                    INSERT INTO events (rule_id, commenter_ig_id, commenter_username, media_ig_id, tracking_id, user_id, created_at, dm_status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
                 `);
 
                 const eventResult = insertEvent.run(
-                    rule.id, senderId, username, mediaIgId, trackingId, new Date().toISOString()
+                    rule.id, senderId, username, mediaIgId, trackingId, targetUserId, new Date().toISOString()
                 );
 
                 db.prepare("UPDATE conversations SET state = 'completed', completed_at = ? WHERE id = ?").run(new Date().toISOString(), conv.id);
@@ -355,6 +389,7 @@ async function processMessageEvent(payload) {
                     recipientId: senderId,
                     messageText: messageToSend,
                     eventId: eventResult.lastInsertRowid,
+                    accessToken: activeToken,
                     processAt: Date.now()
                 });
             }

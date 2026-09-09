@@ -1,5 +1,5 @@
 const express = require('express');
-const { getDb, getConfig, setConfig, backupRules, backupEvents } = require('../database');
+const { getDb, getConfig, setConfig, backupRules, backupEvents, getUserInstagramAccount, saveUserInstagramAccount } = require('../database');
 const auth = require('../middleware/auth');
 const { subscribeWebhook, getUserProfile } = require('../services/instagram');
 const { seedDemoData } = require('../seedData');
@@ -11,13 +11,19 @@ const router = express.Router();
 
 router.get('/status', auth, (req, res) => {
     const db = getDb();
+    const userId = req.user?.id;
+    const userIgAccount = userId ? getUserInstagramAccount(userId) : null;
+
     const appId = getConfig('meta_app_id');
     const appSecret = getConfig('meta_app_secret');
     const verifyToken = getConfig('webhook_verify_token');
-    const accessToken = getConfig('access_token');
-    const tokenExpiresAt = getConfig('token_expires_at');
-    const igUsername = getConfig('ig_username');
-    const igUserId = getConfig('ig_user_id');
+
+    // Use user's specific Instagram account if found, otherwise fall back to global config (admin/legacy)
+    const accessToken = userIgAccount?.access_token || (req.user?.role === 'super_admin' ? getConfig('access_token') : '');
+    const tokenExpiresAt = userIgAccount?.token_expires_at || (req.user?.role === 'super_admin' ? getConfig('token_expires_at') : '');
+    const igUsername = userIgAccount?.ig_username || (req.user?.role === 'super_admin' ? getConfig('ig_username') : '');
+    const igUserId = userIgAccount?.ig_user_id || (req.user?.role === 'super_admin' ? getConfig('ig_user_id') : '');
+    const profilePic = userIgAccount?.profile_pic || (req.user?.role === 'super_admin' ? getConfig('ig_profile_pic') : '');
     
     let tokenHealth = null;
     if (tokenExpiresAt) {
@@ -28,8 +34,13 @@ router.get('/status', auth, (req, res) => {
     const isConnected = !!(accessToken && accessToken.trim() && !accessToken.includes('•'));
     let mediaCount = 0;
     try {
-        const row = db.prepare('SELECT COUNT(*) as cnt FROM media').get();
-        mediaCount = row?.cnt || 0;
+        if (userId && req.user?.role !== 'super_admin') {
+            const row = db.prepare('SELECT COUNT(*) as cnt FROM media WHERE user_id = ?').get(userId);
+            mediaCount = row?.cnt || 0;
+        } else {
+            const row = db.prepare('SELECT COUNT(*) as cnt FROM media').get();
+            mediaCount = row?.cnt || 0;
+        }
     } catch(e) {}
 
     res.json({
@@ -39,7 +50,7 @@ router.get('/status', auth, (req, res) => {
         tokenPreview: isConnected ? `${accessToken.slice(0, 8)}••••••••${accessToken.slice(-4)}` : '',
         username: igUsername || (isConnected ? 'connected.creator' : ''),
         igUserId: igUserId || '',
-        profilePic: getConfig('ig_profile_pic') || '',
+        profilePic: profilePic || '',
         webhookSubscribed: getConfig('webhook_subscribed') === '1',
         appId: appId || '',
         hasSecret: !!appSecret,
@@ -66,29 +77,42 @@ router.post('/setup', auth, (req, res) => {
 
 /**
  * 💾 Save Credentials Endpoint (Local & Persistent)
- * Saves Instagram Access Token, Username, and Account ID permanently without breaking on network calls.
+ * Saves Instagram Access Token, Username, and Account ID permanently for the authenticated user.
  */
 router.post('/setup/save-credentials', auth, (req, res) => {
     try {
         const { accessToken, username, igUserId } = req.body;
+        const userId = req.user?.id;
         let tokenSaved = false;
 
-        if (accessToken && accessToken.trim() && !accessToken.includes('•') && !accessToken.includes('***')) {
-            setConfig('access_token', accessToken.trim());
-            setConfig('token_expires_at', new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString());
-            tokenSaved = true;
+        let cleanToken = (accessToken && accessToken.trim() && !accessToken.includes('•') && !accessToken.includes('***')) ? accessToken.trim() : null;
+        let cleanUsername = username ? username.replace('@', '').trim() : null;
+        let cleanIgUserId = (igUserId && igUserId.trim()) ? igUserId.trim() : null;
+        const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+
+        if (userId) {
+            saveUserInstagramAccount(userId, {
+                igUserId: cleanIgUserId,
+                igUsername: cleanUsername,
+                accessToken: cleanToken || undefined,
+                tokenExpiresAt: cleanToken ? expiresAt : undefined
+            });
+            tokenSaved = !!cleanToken;
         }
 
-        if (username) {
-            const cleanUser = username.replace('@', '').trim();
-            if (cleanUser) setConfig('ig_username', cleanUser);
+        // Maintain global config for super_admin or legacy
+        if (!userId || req.user?.role === 'super_admin') {
+            if (cleanToken) {
+                setConfig('access_token', cleanToken);
+                setConfig('token_expires_at', expiresAt);
+                tokenSaved = true;
+            }
+            if (cleanUsername) setConfig('ig_username', cleanUsername);
+            if (cleanIgUserId) setConfig('ig_user_id', cleanIgUserId);
         }
 
-        if (igUserId && igUserId.trim()) {
-            setConfig('ig_user_id', igUserId.trim());
-        }
-
-        const currentToken = getConfig('access_token');
+        const userAcct = userId ? getUserInstagramAccount(userId) : null;
+        const currentToken = userAcct?.access_token || getConfig('access_token');
         const hasToken = !!(currentToken && currentToken.trim() && !currentToken.includes('•'));
 
         try {
@@ -100,8 +124,8 @@ router.post('/setup/save-credentials', auth, (req, res) => {
             success: true,
             hasToken,
             tokenSaved,
-            username: getConfig('ig_username') || '',
-            igUserId: getConfig('ig_user_id') || '',
+            username: userAcct?.ig_username || getConfig('ig_username') || '',
+            igUserId: userAcct?.ig_user_id || getConfig('ig_user_id') || '',
             message: '💾 All credentials and automations saved permanently to system config & backup file!'
         });
     } catch (err) {
@@ -112,25 +136,27 @@ router.post('/setup/save-credentials', auth, (req, res) => {
 
 /**
  * ⚡ Creator 1-Click Token Connection & Sync Endpoint
- * Connects, validates with Meta, syncs Reels, and saves everything permanently.
+ * Connects, validates with Meta, syncs Reels, and saves everything permanently for user.
  */
 async function handleConnectAndScan(req, res) {
     try {
         const { accessToken, username, igUserId } = req.body;
+        const userId = req.user?.id;
+        const userAcct = userId ? getUserInstagramAccount(userId) : null;
         
         let tokenToUse = (accessToken || '').trim();
         // Fallback to saved token if empty or masked with dots
         if (!tokenToUse || tokenToUse.includes('•') || tokenToUse.includes('***')) {
-            tokenToUse = getConfig('access_token');
+            tokenToUse = userAcct?.access_token || getConfig('access_token');
         }
 
         if (!tokenToUse || !tokenToUse.trim()) {
             return res.status(400).json({ error: 'Instagram Access Token is required. Please paste your token.' });
         }
 
-        let targetUsername = (username || getConfig('ig_username') || '').replace('@', '').trim();
-        let resolvedIgUserId = (igUserId || getConfig('ig_user_id') || '').trim();
-        let profilePic = '';
+        let targetUsername = (username || userAcct?.ig_username || getConfig('ig_username') || '').replace('@', '').trim();
+        let resolvedIgUserId = (igUserId || userAcct?.ig_user_id || getConfig('ig_user_id') || '').trim();
+        let profilePic = userAcct?.profile_pic || '';
 
         console.log('[Setup] Verifying access token with Meta API...');
 
@@ -155,11 +181,22 @@ async function handleConnectAndScan(req, res) {
         }
 
         const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
-        setConfig('access_token', tokenToUse);
-        setConfig('token_expires_at', expiresAt);
-        if (targetUsername) setConfig('ig_username', targetUsername);
-        if (resolvedIgUserId) setConfig('ig_user_id', resolvedIgUserId);
-        if (profilePic) setConfig('ig_profile_pic', profilePic);
+        if (userId) {
+            saveUserInstagramAccount(userId, {
+                igUserId: resolvedIgUserId,
+                igUsername: targetUsername,
+                profilePic: profilePic,
+                accessToken: tokenToUse,
+                tokenExpiresAt: expiresAt
+            });
+        }
+        if (!userId || req.user?.role === 'super_admin') {
+            setConfig('access_token', tokenToUse);
+            setConfig('token_expires_at', expiresAt);
+            if (targetUsername) setConfig('ig_username', targetUsername);
+            if (resolvedIgUserId) setConfig('ig_user_id', resolvedIgUserId);
+            if (profilePic) setConfig('ig_profile_pic', profilePic);
+        }
 
         // Clean up only known mock commenter usernames (non-destructive to real media or rules)
         try {
@@ -169,11 +206,12 @@ async function handleConnectAndScan(req, res) {
             `);
         } catch(e) {}
 
-        // Immediately run media sync
+        // Immediately run media sync for this user
         let syncCount = 0;
         let syncErrMessage = null;
+        let syncRes = null;
         try {
-            const syncRes = await syncMedia();
+            syncRes = await syncMedia(userId);
             syncCount = syncRes?.synced || 0;
         } catch (syncErr) {
             console.warn('[Setup] Post-connection media sync notice:', syncErr.message);
@@ -211,22 +249,28 @@ router.post('/setup/connect-scan-save', auth, handleConnectAndScan);
 router.post('/setup/clear-demo', auth, async (req, res) => {
     try {
         const db = getDb();
-        console.log('[Setup] Purging all demo data from database...');
+        const userId = req.user?.id;
+        console.log('[Setup] Purging demo data from database...');
 
-        // Purge mock events, clicks, conversations, and demo stats (preserves rules and real media)
-        db.exec(`
-            DELETE FROM events;
-            DELETE FROM clicks;
-            DELETE FROM conversations;
-            DELETE FROM reel_stats_history;
-        `);
+        if (userId && req.user?.role !== 'super_admin') {
+            db.prepare('DELETE FROM events WHERE user_id = ?').run(userId);
+            db.prepare('DELETE FROM conversations WHERE user_id = ?').run(userId);
+            db.prepare('DELETE FROM reel_stats_history WHERE user_id = ?').run(userId);
+        } else {
+            db.exec(`
+                DELETE FROM events;
+                DELETE FROM clicks;
+                DELETE FROM conversations;
+                DELETE FROM reel_stats_history;
+            `);
+        }
 
-        // If a real token is connected, immediately fetch real media!
         let syncCount = 0;
-        const token = getConfig('access_token');
+        const userAcct = userId ? getUserInstagramAccount(userId) : null;
+        const token = userAcct?.access_token || getConfig('access_token');
         if (token && !token.startsWith('IGQWR_demo')) {
             try {
-                const syncRes = await syncMedia();
+                const syncRes = await syncMedia(userId);
                 syncCount = syncRes?.synced || 0;
             } catch (e) {
                 console.warn('[Setup] Sync real media notice:', e.message);

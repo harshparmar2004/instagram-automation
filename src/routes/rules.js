@@ -21,18 +21,31 @@ router.get('/rules', auth, (req, res) => {
         } catch(e) {}
 
         const { media_id } = req.query;
+        const userId = req.user?.id;
+        const isSuperAdmin = req.user?.role === 'super_admin' && !req.isImpersonating;
+
         let query = `
             SELECT r.*, r.trigger_keyword as trigger_word, m.ig_media_id, m.thumbnail_url 
             FROM rules r 
             LEFT JOIN media m ON (r.media_id = m.id OR r.media_id = m.ig_media_id)
         `;
+        const whereClauses = [];
         const params = [];
 
+        if (!isSuperAdmin && userId) {
+            whereClauses.push('(r.user_id = ? OR r.user_id IS NULL)');
+            params.push(userId);
+        }
+
         if (media_id === 'global') {
-            query += ' WHERE r.media_id IS NULL';
+            whereClauses.push('r.media_id IS NULL');
         } else if (media_id) {
-            query += ' WHERE (r.media_id = ? OR m.ig_media_id = ?)';
+            whereClauses.push('(r.media_id = ? OR m.ig_media_id = ?)');
             params.push(media_id, media_id);
+        }
+
+        if (whereClauses.length > 0) {
+            query += ' WHERE ' + whereClauses.join(' AND ');
         }
 
         query += ' ORDER BY r.created_at DESC';
@@ -102,9 +115,11 @@ router.post('/rules', auth, (req, res) => {
 
         const sanitizedUrl = cleanUrl(link_url);
 
+        const userId = req.user?.id || null;
+
         const result = db.prepare(`
-            INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, created_at, updated_at, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
             resolvedMediaId, 
             keyword, 
@@ -116,7 +131,8 @@ router.post('/rules', auth, (req, res) => {
             parseInt(delay_seconds || 0),
             variations_json || null,
             new Date().toISOString(), 
-            new Date().toISOString()
+            new Date().toISOString(),
+            userId
         );
 
         try { backupRules(db); } catch(e) { console.error('Error backing up rules:', e); }

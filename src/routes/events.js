@@ -11,6 +11,8 @@ router.get('/events', auth, (req, res) => {
         const { page = 1, limit = 20, rule_id, media_id, status, search } = req.query;
         
         const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+        const userId = req.user?.id;
+        const isSuperAdmin = req.user?.role === 'super_admin' && !req.isImpersonating;
         
         let query = `
             SELECT e.*, r.trigger_keyword, r.action_type, r.response_text as rule_response,
@@ -21,6 +23,11 @@ router.get('/events', auth, (req, res) => {
             WHERE 1=1
         `;
         const params = [];
+
+        if (!isSuperAdmin && userId) {
+            query += ' AND (e.user_id = ? OR e.user_id IS NULL)';
+            params.push(userId);
+        }
 
         if (rule_id) {
             query += ' AND e.rule_id = ?';
@@ -120,28 +127,38 @@ router.get('/events/export', auth, (req, res) => {
 router.get('/events/stats', auth, (req, res) => {
     try {
         const db = getDb();
-        
-        const totalEvents = db.prepare('SELECT COUNT(*) as count FROM events').get().count;
-        const dmsSent = db.prepare("SELECT COUNT(*) as count FROM events WHERE dm_status IN ('sent', 'delivered')").get().count;
-        const dmsDelivered = db.prepare("SELECT COUNT(*) as count FROM events WHERE dm_status = 'delivered'").get().count;
-        const dmsFailed = db.prepare("SELECT COUNT(*) as count FROM events WHERE dm_status = 'failed'").get().count;
-        const totalClicks = db.prepare('SELECT COUNT(*) as count FROM clicks').get().count;
+        const userId = req.user?.id;
+        const isSuperAdmin = req.user?.role === 'super_admin' && !req.isImpersonating;
+        const userFilter = (!isSuperAdmin && userId) ? ' WHERE (user_id = ? OR user_id IS NULL)' : '';
+        const userParams = (!isSuperAdmin && userId) ? [userId] : [];
+
+        const totalEvents = db.prepare(`SELECT COUNT(*) as count FROM events ${userFilter}`).get(...userParams).count;
+        const dmsSent = db.prepare(`SELECT COUNT(*) as count FROM events WHERE dm_status IN ('sent', 'delivered') ${userFilter ? userFilter.replace('WHERE', 'AND') : ''}`).get(...userParams).count;
+        const dmsDelivered = db.prepare(`SELECT COUNT(*) as count FROM events WHERE dm_status = 'delivered' ${userFilter ? userFilter.replace('WHERE', 'AND') : ''}`).get(...userParams).count;
+        const dmsFailed = db.prepare(`SELECT COUNT(*) as count FROM events WHERE dm_status = 'failed' ${userFilter ? userFilter.replace('WHERE', 'AND') : ''}`).get(...userParams).count;
+        const totalClicks = db.prepare(`SELECT COUNT(*) as count FROM clicks c JOIN events e ON c.event_id = e.id ${userFilter ? userFilter.replace('WHERE', 'WHERE (e.user_id = ? OR e.user_id IS NULL)') : ''}`).get(...userParams).count;
         
         const todayStr = new Date().toISOString().split('T')[0];
-        const todayEvents = db.prepare("SELECT COUNT(*) as count FROM events WHERE created_at >= ?").get(todayStr).count;
+        const todayEvents = db.prepare(`SELECT COUNT(*) as count FROM events WHERE created_at >= ? ${userFilter ? userFilter.replace('WHERE', 'AND') : ''}`).get(todayStr, ...userParams).count;
         
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
-        const weekEvents = db.prepare("SELECT COUNT(*) as count FROM events WHERE created_at >= ?").get(weekAgo.toISOString()).count;
+        const weekEvents = db.prepare(`SELECT COUNT(*) as count FROM events WHERE created_at >= ? ${userFilter ? userFilter.replace('WHERE', 'AND') : ''}`).get(weekAgo.toISOString(), ...userParams).count;
 
-        const topPosts = db.prepare(`
+        let topPostsQuery = `
             SELECT m.id, m.caption, m.media_type, m.thumbnail_url, COUNT(e.id) as total_triggers
             FROM events e
             JOIN media m ON e.media_ig_id = m.ig_media_id
+        `;
+        if (!isSuperAdmin && userId) {
+            topPostsQuery += ` WHERE (e.user_id = ? OR e.user_id IS NULL) `;
+        }
+        topPostsQuery += `
             GROUP BY m.id
             ORDER BY total_triggers DESC
             LIMIT 5
-        `).all();
+        `;
+        const topPosts = db.prepare(topPostsQuery).all(...userParams);
 
         res.json({
             total: totalEvents,

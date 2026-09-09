@@ -1,5 +1,5 @@
 const express = require('express');
-const { getConfig, setConfig } = require('../database');
+const { getConfig, setConfig, validateSession, saveUserInstagramAccount } = require('../database');
 const { exchangeCodeForToken, exchangeLongLivedToken, getUserProfile } = require('../services/instagram');
 const { syncMedia } = require('../services/mediaSync');
 const config = require('../config');
@@ -40,11 +40,20 @@ router.get('/instagram', (req, res) => {
 
     setConfig('redirect_uri', redirectUri);
 
-    const scope = req.query.scope || 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments';
+    const provider = req.query.provider || 'facebook';
+    const state = req.query.state || '';
     
-    // Official Instagram API with Instagram Login OAuth endpoint
-    const authUrl = `https://api.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code`;
-    console.log(`[OAuth] Launching Instagram Business OAuth with client_id: "${appId}", redirect_uri: "${redirectUri}", scope: "${scope}"`);
+    let authUrl;
+    if (provider === 'instagram') {
+        const scope = req.query.scope || 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments';
+        authUrl = `https://api.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code${state ? `&state=${encodeURIComponent(state)}` : ''}`;
+    } else {
+        // Official Meta Graph API OAuth dialog for Facebook Platform App IDs (avoids 'Invalid platform app' error)
+        const scope = req.query.scope || 'email,public_profile,instagram_basic,instagram_manage_comments,instagram_manage_messages,pages_show_list,pages_read_engagement';
+        authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code${state ? `&state=${encodeURIComponent(state)}` : ''}`;
+    }
+
+    console.log(`[OAuth] Launching Meta OAuth (${provider}) with client_id: "${appId}", redirect_uri: "${redirectUri}"`);
     res.redirect(authUrl);
 });
 
@@ -169,7 +178,26 @@ router.get('/instagram/callback', async (req, res) => {
         
         console.log('[OAuth] Fetching user profile');
         const profile = await getUserProfile(token);
-        
+
+        let sessionUserId = null;
+        if (state) {
+            try {
+                const session = validateSession(state);
+                if (session) sessionUserId = session.user_id;
+            } catch (e) {}
+        }
+
+        if (sessionUserId) {
+            saveUserInstagramAccount(sessionUserId, {
+                igUserId: profile.id,
+                igUsername: profile.username,
+                profilePic: profile.profile_picture_url,
+                accessToken: token,
+                tokenExpiresAt: expiresAt
+            });
+        }
+
+        // Also save to global config for admin or fallback
         setConfig('access_token', token);
         setConfig('token_expires_at', expiresAt);
         if (profile.id) setConfig('ig_user_id', profile.id);
@@ -178,8 +206,8 @@ router.get('/instagram/callback', async (req, res) => {
 
         // Auto-sync media right after connecting!
         try {
-            await syncMedia();
-            console.log('[OAuth] ✅ Reels & posts automatically synced after OAuth connection!');
+            await syncMedia(sessionUserId);
+            console.log(`[OAuth] ✅ Reels & posts automatically synced after OAuth connection for user ${sessionUserId || 'default'}!`);
         } catch (syncErr) {
             console.warn('[OAuth] Media auto-sync notice:', syncErr.message);
         }

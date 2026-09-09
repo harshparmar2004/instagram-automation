@@ -42,47 +42,124 @@
 <body class="bg-cream-50 text-cream-800 antialiased min-h-screen">
     <div id="toast-container" class="toast-container"></div>
     
-    <!-- CLEAN DEDICATED SIGN IN TO DASHBOARD SCREEN -->
+    <!-- CLEAN DEDICATED AUTH SCREEN (SIGN IN & REGISTER) -->
     <div id="login-screen" class="login-screen active">
-        <div class="login-card-box">
-            <div class="login-header-text" style="text-align: left; margin-bottom: 1.6rem;">
-                <div style="display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.25rem;">
+        <div class="login-card-box" style="max-width: 440px; width: 100%;">
+            <div class="login-header-text" style="text-align: left; margin-bottom: 1.4rem;">
+                <div style="display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.15rem;">
                     <img src="favicon.png?v=5" alt="InstaAuto Logo" style="width: 44px; height: 44px; object-fit: contain; background: transparent;" />
                     <div>
                         <h1 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.45rem; color: #2C2A29; letter-spacing: -0.03em; margin: 0; line-height: 1.1;">InstaAuto</h1>
-                        <div style="font-size: 0.72rem; font-weight: 700; color: #D97757; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.15rem;">Creator Automation Studio</div>
+                        <div style="font-size: 0.72rem; font-weight: 700; color: #D97757; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.15rem;">Creator Automation SaaS</div>
                     </div>
                 </div>
-                <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.35rem; color: #2C2A29; margin: 0 0 0.35rem 0; letter-spacing: -0.02em;">Sign In to Dashboard 👋</h2>
-                <p style="font-size: 0.86rem; color: #736E68; margin: 0; line-height: 1.45;">Enter your dashboard password to access your rules and leads.</p>
+
+                <!-- Auth Mode Switcher Tabs -->
+                <div style="display: flex; background: #F5F1EA; padding: 4px; border-radius: 12px; margin-bottom: 1.25rem;">
+                    <button type="button" id="tab-btn-login" onclick="switchAuthTab('login')" style="flex: 1; padding: 0.6rem; border-radius: 9px; font-weight: 700; font-size: 0.85rem; border: none; cursor: pointer; background: #FFFFFF; color: #2C2A29; box-shadow: 0 2px 6px rgba(0,0,0,0.06); transition: all 0.2s;">
+                        Sign In
+                    </button>
+                    <button type="button" id="tab-btn-register" onclick="switchAuthTab('register')" style="flex: 1; padding: 0.6rem; border-radius: 9px; font-weight: 700; font-size: 0.85rem; border: none; cursor: pointer; background: transparent; color: #736E68; transition: all 0.2s;">
+                        Create Account
+                    </button>
+                </div>
+
+                <div id="auth-heading-login">
+                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.35rem; color: #2C2A29; margin: 0 0 0.35rem 0; letter-spacing: -0.02em;">Welcome Back 👋</h2>
+                    <p style="font-size: 0.86rem; color: #736E68; margin: 0; line-height: 1.45;">Enter your email & password to access your automation workspace.</p>
+                </div>
+
+                <div id="auth-heading-register" style="display: none;">
+                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.35rem; color: #2C2A29; margin: 0 0 0.35rem 0; letter-spacing: -0.02em;">Start Free as Creator 🚀</h2>
+                    <p style="font-size: 0.86rem; color: #736E68; margin: 0; line-height: 1.45;">Create your dedicated workspace. Connect your Instagram in seconds.</p>
+                </div>
             </div>
 
+            <!-- SIGN IN FORM -->
             <form id="login-form">
-                <div class="form-group" style="position: relative; text-align: left; margin-bottom: 1.35rem;">
-                    <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.4rem; display: block;">Dashboard Password</label>
-                    <input type="password" id="password" class="input" placeholder="Enter password (e.g. changeme)" required style="width: 100%; padding: 0.8rem 2.6rem 0.8rem 1rem; font-size: 0.95rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none; transition: all 0.2s ease;">
-                    <button type="button" id="btn-toggle-login-pwd" onclick="toggleLoginPassword()" style="position: absolute; right: 12px; top: 36px; background: none; border: none; font-size: 1.05rem; cursor: pointer; color: #736E68;" title="Toggle Password Visibility">👁️</button>
-                    <div style="font-size: 0.76rem; color: #8C827A; margin-top: 0.4rem;">
-                        Default password: <code style="font-weight: 700; color: #D97757; background: #FAF0EC; padding: 0.15rem 0.4rem; border-radius: 6px;">changeme</code> (or <code style="font-weight: 700; color: #D97757; background: #FAF0EC; padding: 0.15rem 0.4rem; border-radius: 6px;">admin</code>)
+                <div class="form-group" style="text-align: left; margin-bottom: 1rem;">
+                    <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.4rem; display: block;">Email Address</label>
+                    <input type="email" id="login-email" class="input" placeholder="harshparmar686630@gmail.com or creator@domain.com" required style="width: 100%; padding: 0.75rem 1rem; font-size: 0.92rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none;">
+                </div>
+
+                <div class="form-group" style="position: relative; text-align: left; margin-bottom: 1.25rem;">
+                    <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.4rem; display: block;">Password</label>
+                    <input type="password" id="password" class="input" placeholder="Enter your password" required style="width: 100%; padding: 0.75rem 2.6rem 0.75rem 1rem; font-size: 0.92rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none;">
+                    <button type="button" id="btn-toggle-login-pwd" onclick="toggleLoginPassword('password', 'btn-toggle-login-pwd')" style="position: absolute; right: 12px; top: 34px; background: none; border: none; font-size: 1.05rem; cursor: pointer; color: #736E68;" title="Toggle Password Visibility">👁️</button>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+                        <span style="font-size: 0.76rem; color: #8C827A;">
+                            Default: <code style="font-weight: 700; color: #D97757; background: #FAF0EC; padding: 0.1rem 0.35rem; border-radius: 6px;">Harsh@2004</code>
+                        </span>
+                        <a href="javascript:void(0)" onclick="autofillSuperAdmin()" style="font-size: 0.76rem; font-weight: 700; color: #D97757; text-decoration: none;">👑 Autofill Super Admin</a>
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary w-full" style="padding: 0.88rem 1.5rem; font-size: 0.95rem; font-weight: 800; border-radius: 12px; box-shadow: 0 4px 14px rgba(217, 119, 87, 0.3);">
-                    <span>Sign In to Dashboard →</span>
+                <button type="submit" class="btn btn-primary w-full" style="padding: 0.85rem 1.5rem; font-size: 0.95rem; font-weight: 800; border-radius: 12px; box-shadow: 0 4px 14px rgba(217, 119, 87, 0.3);">
+                    <span>Sign In to Workspace →</span>
                 </button>
             </form>
 
-            <div style="margin-top: 1.65rem; text-align: center; font-size: 0.76rem; font-weight: 700; color: #736E68; display: flex; align-items: center; justify-content: center; gap: 0.4rem; border-top: 1px solid #F5F1EA; padding-top: 1.15rem;">
+            <!-- REGISTER FORM -->
+            <form id="register-form" style="display: none;">
+                <div class="form-group" style="text-align: left; margin-bottom: 0.85rem;">
+                    <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.35rem; display: block;">Full Name</label>
+                    <input type="text" id="reg-name" class="input" placeholder="e.g. Alex Rivera" required style="width: 100%; padding: 0.75rem 1rem; font-size: 0.92rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none;">
+                </div>
+
+                <div class="form-group" style="text-align: left; margin-bottom: 0.85rem;">
+                    <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.35rem; display: block;">Email Address</label>
+                    <input type="email" id="reg-email" class="input" placeholder="e.g. alex@creatorstudio.com" required style="width: 100%; padding: 0.75rem 1rem; font-size: 0.92rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none;">
+                </div>
+
+                <div class="form-group" style="position: relative; text-align: left; margin-bottom: 1.25rem;">
+                    <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.35rem; display: block;">Password (min 6 chars)</label>
+                    <input type="password" id="reg-password" class="input" placeholder="Create a secure password" minlength="6" required style="width: 100%; padding: 0.75rem 2.6rem 0.75rem 1rem; font-size: 0.92rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none;">
+                    <button type="button" id="btn-toggle-reg-pwd" onclick="toggleLoginPassword('reg-password', 'btn-toggle-reg-pwd')" style="position: absolute; right: 12px; top: 34px; background: none; border: none; font-size: 1.05rem; cursor: pointer; color: #736E68;" title="Toggle Password Visibility">👁️</button>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-full" style="padding: 0.85rem 1.5rem; font-size: 0.95rem; font-weight: 800; border-radius: 12px; box-shadow: 0 4px 14px rgba(217, 119, 87, 0.3);">
+                    <span>Create Creator Account →</span>
+                </button>
+            </form>
+
+            <div style="margin-top: 1.45rem; text-align: center; font-size: 0.76rem; font-weight: 700; color: #736E68; display: flex; align-items: center; justify-content: center; gap: 0.4rem; border-top: 1px solid #F5F1EA; padding-top: 1.15rem;">
                 <span style="color: #2E7D32;">🟢</span>
-                <span>Meta Graph API Verified • 250 DMs/hr Cap Safe</span>
+                <span>Isolated Workspace • Meta Graph API 250 DMs/hr Cap Safe</span>
             </div>
         </div>
     </div>
 
     <script>
-        function toggleLoginPassword() {
-            const pwd = document.getElementById('password');
-            const btn = document.getElementById('btn-toggle-login-pwd');
+        function switchAuthTab(mode) {
+            const isLogin = mode === 'login';
+            document.getElementById('login-form').style.display = isLogin ? 'block' : 'none';
+            document.getElementById('register-form').style.display = isLogin ? 'none' : 'block';
+            document.getElementById('auth-heading-login').style.display = isLogin ? 'block' : 'none';
+            document.getElementById('auth-heading-register').style.display = isLogin ? 'none' : 'block';
+
+            const btnLogin = document.getElementById('tab-btn-login');
+            const btnReg = document.getElementById('tab-btn-register');
+            if (isLogin) {
+                btnLogin.style.background = '#FFFFFF';
+                btnLogin.style.color = '#2C2A29';
+                btnLogin.style.boxShadow = '0 2px 6px rgba(0,0,0,0.06)';
+                btnReg.style.background = 'transparent';
+                btnReg.style.color = '#736E68';
+                btnReg.style.boxShadow = 'none';
+            } else {
+                btnReg.style.background = '#FFFFFF';
+                btnReg.style.color = '#2C2A29';
+                btnReg.style.boxShadow = '0 2px 6px rgba(0,0,0,0.06)';
+                btnLogin.style.background = 'transparent';
+                btnLogin.style.color = '#736E68';
+                btnLogin.style.boxShadow = 'none';
+            }
+        }
+
+        function toggleLoginPassword(fieldId = 'password', btnId = 'btn-toggle-login-pwd') {
+            const pwd = document.getElementById(fieldId);
+            const btn = document.getElementById(btnId);
             if (pwd && btn) {
                 if (pwd.type === 'password') {
                     pwd.type = 'text';
@@ -93,6 +170,11 @@
                 }
             }
         }
+
+        function autofillSuperAdmin() {
+            document.getElementById('login-email').value = 'harshparmar686630@gmail.com';
+            document.getElementById('password').value = 'Harsh@2004';
+        }
     </script>
 
     <!-- Main Dashboard -->
@@ -101,13 +183,23 @@
             <div class="sidebar-header" style="padding: 1.35rem 1.25rem 0.95rem 1.25rem;">
                 <div class="logo" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-start !important; gap: 0.85rem !important;">
                     <img src="favicon.png?v=5" alt="InstaAuto Standalone Vector Logo" style="width: 44px !important; height: 44px !important; object-fit: contain; background: transparent; flex-shrink: 0;" />
-                    <div>
+                    <div style="overflow: hidden;">
                         <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.35rem; color: #2C2A29; letter-spacing: -0.03em; line-height: 1.1; margin: 0;">InstaAuto</h2>
-                        <div style="font-size: 0.72rem; color: #2E7D32; font-weight: 700; display: flex; align-items: center; gap: 5px; margin-top: 3px;">
-                            <span style="width: 7px; height: 7px; border-radius: 50%; background: #2E7D32; display: inline-block; box-shadow: 0 0 6px rgba(46,125,50,0.4);"></span> @creator.studio
+                        <div id="sidebar-user-badge" style="font-size: 0.72rem; color: #2E7D32; font-weight: 700; display: flex; align-items: center; gap: 5px; margin-top: 3px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">
+                            <span style="width: 7px; height: 7px; border-radius: 50%; background: #2E7D32; display: inline-block; box-shadow: 0 0 6px rgba(46,125,50,0.4);"></span>
+                            <span id="sidebar-user-handle">@creator.studio</span>
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Impersonation Notice Banner (Super Admin Mode) -->
+            <div id="impersonation-banner" style="display: none; margin: 0 1rem 0.75rem 1rem; padding: 0.5rem 0.75rem; background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 10px; font-size: 0.76rem; color: #92400E;">
+                <div style="font-weight: 700; display: flex; align-items: center; justify-content: space-between;">
+                    <span>👁️ Viewing Workspace</span>
+                    <button onclick="App.exitImpersonation()" style="background: none; border: none; font-size: 0.72rem; font-weight: 800; color: #B45309; text-decoration: underline; cursor: pointer;">Exit</button>
+                </div>
+                <div id="impersonation-user-name" style="font-weight: 600; margin-top: 2px;">User Workspace</div>
             </div>
 
             <!-- Dedicated Sidebar "+ New Automation" Action Button -->
@@ -151,8 +243,22 @@
                     <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
                     <span class="nav-label">About & Meta Handbook</span>
                 </a>
+
+                <!-- Super Admin Dedicated Portal Nav Link (Visible only to Super Admins) -->
+                <a href="#admin" class="nav-item" data-view="admin" id="nav-item-admin" style="display: none; border-left: 3px solid #D97757; background: rgba(217, 119, 87, 0.08);">
+                    <svg class="nav-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D97757" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                    <span class="nav-label" style="font-weight: 800; color: #D97757;">👑 Super Admin</span>
+                </a>
             </nav>
-            <div class="sidebar-footer">
+
+            <div class="sidebar-footer" style="padding: 1rem;">
+                <div id="sidebar-user-pill" style="margin-bottom: 0.65rem; padding: 0.5rem 0.65rem; background: #FAF8F5; border-radius: 8px; border: 1px solid #E6E1D8; display: flex; align-items: center; justify-content: space-between;">
+                    <div style="overflow: hidden;">
+                        <div id="sidebar-user-name" style="font-size: 0.8rem; font-weight: 700; color: #2C2A29; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">User</div>
+                        <div id="sidebar-user-email" style="font-size: 0.7rem; color: #736E68; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">user@mail.com</div>
+                    </div>
+                    <span id="sidebar-role-badge" style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: #FAF0EC; color: #D97757;">Creator</span>
+                </div>
                 <button id="logout-btn" class="btn btn-secondary w-full" style="font-weight: 600; font-size: 0.82rem;">Sign Out</button>
             </div>
         </aside>
@@ -190,5 +296,6 @@
     <script src="js/activity.js" defer></script>
     <script src="js/analytics.js" defer></script>
     <script src="js/about.js" defer></script>
+    <script src="js/admin.js" defer></script>
 </body>
 </html>

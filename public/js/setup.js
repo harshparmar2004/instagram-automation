@@ -34,7 +34,7 @@ window.setup = {
         const left = window.screenX + (window.outerWidth - width) / 2;
         const top = window.screenY + (window.outerHeight - height) / 2;
         const callbackUrl = window.location.origin + '/auth/instagram/callback';
-        const targetUrl = `/auth/instagram?redirect_uri=${encodeURIComponent(callbackUrl)}`;
+        const targetUrl = `/auth/instagram?redirect_uri=${encodeURIComponent(callbackUrl)}${App.state.token ? '&state=' + encodeURIComponent(App.state.token) : ''}`;
         const popup = window.open(
             targetUrl,
             'meta_oauth_popup',

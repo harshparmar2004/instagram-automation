@@ -16,7 +16,7 @@ getDb();
 // Enable CORS for Vercel / cross-origin deployments
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Impersonate-User-Id');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
     if (req.method === 'OPTIONS') {
         return res.sendStatus(200);
@@ -50,6 +50,9 @@ const eventsRoutes = require('./src/routes/events');
 const integrationsRoutes = require('./src/routes/integrations');
 const redirectRoutes = require('./src/routes/redirect');
 
+const authRoutes = require('./src/routes/auth');
+const adminRoutes = require('./src/routes/admin');
+
 // Mount routes
 // Webhook needs raw body for HMAC signature verification
 // Mount on both /webhook and /api/webhook for Meta compatibility
@@ -59,6 +62,8 @@ app.use('/api/webhook', express.raw({ type: 'application/json' }), webhookRoutes
 // Other routes need JSON parser
 app.use(express.json());
 
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api', setupRoutes);
 app.use('/api', mediaRoutes);
 app.use('/api', rulesRoutes);

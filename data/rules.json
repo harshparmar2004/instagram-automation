@@ -12,7 +12,8 @@
     "updated_at": "2026-09-03T07:19:19.344Z",
     "public_reply": "Check your DMs! 📩",
     "delay_seconds": 10,
-    "variations_json": "[\"Thanks for commenting! Grab your AI Playbook here...\",\"Hey! Here is your free 2026 AI Growth Playbook...\"]"
+    "variations_json": "[\"Thanks for commenting! Grab your AI Playbook here...\",\"Hey! Here is your free 2026 AI Growth Playbook...\"]",
+    "user_id": 1
   },
   {
     "id": 10,
@@ -27,7 +28,8 @@
     "updated_at": "2026-09-03T07:19:19.344Z",
     "public_reply": "Check your DMs for instructions! 📩",
     "delay_seconds": 0,
-    "variations_json": "[\"Appreciate the comment! Follow us and reply DONE for your guide.\"]"
+    "variations_json": "[\"Appreciate the comment! Follow us and reply DONE for your guide.\"]",
+    "user_id": 1
   },
   {
     "id": 11,
@@ -42,7 +44,8 @@
     "updated_at": "2026-09-03T07:19:19.344Z",
     "public_reply": "Sent to your DMs! 📩",
     "delay_seconds": 30,
-    "variations_json": null
+    "variations_json": null,
+    "user_id": 1
   },
   {
     "id": 12,
@@ -57,7 +60,8 @@
     "updated_at": "2026-09-03T07:19:19.345Z",
     "public_reply": "Replied in DMs! 📩",
     "delay_seconds": 0,
-    "variations_json": null
+    "variations_json": null,
+    "user_id": 1
   },
   {
     "id": 13,
@@ -72,6 +76,7 @@
     "updated_at": "2026-09-06T18:09:21.364Z",
     "public_reply": "Checked!",
     "delay_seconds": 0,
-    "variations_json": null
+    "variations_json": null,
+    "user_id": 1
   }
 ]

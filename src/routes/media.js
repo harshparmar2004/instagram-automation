@@ -9,18 +9,30 @@ router.get('/media', auth, (req, res) => {
     try {
         const db = getDb();
         const type = req.query.type; // 'reels', 'feed', or all
+        const userId = req.user?.id;
+        const isSuperAdmin = req.user?.role === 'super_admin' && !req.isImpersonating;
 
         let query = `
             SELECT m.*, 
                    (SELECT COUNT(*) FROM rules r WHERE r.media_id = m.id AND r.is_active = 1) as rulesCount
             FROM media m
         `;
+        const whereClauses = [];
         const params = [];
 
+        if (!isSuperAdmin && userId) {
+            whereClauses.push('(m.user_id = ? OR m.user_id IS NULL)');
+            params.push(userId);
+        }
+
         if (type === 'reels') {
-            query += ` WHERE m.media_product_type = 'REELS' OR m.media_type = 'REEL' OR (m.media_type = 'VIDEO' AND m.media_product_type != 'FEED') `;
+            whereClauses.push("(m.media_product_type = 'REELS' OR m.media_type = 'REEL' OR (m.media_type = 'VIDEO' AND m.media_product_type != 'FEED'))");
         } else if (type === 'feed') {
-            query += ` WHERE m.media_product_type != 'REELS' AND m.media_type != 'REEL' `;
+            whereClauses.push("(m.media_product_type != 'REELS' AND m.media_type != 'REEL')");
+        }
+
+        if (whereClauses.length > 0) {
+            query += ' WHERE ' + whereClauses.join(' AND ');
         }
 
         query += ` ORDER BY m.timestamp DESC `;
@@ -36,18 +48,32 @@ router.get('/media', auth, (req, res) => {
 router.get('/media/automated', auth, (req, res) => {
     try {
         const db = getDb();
+        const userId = req.user?.id;
+        const isSuperAdmin = req.user?.role === 'super_admin' && !req.isImpersonating;
         
-        // 1. Fetch ALL rules with trigger and click counts
-        const allRules = db.prepare(`
+        let rulesQuery = `
             SELECT r.*, 
                    (SELECT COUNT(*) FROM events e WHERE e.rule_id = r.id) as total_triggers,
                    (SELECT COUNT(*) FROM clicks c JOIN events e ON c.event_id = e.id WHERE e.rule_id = r.id) as total_clicks
             FROM rules r
-            ORDER BY r.created_at DESC
-        `).all();
+        `;
+        const rulesParams = [];
+        if (!isSuperAdmin && userId) {
+            rulesQuery += ` WHERE (r.user_id = ? OR r.user_id IS NULL)`;
+            rulesParams.push(userId);
+        }
+        rulesQuery += ` ORDER BY r.created_at DESC`;
+        const allRules = db.prepare(rulesQuery).all(...rulesParams);
 
         // 2. Fetch all media from DB
-        const allMedia = db.prepare(`SELECT * FROM media ORDER BY timestamp DESC`).all();
+        let mediaQuery = `SELECT * FROM media`;
+        const mediaParams = [];
+        if (!isSuperAdmin && userId) {
+            mediaQuery += ` WHERE (user_id = ? OR user_id IS NULL)`;
+            mediaParams.push(userId);
+        }
+        mediaQuery += ` ORDER BY timestamp DESC`;
+        const allMedia = db.prepare(mediaQuery).all(...mediaParams);
 
         const historyStmt = db.prepare(`
             SELECT * FROM reel_stats_history WHERE media_id = ? ORDER BY month_year DESC
@@ -126,7 +152,7 @@ router.get('/media/automated', auth, (req, res) => {
 
 router.post('/media/sync', auth, async (req, res) => {
     try {
-        const result = await syncMedia();
+        const result = await syncMedia(req.user?.id);
         res.json({ success: true, count: result?.synced || 0, pages: result?.pages || 1 });
     } catch (err) {
         res.status(500).json({ error: err.response?.data?.error?.message || err.message });

@@ -1,15 +1,23 @@
 const { getMedia, getMediaComments } = require('./instagram');
-const { getDb, getConfig, backupRules, restoreRules, backupEvents, restoreEvents } = require('../database');
+const { getDb, getConfig, getUserInstagramAccount, backupRules, restoreRules, backupEvents, restoreEvents } = require('../database');
 
-async function syncMedia() {
-    const token = getConfig('access_token');
+async function syncMedia(userId = null) {
+    let token = null;
+    if (userId) {
+        const acct = getUserInstagramAccount(userId);
+        token = acct ? acct.access_token : null;
+    }
+    if (!token) {
+        token = getConfig('access_token');
+    }
+
     if (!token) {
         console.log('[MediaSync] No access token, skipping sync');
         return { synced: 0, error: 'No access token configured' };
     }
 
     try {
-        console.log('[MediaSync] Fetching media from Instagram with cursor pagination...');
+        console.log(`[MediaSync] Fetching media from Instagram with cursor pagination (userId: ${userId || 'default'})...`);
         
         let allItems = [];
         let afterCursor = null;
@@ -36,9 +44,9 @@ async function syncMedia() {
             INSERT INTO media (
                 ig_media_id, media_type, media_product_type, caption, 
                 thumbnail_url, media_url, permalink, timestamp, 
-                comments_count, like_count, synced_at
+                comments_count, like_count, synced_at, user_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(ig_media_id) DO UPDATE SET 
                 media_type = excluded.media_type,
                 media_product_type = excluded.media_product_type,
@@ -48,7 +56,8 @@ async function syncMedia() {
                 permalink = excluded.permalink,
                 comments_count = excluded.comments_count,
                 like_count = excluded.like_count,
-                synced_at = excluded.synced_at
+                synced_at = excluded.synced_at,
+                user_id = COALESCE(media.user_id, excluded.user_id)
         `);
 
         db.transaction((items) => {
@@ -67,7 +76,8 @@ async function syncMedia() {
                     item.timestamp || '',
                     item.comments_count || 0,
                     item.like_count || 0,
-                    new Date().toISOString()
+                    new Date().toISOString(),
+                    userId
                 );
             }
         })(allItems);

@@ -11,7 +11,8 @@
     "dm_message_id": null,
     "tracking_id": "5be7d1d7-5241-4c6c-a773-57f75b727297",
     "created_at": "2026-09-02T13:19:19.345Z",
-    "synced_to_sheet": 0
+    "synced_to_sheet": 0,
+    "user_id": 1
   },
   {
     "id": 44,
@@ -25,7 +26,8 @@
     "dm_message_id": null,
     "tracking_id": "f8d0d9ec-5270-4517-9720-52755aad84ba",
     "created_at": "2026-09-02T10:19:19.346Z",
-    "synced_to_sheet": 0
+    "synced_to_sheet": 0,
+    "user_id": 1
   },
   {
     "id": 45,
@@ -39,7 +41,8 @@
     "dm_message_id": null,
     "tracking_id": "b8a0658b-12ee-46f8-b0e6-df0909d1766b",
     "created_at": "2026-09-02T07:19:19.346Z",
-    "synced_to_sheet": 0
+    "synced_to_sheet": 0,
+    "user_id": 1
   },
   {
     "id": 46,
@@ -53,7 +56,8 @@
     "dm_message_id": null,
     "tracking_id": "326874bf-c55c-46ba-b44d-be0a2ac6649b",
     "created_at": "2026-09-02T04:19:19.346Z",
-    "synced_to_sheet": 0
+    "synced_to_sheet": 0,
+    "user_id": 1
   },
   {
     "id": 47,
@@ -67,7 +71,8 @@
     "dm_message_id": null,
     "tracking_id": "a8f6bafc-3c98-4683-b2f4-3fed4aebe971",
     "created_at": "2026-09-02T01:19:19.346Z",
-    "synced_to_sheet": 0
+    "synced_to_sheet": 0,
+    "user_id": 1
   },
   {
     "id": 48,
@@ -81,7 +86,8 @@
     "dm_message_id": null,
     "tracking_id": "f8a88beb-50e2-4aae-a6fd-e9cb2167fc19",
     "created_at": "2026-09-01T22:19:19.346Z",
-    "synced_to_sheet": 0
+    "synced_to_sheet": 0,
+    "user_id": 1
   },
   {
     "id": 49,
@@ -95,7 +101,8 @@
     "dm_message_id": null,
     "tracking_id": "ef592b2e-0b44-42a6-97c4-bf7a8243cfe2",
     "created_at": "2026-09-01T19:19:19.346Z",
-    "synced_to_sheet": 0
+    "synced_to_sheet": 0,
+    "user_id": 1
   },
   {
     "id": 50,
@@ -109,7 +116,8 @@
     "dm_message_id": null,
     "tracking_id": "ab52c9a0-f933-4907-b25d-aaabe6aa2082",
     "created_at": "2026-09-01T16:19:19.346Z",
-    "synced_to_sheet": 0
+    "synced_to_sheet": 0,
+    "user_id": 1
   },
   {
     "id": 51,
@@ -123,6 +131,7 @@
     "dm_message_id": null,
     "tracking_id": "eb241c7e-5a4a-4b1c-aee5-f33e92984ff5",
     "created_at": "2026-09-01T13:19:19.346Z",
-    "synced_to_sheet": 0
+    "synced_to_sheet": 0,
+    "user_id": 1
   }
 ]
