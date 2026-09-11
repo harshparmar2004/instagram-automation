@@ -20,7 +20,7 @@ const adminView = {
                         <p style="font-size: 0.88rem; color: #736E68; margin: 0;">Monitor creator workspaces, manage accounts, track system metrics, and inspect tenant rules.</p>
                     </div>
                     <div style="display: flex; gap: 0.75rem;">
-                        <button onclick="adminView.refresh()" class="btn btn-secondary" style="font-size: 0.84rem; padding: 0.55rem 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+                        <button onclick="adminView.refresh(false)" class="btn btn-secondary" style="font-size: 0.84rem; padding: 0.55rem 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
                             <span>↻</span> Refresh Live
                         </button>
                     </div>
@@ -349,8 +349,8 @@ const adminView = {
         }
     },
 
-    async refresh() {
-        App.showToast('Refreshing Super Admin telemetry...', 'info');
+    async refresh(isSilent = true) {
+        if (!isSilent) App.showToast('Refreshing Super Admin telemetry...', 'info');
         await this.loadData();
     }
 };

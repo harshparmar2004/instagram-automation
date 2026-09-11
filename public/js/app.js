@@ -329,7 +329,7 @@ const App = {
             if (currentObj && typeof currentObj.refresh === 'function') {
                 currentObj.refresh();
             }
-        }, 10000);
+        }, 15000);
     },
 
     navigate(view) {
