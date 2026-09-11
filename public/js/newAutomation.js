@@ -6,6 +6,16 @@ window['new-automation'] = {
     step1Filter: 'reels',
     keywordMode: 'specific', // 'specific' or 'any'
     keywordList: ['PLAYBOOK', 'PDF'],
+    savedButtonsConfig: {
+        gate_type: 'buttons',
+        step1_text: "Hey there! Glad you're here ☺️\n\nTap below and I'll send you the access in just a moment ✨",
+        step1_button: "Send me the access",
+        step2_text: "Almost there !\nPlease visit my profile and tap follow to continue 😄",
+        step2_profile_button: "Visit Profile",
+        step2_confirm_button: "I'm following ✅",
+        step3_text: "Dost appko document bejhdiya hai bahut mehnat sa bnaya hai please follow",
+        step3_button: "Click me"
+    },
 
     setKeywordMode(mode) {
         this.keywordMode = mode;
@@ -574,6 +584,20 @@ window['new-automation'] = {
         const linkVal = this.savedLinkUrl || 'https://example.com/guide.pdf';
         const promptVal = this.savedFollowPrompt || 'Thanks for commenting! Please follow @creator.studio first, then reply "I FOLLOWED" in this DM to unlock your link!';
 
+        if (!this.savedButtonsConfig) {
+            this.savedButtonsConfig = {
+                gate_type: 'buttons',
+                step1_text: "Hey there! Glad you're here ☺️\n\nTap below and I'll send you the access in just a moment ✨",
+                step1_button: "Send me the access",
+                step2_text: "Almost there !\nPlease visit my profile and tap follow to continue 😄",
+                step2_profile_button: "Visit Profile",
+                step2_confirm_button: "I'm following ✅",
+                step3_text: "Dost appko document bejhdiya hai bahut mehnat sa bnaya hai please follow",
+                step3_button: "Click me"
+            };
+        }
+        const btnCfg = this.savedButtonsConfig;
+
         container.innerHTML = `
             <div style="width: 100%;">
                 <div style="margin-bottom: 1rem;">
@@ -593,49 +617,105 @@ window['new-automation'] = {
                     </div>
 
                     ${actionVal === 'follow_first' ? `
-                        <!-- FOLLOW-FIRST GATE WORKFLOW VISUAL PREVIEW -->
-                        <div style="padding: 1rem 1.25rem; background: #FDF8F6; border: 2px solid var(--accent-primary); border-radius: 14px; box-shadow: 0 4px 14px rgba(217,119,87,0.08);">
-                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.65rem;">
-                                <span style="font-size: 1.2rem;">🔐</span>
-                                <h3 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--accent-primary); margin: 0;">
-                                    Follow-First Gate System Active
-                                </h3>
+                        <!-- FOLLOW-FIRST GATE WORKFLOW & 3-STEP BUTTON FUNNEL BUILDER -->
+                        <div style="padding: 1.15rem; background: #FAF8F5; border: 2px solid var(--accent-primary); border-radius: 14px; box-shadow: 0 4px 14px rgba(217,119,87,0.08);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="font-size: 1.25rem;">🔐</span>
+                                    <div>
+                                        <h3 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--accent-primary); margin: 0;">
+                                            Follow-First Gate System Active
+                                        </h3>
+                                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.1rem 0 0 0;">
+                                            Followers must follow your account to unlock your resource.
+                                        </p>
+                                    </div>
+                                </div>
+                                <select id="wizard_gate_type_select" onchange="window['new-automation'].savedButtonsConfig.gate_type=this.value; window['new-automation'].renderStep3(document.getElementById('new-automation-content'))" style="padding: 0.4rem 0.8rem; font-size: 0.82rem; font-weight: 700; border-radius: 8px; border: 1px solid #D1C9BE; background: #FFF; outline: none;">
+                                    <option value="buttons" ${btnCfg.gate_type !== 'text' ? 'selected' : ''}>🌟 3-Step Interactive Button Funnel (Top Creator Setup)</option>
+                                    <option value="text" ${btnCfg.gate_type === 'text' ? 'selected' : ''}>💬 Simple Text Prompt ("DONE")</option>
+                                </select>
                             </div>
-                            
-                            <p style="font-size: 0.82rem; color: var(--text-primary); line-height: 1.45; margin: 0 0 0.85rem 0;">
-                                Followers must <strong>follow @creator.studio</strong> first before receiving your PDF resource. InstaAuto automatically verifies their follow status in DM when they reply!
-                            </p>
 
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; background: #FFFFFF; padding: 0.85rem; border-radius: 10px; border: 1px solid #F2E3D5;">
+                            ${btnCfg.gate_type !== 'text' ? `
+                            <!-- 3-STEP VISUAL BUTTON FUNNEL PIPELINE -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; background: #FFFFFF; padding: 0.85rem; border-radius: 10px; border: 1px solid #F2E3D5; margin-bottom: 1rem;">
                                 <div style="font-size: 0.78rem;">
-                                    <strong style="color: var(--accent-primary);">1. Comment:</strong> Follower comments trigger word on your Reel.
+                                    <strong style="color: var(--accent-primary);">1. Comment:</strong> Follower comments trigger keyword on your Reel.
                                 </div>
                                 <div style="font-size: 0.78rem;">
-                                    <strong style="color: var(--accent-primary);">2. Gate DM:</strong> InstaAuto asks follower to follow your account first.
+                                    <strong style="color: var(--accent-primary);">2. Hook DM:</strong> Quick Reply button <em>"Send me the access"</em>.
                                 </div>
                                 <div style="font-size: 0.78rem;">
-                                    <strong style="color: var(--accent-primary);">3. Follow & Reply:</strong> Follower clicks Follow and replies <em>"I FOLLOWED"</em>.
+                                    <strong style="color: var(--accent-primary);">3. Follow Gate:</strong> <em>"Visit Profile"</em> + <em>"I'm following ✅"</em> buttons.
                                 </div>
                                 <div style="font-size: 0.78rem;">
-                                    <strong style="color: #2E7D32;">4. PDF Unlocked:</strong> Deliverable PDF link is automatically dispatched!
+                                    <strong style="color: #2E7D32;">4. Unlocked:</strong> Deliverable message with <em>"Click me"</em> link button!
                                 </div>
                             </div>
+
+                            <!-- STEP 1 CARD -->
+                            <div style="background: #FFFFFF; border: 1px solid #E5E0D8; border-radius: 10px; padding: 0.9rem 1.1rem; margin-bottom: 0.85rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem;">
+                                    <span style="background: var(--accent-primary); color: #FFF; font-size: 0.7rem; font-weight: 800; padding: 2px 7px; border-radius: 4px;">STEP 1</span>
+                                    <span style="font-weight: 700; font-size: 0.82rem; color: var(--text-primary);">First DM Sent to Follower (Unlocks 24-hr messaging window)</span>
+                                </div>
+                                <textarea id="wizard_btn_step1_text" rows="2" onchange="window['new-automation'].savedButtonsConfig.step1_text=this.value" style="width: 100%; padding: 0.65rem 0.9rem; font-size: 0.88rem; font-family: inherit; font-weight: 500; border-radius: 8px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none; margin-bottom: 0.5rem;">${btnCfg.step1_text}</textarea>
+                                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                    <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">Tappable Button Title:</span>
+                                    <input type="text" id="wizard_btn_step1_button" value="${btnCfg.step1_button}" onchange="window['new-automation'].savedButtonsConfig.step1_button=this.value" placeholder="Send me the access" maxlength="20" style="flex: 1; max-width: 250px; padding: 0.4rem 0.75rem; font-size: 0.85rem; font-weight: 700; border-radius: 8px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none;">
+                                </div>
+                            </div>
+
+                            <!-- STEP 2 CARD -->
+                            <div style="background: #FFFFFF; border: 1px solid #E5E0D8; border-radius: 10px; padding: 0.9rem 1.1rem; margin-bottom: 0.85rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem;">
+                                    <span style="background: #B45309; color: #FFF; font-size: 0.7rem; font-weight: 800; padding: 2px 7px; border-radius: 4px;">STEP 2</span>
+                                    <span style="font-weight: 700; font-size: 0.82rem; color: var(--text-primary);">Follow Gate DM (Sent when follower taps "Send me the access")</span>
+                                </div>
+                                <textarea id="wizard_btn_step2_text" rows="2" onchange="window['new-automation'].savedButtonsConfig.step2_text=this.value" style="width: 100%; padding: 0.65rem 0.9rem; font-size: 0.88rem; font-family: inherit; font-weight: 500; border-radius: 8px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none; margin-bottom: 0.5rem;">${btnCfg.step2_text}</textarea>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+                                    <div>
+                                        <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Button 1 (Opens Profile URL):</label>
+                                        <input type="text" id="wizard_btn_step2_profile_button" value="${btnCfg.step2_profile_button}" onchange="window['new-automation'].savedButtonsConfig.step2_profile_button=this.value" placeholder="Visit Profile" maxlength="20" style="width: 100%; padding: 0.4rem 0.75rem; font-size: 0.85rem; font-weight: 700; border-radius: 8px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none;">
+                                    </div>
+                                    <div>
+                                        <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Button 2 (Follow Confirmation):</label>
+                                        <input type="text" id="wizard_btn_step2_confirm_button" value="${btnCfg.step2_confirm_button}" onchange="window['new-automation'].savedButtonsConfig.step2_confirm_button=this.value" placeholder="I'm following ✅" maxlength="20" style="width: 100%; padding: 0.4rem 0.75rem; font-size: 0.85rem; font-weight: 700; border-radius: 8px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none;">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- STEP 3 CARD -->
+                            <div style="background: #FFFFFF; border: 1px solid #E5E0D8; border-radius: 10px; padding: 0.9rem 1.1rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem;">
+                                    <span style="background: #15803D; color: #FFF; font-size: 0.7rem; font-weight: 800; padding: 2px 7px; border-radius: 4px;">STEP 3</span>
+                                    <span style="font-weight: 700; font-size: 0.82rem; color: var(--text-primary);">Deliverable DM (Sent when follower taps "I'm following ✅")</span>
+                                </div>
+                                <textarea id="wizard_btn_step3_text" rows="2" onchange="window['new-automation'].savedButtonsConfig.step3_text=this.value" style="width: 100%; padding: 0.65rem 0.9rem; font-size: 0.88rem; font-family: inherit; font-weight: 500; border-radius: 8px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none; margin-bottom: 0.5rem;">${btnCfg.step3_text}</textarea>
+                                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                    <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">Resource Button Title:</span>
+                                    <input type="text" id="wizard_btn_step3_button" value="${btnCfg.step3_button}" onchange="window['new-automation'].savedButtonsConfig.step3_button=this.value" placeholder="Click me" maxlength="20" style="flex: 1; max-width: 250px; padding: 0.4rem 0.75rem; font-size: 0.85rem; font-weight: 700; border-radius: 8px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none;">
+                                </div>
+                            </div>
+                            ` : `
+                            <!-- SIMPLE TEXT PROMPT -->
+                            <div style="margin-top: 0.75rem;">
+                                <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.35rem; display: block;">Follow Gate Prompt DM Message</label>
+                                <textarea id="auto_follow_prompt" rows="2" onchange="window['new-automation'].savedFollowPrompt=this.value" placeholder="e.g. Thanks for commenting! Please follow @creator.studio first, then reply 'I FOLLOWED' in this DM to unlock your link!" style="width: 100%; padding: 0.75rem 1.1rem; font-size: 0.9rem; font-family: inherit; font-weight: 500; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none; line-height: 1.4;">${promptVal}</textarea>
+                            </div>
+                            `}
                         </div>
-
+                    ` : `
                         <div style="display: flex; flex-direction: column; gap: 0.35rem;">
-                            <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">Follow Gate Prompt DM Message</label>
-                            <textarea id="auto_follow_prompt" rows="2" onchange="window['new-automation'].savedFollowPrompt=this.value" placeholder="e.g. Thanks for commenting! Please follow @creator.studio first, then reply 'I FOLLOWED' in this DM to unlock your link!" style="width: 100%; padding: 0.75rem 1.1rem; font-size: 0.9rem; font-family: inherit; font-weight: 500; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none; line-height: 1.4;">${promptVal}</textarea>
+                            <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">DM Message Body</label>
+                            <textarea id="auto_response_text" rows="3" onchange="window['new-automation'].savedResponseText=this.value" placeholder="e.g. Thanks for commenting! Here is your requested resource link..." style="width: 100%; padding: 0.75rem 1.1rem; font-size: 0.9rem; font-family: inherit; font-weight: 500; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; box-shadow: inset 0 2px 4px rgba(0,0,0,0.03); outline: none; line-height: 1.45;">${responseVal}</textarea>
                         </div>
-                    ` : ''}
-
-                    <div style="display: flex; flex-direction: column; gap: 0.35rem;">
-                        <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">${actionVal==='follow_first' ? 'Unlocked Deliverable DM Message Body' : 'DM Message Body'}</label>
-                        <textarea id="auto_response_text" rows="3" onchange="window['new-automation'].savedResponseText=this.value" placeholder="e.g. Thanks for commenting! Here is your requested resource link..." style="width: 100%; padding: 0.75rem 1.1rem; font-size: 0.9rem; font-family: inherit; font-weight: 500; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; box-shadow: inset 0 2px 4px rgba(0,0,0,0.03); outline: none; line-height: 1.45;">${responseVal}</textarea>
-                    </div>
+                    `}
 
                     ${(actionVal === 'link_dm' || actionVal === 'follow_first') ? `
                         <div style="display: flex; flex-direction: column; gap: 0.35rem;">
-                            <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">Deliverable Resource URL (PDF / Guide)</label>
+                            <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">Deliverable Resource URL (PDF / Guide / Website)</label>
                             <input type="url" id="auto_link_url" value="${linkVal}" onchange="window['new-automation'].savedLinkUrl=this.value" placeholder="https://example.com/guide.pdf" style="width: 100%; padding: 0.75rem 1.1rem; font-size: 0.9rem; font-weight: 500; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; box-shadow: inset 0 2px 4px rgba(0,0,0,0.03); outline: none;">
                         </div>
                     ` : ''}
@@ -727,15 +807,35 @@ window['new-automation'] = {
                 : (this.savedKeywords || 'PLAYBOOK');
         }
 
+        const actionType = this.savedActionType || document.getElementById('auto_action_type')?.value || 'link_dm';
+
+        const gateType = document.getElementById('wizard_gate_type_select')?.value || this.savedButtonsConfig?.gate_type || 'buttons';
+        const buttonsConfig = {
+            gate_type: gateType,
+            step1_text: document.getElementById('wizard_btn_step1_text')?.value || this.savedButtonsConfig?.step1_text || "Hey there! Glad you're here ☺️\n\nTap below and I'll send you the access in just a moment ✨",
+            step1_button: (document.getElementById('wizard_btn_step1_button')?.value || this.savedButtonsConfig?.step1_button || "Send me the access").trim(),
+            step2_text: document.getElementById('wizard_btn_step2_text')?.value || this.savedButtonsConfig?.step2_text || "Almost there !\nPlease visit my profile and tap follow to continue 😄",
+            step2_profile_button: (document.getElementById('wizard_btn_step2_profile_button')?.value || this.savedButtonsConfig?.step2_profile_button || "Visit Profile").trim(),
+            step2_confirm_button: (document.getElementById('wizard_btn_step2_confirm_button')?.value || this.savedButtonsConfig?.step2_confirm_button || "I'm following ✅").trim(),
+            step3_text: document.getElementById('wizard_btn_step3_text')?.value || this.savedButtonsConfig?.step3_text || "Dost appko document bejhdiya hai bahut mehnat sa bnaya hai please follow",
+            step3_button: (document.getElementById('wizard_btn_step3_button')?.value || this.savedButtonsConfig?.step3_button || "Click me").trim()
+        };
+        this.savedButtonsConfig = buttonsConfig;
+
+        const responseText = actionType === 'follow_first'
+            ? (buttonsConfig.step3_text || this.savedResponseText || 'Dost appko document bejhdiya hai bahut mehnat sa bnaya hai please follow')
+            : (this.savedResponseText || document.getElementById('auto_response_text')?.value || 'Here is your resource link!');
+
         const payload = {
             media_id: this.selectedMediaId,
             trigger_word: triggerWord,
-            action_type: this.savedActionType || document.getElementById('auto_action_type')?.value || 'link_dm',
-            response_text: this.savedResponseText || document.getElementById('auto_response_text')?.value || 'Here is your resource link!',
+            action_type: actionType,
+            response_text: responseText,
             link_url: this.savedLinkUrl || document.getElementById('auto_link_url')?.value || 'https://example.com/guide.pdf',
             follow_prompt: this.savedFollowPrompt || document.getElementById('auto_follow_prompt')?.value || 'Please follow us first!',
             public_reply: this.savedPublicReply || document.getElementById('auto_public_reply')?.value || 'Sent to DMs!',
             delay_seconds: this.savedDelay !== undefined ? this.savedDelay : 5,
+            buttons_config_json: JSON.stringify(buttonsConfig),
             is_active: true
         };
 
