@@ -232,6 +232,13 @@ async function processCommentEvent(payload) {
                     finalLink = 'https://' + finalLink;
                 }
 
+                let trackedLink = finalLink;
+                if (finalLink) {
+                    trackingId = uuidv4();
+                    const baseUrl = process.env.PUBLIC_URL || process.env.BASE_URL || getConfig('public_url') || config.BASE_URL || 'http://localhost:3000';
+                    trackedLink = `${baseUrl}/r/${trackingId}`;
+                }
+
                 let btnCfg = null;
                 if (rule.buttons_config_json) {
                     try { btnCfg = JSON.parse(rule.buttons_config_json); } catch(e) {}
@@ -242,16 +249,15 @@ async function processCommentEvent(payload) {
                 if (rule.action_type === 'direct_dm') {
                     messageToSend = baseResponse;
                 } else if (rule.action_type === 'link_dm') {
-                    // Send the real, direct link URL configured by creator (no broken redirect cloaks)
-                    if (finalLink) {
+                    if (trackedLink) {
                         if (baseResponse.includes('{link}')) {
-                            messageToSend = baseResponse.replace(/\{link\}/gi, finalLink);
+                            messageToSend = baseResponse.replace(/\{link\}/gi, trackedLink);
                         } else if (baseResponse.includes('{url}')) {
-                            messageToSend = baseResponse.replace(/\{url\}/gi, finalLink);
+                            messageToSend = baseResponse.replace(/\{url\}/gi, trackedLink);
                         } else if (baseResponse.includes(finalLink)) {
-                            messageToSend = baseResponse;
+                            messageToSend = baseResponse.replace(finalLink, trackedLink);
                         } else {
-                            messageToSend = baseResponse ? `${baseResponse}\n${finalLink}` : finalLink;
+                            messageToSend = baseResponse ? `${baseResponse}\n${trackedLink}` : trackedLink;
                         }
                     } else {
                         messageToSend = baseResponse || 'Here is your requested link!';
@@ -263,14 +269,20 @@ async function processCommentEvent(payload) {
                         const step1Button = (btnCfg?.step1_button || "Send me the access").slice(0, 20);
                         messageToSend = step1Text;
                         messagePayload = {
-                            text: step1Text,
-                            quick_replies: [
-                                {
-                                    content_type: 'text',
-                                    title: step1Button,
-                                    payload: 'REQ_ACCESS'
+                            attachment: {
+                                type: 'template',
+                                payload: {
+                                    template_type: 'button',
+                                    text: step1Text,
+                                    buttons: [
+                                        {
+                                            type: 'postback',
+                                            title: step1Button,
+                                            payload: 'REQ_ACCESS'
+                                        }
+                                    ]
                                 }
-                            ]
+                            }
                         };
                     } else {
                         messageToSend = rule.follow_prompt || `Hey @${from.username || 'friend'}! 🚀 Thanks for commenting! Please follow us first, then reply "DONE" in this DM to unlock your link!`;
@@ -470,10 +482,18 @@ async function processMessageEvent(payload) {
                     const finalDeliverableText = btnCfg?.step3_text || (getRandomResponseText(rule) || '').trim() || defaultDeliverText;
                     const clickBtnTitle = (btnCfg?.step3_button || 'Click me').slice(0, 20);
 
+                    let trackingId = null;
+                    let trackedLink = directLink;
+                    if (directLink) {
+                        trackingId = uuidv4();
+                        const baseUrl = process.env.PUBLIC_URL || process.env.BASE_URL || getConfig('public_url') || config.BASE_URL || 'http://localhost:3000';
+                        trackedLink = `${baseUrl}/r/${trackingId}`;
+                    }
+
                     let step3Payload = null;
                     let messageToSend = '';
 
-                    if (isButtonMode && directLink) {
+                    if (isButtonMode && trackedLink) {
                         step3Payload = {
                             attachment: {
                                 type: 'template',
@@ -483,20 +503,20 @@ async function processMessageEvent(payload) {
                                     buttons: [
                                         {
                                             type: 'web_url',
-                                            url: directLink,
+                                            url: trackedLink,
                                             title: clickBtnTitle
                                         }
                                     ]
                                 }
                             }
                         };
-                        messageToSend = `${finalDeliverableText}\n${directLink}`;
+                        messageToSend = `${finalDeliverableText}\n${trackedLink}`;
                     } else {
-                        if (directLink) {
+                        if (trackedLink) {
                             if (finalDeliverableText && !finalDeliverableText.includes(directLink)) {
-                                messageToSend = `${finalDeliverableText}\n${directLink}`;
+                                messageToSend = `${finalDeliverableText}\n${trackedLink}`;
                             } else {
-                                messageToSend = finalDeliverableText || `🎉 Thank you for following! Here is your requested link:\n${directLink}`;
+                                messageToSend = finalDeliverableText ? finalDeliverableText.replace(directLink, trackedLink) : `🎉 Thank you for following! Here is your requested link:\n${trackedLink}`;
                             }
                         } else {
                             messageToSend = finalDeliverableText || '🎉 Thank you for following!';
@@ -513,7 +533,7 @@ async function processMessageEvent(payload) {
                     `);
 
                     const eventResult = insertEvent.run(
-                        rule.id, senderId, username, mediaIgId, null, targetUserId, new Date().toISOString()
+                        rule.id, senderId, username, mediaIgId, trackingId, targetUserId, new Date().toISOString()
                     );
 
                     db.prepare("UPDATE conversations SET state = 'completed', completed_at = ? WHERE id = ?").run(new Date().toISOString(), conv.id);

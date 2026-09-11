@@ -279,7 +279,7 @@ async function sendPrivateReply(token, commentId, commenterId, messagePayload) {
 
     const messageObj = typeof messagePayload === 'string' ? { text: messagePayload } : messagePayload;
 
-    // Strategy 1: Official Instagram Private Reply using recipient: { comment_id }
+    // Strategy 1: Official Instagram Private Reply using recipient: { comment_id } with button template
     try {
         console.log(`[Instagram] Dispatching Private Reply DM for comment ${commentId} to ${endpoint}...`);
         const res = await axios.post(endpoint, {
@@ -291,17 +291,73 @@ async function sendPrivateReply(token, commentId, commenterId, messagePayload) {
                 'Content-Type': 'application/json'
             }
         });
-        console.log(`[Instagram] ✅ Private Reply DM delivered successfully!`, res.data);
+        console.log(`[Instagram] ✅ Private Reply DM delivered successfully with buttons!`, res.data);
         return res.data;
     } catch (err) {
         const errorMsg = err.response?.data?.error?.message || err.message;
-        console.warn(`[Instagram] Strategy 1 (comment_id) notice: ${errorMsg}`);
+        console.warn(`[Instagram] Strategy 1 (comment_id) button notice: ${errorMsg}`);
 
-        // If structured buttons failed, try plain text on comment_id
-        if (typeof messagePayload === 'object') {
-            const fallbackText = messagePayload.text || messagePayload.attachment?.payload?.text || 'Hey! Check your DMs!';
+        // Strategy 2: If commenterId is provided, try direct message to recipient: { id } with button template
+        if (commenterId) {
             try {
-                console.log(`[Instagram] Retrying Private Reply with plain text fallback...`);
+                console.log(`[Instagram] Strategy 2: Trying DM to recipient id ${commenterId} with button template...`);
+                const res2 = await axios.post(endpoint, {
+                    recipient: { id: commenterId },
+                    message: messageObj
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                console.log(`[Instagram] ✅ DM delivered via user ID with buttons!`, res2.data);
+                return res2.data;
+            } catch (err2) {
+                console.warn(`[Instagram] Strategy 2 notice:`, err2.response?.data?.error?.message || err2.message);
+            }
+        }
+
+        // Strategy 3: Try Generic Template on comment_id if Button Template was rejected
+        if (messagePayload?.attachment?.payload?.template_type === 'button') {
+            try {
+                console.log(`[Instagram] Strategy 3: Trying Generic Template fallback on comment_id...`);
+                const btnText = messagePayload.attachment.payload.text;
+                const buttons = messagePayload.attachment.payload.buttons;
+                const genericPayload = {
+                    attachment: {
+                        type: 'template',
+                        payload: {
+                            template_type: 'generic',
+                            elements: [
+                                {
+                                    title: (btnText || 'Exclusive Access').slice(0, 80),
+                                    buttons: buttons
+                                }
+                            ]
+                        }
+                    }
+                };
+                const resGeneric = await axios.post(endpoint, {
+                    recipient: { comment_id: commentId },
+                    message: genericPayload
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                console.log(`[Instagram] ✅ Generic Template delivered on comment_id!`, resGeneric.data);
+                return resGeneric.data;
+            } catch (errGeneric) {
+                console.warn(`[Instagram] Strategy 3 notice:`, errGeneric.response?.data?.error?.message || errGeneric.message);
+            }
+        }
+
+        // Strategy 4 (Absolute Last Resort): If all interactive button templates failed, send plain text
+        if (typeof messagePayload === 'object') {
+            const fallbackText = messagePayload.text || messagePayload.attachment?.payload?.text || messagePayload.attachment?.payload?.elements?.[0]?.title || 'Hey! Check your DMs!';
+            try {
+                console.log(`[Instagram] Strategy 4 (Last Resort): Retrying Private Reply with plain text fallback...`);
                 const resFallback = await axios.post(endpoint, {
                     recipient: { comment_id: commentId },
                     message: { text: fallbackText }
@@ -314,40 +370,20 @@ async function sendPrivateReply(token, commentId, commenterId, messagePayload) {
                 console.log(`[Instagram] ✅ Private Reply plain text delivered!`, resFallback.data);
                 return resFallback.data;
             } catch (e) {}
-        }
 
-        // Strategy 2: If commenterId is provided, fallback to direct message by recipient: { id }
-        if (commenterId) {
-            try {
-                console.log(`[Instagram] Strategy 2: Fallback DM to recipient id ${commenterId}...`);
-                const res2 = await axios.post(endpoint, {
-                    recipient: { id: commenterId },
-                    message: messageObj
-                }, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                console.log(`[Instagram] ✅ DM delivered via user ID!`, res2.data);
-                return res2.data;
-            } catch (err2) {
-                console.warn(`[Instagram] Strategy 2 notice:`, err2.response?.data?.error?.message || err2.message);
-                if (typeof messagePayload === 'object') {
-                    const fallbackText = messagePayload.text || messagePayload.attachment?.payload?.text || 'Hey! Check your DMs!';
-                    try {
-                        const res2Fallback = await axios.post(endpoint, {
-                            recipient: { id: commenterId },
-                            message: { text: fallbackText }
-                        }, {
-                            headers: {
-                                'Authorization': `Bearer ${token}`,
-                                'Content-Type': 'application/json'
-                            }
-                        });
-                        return res2Fallback.data;
-                    } catch (e) {}
-                }
+            if (commenterId) {
+                try {
+                    const res2Fallback = await axios.post(endpoint, {
+                        recipient: { id: commenterId },
+                        message: { text: fallbackText }
+                    }, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    return res2Fallback.data;
+                } catch (e) {}
             }
         }
 
@@ -485,6 +521,52 @@ async function getMediaComments(token, mediaId, limit = 100) {
     }
 }
 
+async function getMediaInsights(token, mediaId) {
+    if (!token || !mediaId) return { views: 0, reach: 0 };
+    const isFbToken = token && token.startsWith('EAA');
+    const base = isFbToken ? FB_API_BASE : IG_API_BASE;
+
+    // Strategy 1: Standard metrics: views, reach
+    try {
+        const res = await axios.get(`${base}/${mediaId}/insights`, {
+            params: {
+                metric: 'views,reach',
+                access_token: token
+            }
+        });
+        const data = res.data?.data || [];
+        let views = 0;
+        let reach = 0;
+        for (const item of data) {
+            const val = item.values?.[0]?.value ?? 0;
+            if (item.name === 'views' || item.name === 'plays') views = Math.max(views, val);
+            if (item.name === 'reach') reach = Math.max(reach, val);
+        }
+        return { views, reach };
+    } catch (err) {
+        // Strategy 2: Fallback for video/reels metrics: plays, reach
+        try {
+            const res2 = await axios.get(`${base}/${mediaId}/insights`, {
+                params: {
+                    metric: 'plays,reach,total_interactions',
+                    access_token: token
+                }
+            });
+            const data2 = res2.data?.data || [];
+            let views = 0;
+            let reach = 0;
+            for (const item of data2) {
+                const val = item.values?.[0]?.value ?? 0;
+                if (item.name === 'plays' || item.name === 'views') views = Math.max(views, val);
+                if (item.name === 'reach') reach = Math.max(reach, val);
+            }
+            return { views, reach };
+        } catch (e2) {
+            return { views: 0, reach: 0 };
+        }
+    }
+}
+
 module.exports = {
     exchangeCodeForToken,
     exchangeLongLivedToken,
@@ -493,6 +575,7 @@ module.exports = {
     getMedia,
     getSingleMedia,
     getMediaComments,
+    getMediaInsights,
     sendPrivateReply,
     replyToComment,
     sendDirectMessage,

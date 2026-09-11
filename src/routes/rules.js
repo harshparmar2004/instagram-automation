@@ -392,7 +392,34 @@ router.post('/rules/:id/backfill', auth, async (req, res) => {
                         messageToSend = 'Here is your resource link!';
                     }
                 } else if (rule.action_type === 'follow_first') {
-                    messageToSend = rule.follow_prompt || `Hey @${from.username || 'friend'}! Please follow us first, then reply "DONE" to unlock your link!`;
+                    let btnCfg = null;
+                    if (rule.buttons_config_json) {
+                        try { btnCfg = JSON.parse(rule.buttons_config_json); } catch(e) {}
+                    }
+                    const isButtonMode = !btnCfg || btnCfg.gate_type !== 'text';
+                    if (isButtonMode) {
+                        const step1Text = btnCfg?.step1_text || "Hey there! Glad you're here ☺️\n\nTap below and I'll send you the access in just a moment ✨";
+                        const step1Button = (btnCfg?.step1_button || "Send me the access").slice(0, 20);
+                        messageToSend = step1Text;
+                        messagePayload = {
+                            attachment: {
+                                type: 'template',
+                                payload: {
+                                    template_type: 'button',
+                                    text: step1Text,
+                                    buttons: [
+                                        {
+                                            type: 'postback',
+                                            title: step1Button,
+                                            payload: 'REQ_ACCESS'
+                                        }
+                                    ]
+                                }
+                            }
+                        };
+                    } else {
+                        messageToSend = rule.follow_prompt || `Hey @${from.username || 'friend'}! Please follow us first, then reply "DONE" to unlock your link!`;
+                    }
                 }
 
                 const eventRes = db.prepare(`
@@ -403,16 +430,23 @@ router.post('/rules/:id/backfill', auth, async (req, res) => {
                 const eventId = eventRes.lastInsertRowid;
 
                 if (rule.action_type === 'follow_first') {
+                    let btnCfg = null;
+                    if (rule.buttons_config_json) {
+                        try { btnCfg = JSON.parse(rule.buttons_config_json); } catch(e) {}
+                    }
+                    const isButtonMode = !btnCfg || btnCfg.gate_type !== 'text';
+                    const initialState = isButtonMode ? 'awaiting_access_tap' : 'awaiting_reply';
                     db.prepare(`
                         INSERT INTO conversations (commenter_ig_id, rule_id, event_id, state, created_at)
-                        VALUES (?, ?, ?, 'awaiting_reply', ?)
-                    `).run(from.id, rule.id, eventId, new Date().toISOString());
+                        VALUES (?, ?, ?, ?, ?)
+                    `).run(from.id, rule.id, eventId, initialState, new Date().toISOString());
                 }
 
                 enqueue({
                     type: 'private_reply',
                     commentId: commentId,
                     commenterId: from.id,
+                    messagePayload: messagePayload || messageToSend,
                     messageText: messageToSend,
                     publicReply: rule.public_reply || null,
                     eventId: eventId,

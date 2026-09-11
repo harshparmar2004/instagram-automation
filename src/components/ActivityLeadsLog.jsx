@@ -437,19 +437,28 @@ export default function ActivityLeadsLog() {
                 {/* FOLLOWER AVATAR + USERNAME + COMMENT DETAILS */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1, minWidth: '300px' }}>
                   
-                  {/* FOLLOWER INSTAGRAM AVATAR IMAGE (36x36px) */}
-                  <img
-                    src={ev.avatar}
-                    alt={ev.username}
+                  {/* USER INITIALS BADGE */}
+                  <div
                     style={{
                       width: '36px',
                       height: '36px',
                       borderRadius: '50%',
-                      objectFit: 'cover',
-                      border: '1px solid #E6E1D8',
-                      flexShrink: 0
+                      background: '#F4EFEA',
+                      border: '1px solid #E2D9CF',
+                      color: '#3D352E',
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                      fontWeight: 800,
+                      fontSize: '0.88rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      textTransform: 'uppercase',
+                      userSelect: 'none'
                     }}
-                  />
+                  >
+                    {(ev.username || 'U').replace(/^@/, '').charAt(0).toUpperCase() || 'U'}
+                  </div>
 
                   <div>
                     <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '0.92rem', fontWeight: 700, color: '#2C2A29' }}>

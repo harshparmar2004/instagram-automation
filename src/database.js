@@ -53,7 +53,8 @@ function getDb() {
       synced_at TEXT,
       views_count INTEGER DEFAULT 0,
       comments_count INTEGER DEFAULT 0,
-      like_count INTEGER DEFAULT 0
+      like_count INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'active'
     );
 
     CREATE TABLE IF NOT EXISTS reel_stats_history (
@@ -160,6 +161,7 @@ function getDb() {
   try { db.exec(`ALTER TABLE media ADD COLUMN comments_count INTEGER DEFAULT 0;`); } catch (e) {}
   try { db.exec(`ALTER TABLE media ADD COLUMN media_product_type TEXT DEFAULT 'FEED';`); } catch (e) {}
   try { db.exec(`ALTER TABLE media ADD COLUMN like_count INTEGER DEFAULT 0;`); } catch (e) {}
+  try { db.exec(`ALTER TABLE media ADD COLUMN status TEXT DEFAULT 'active';`); } catch (e) {}
   try { db.exec(`ALTER TABLE events ADD COLUMN synced_to_sheet INTEGER DEFAULT 0;`); } catch (e) {}
   try { db.exec(`ALTER TABLE rules ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
   try { db.exec(`ALTER TABLE media ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}

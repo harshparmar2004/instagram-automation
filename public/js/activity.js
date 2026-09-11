@@ -79,16 +79,6 @@ window.activity = {
         const content = document.getElementById('activity-content');
         if (!content) return;
 
-        // MOCK AVATAR MAP FOR REAL FOLLOWER PICTURES
-        const avatars = [
-            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-            'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
-            'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
-            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
-        ];
-
         // REAL EVENTS FROM DATABASE
         const eventsList = this.rawEvents || [];
 
@@ -235,7 +225,6 @@ window.activity = {
             `;
         } else {
             pageItems.forEach((ev, idx) => {
-                const avatar = avatars[idx % avatars.length];
                 let statusText = '🟢 Delivered';
                 let statusColor = '#2E7D32';
 
@@ -248,6 +237,8 @@ window.activity = {
                 }
 
                 const timeStr = ev.created_at ? this.timeAgo(new Date(ev.created_at)) : '10 min ago';
+                const rawUsername = (ev.username || 'U').replace(/^@/, '').trim();
+                const initialChar = rawUsername.charAt(0).toUpperCase() || 'U';
 
                 html += `
                     <div class="card" style="
@@ -262,17 +253,39 @@ window.activity = {
                         gap: 1rem;
                         flex-wrap: wrap;
                     ">
-                        <!-- LEFT: FOLLOWER AVATAR + USERNAME + COMMENT -->
-                        <div style="display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 300px;">
+                        <!-- LEFT: USERNAME INITIAL BADGE + COMMENT -->
+                        <div style="display: flex; align-items: center; gap: 0.85rem; flex: 1; min-width: 300px;">
                             
-                            <img src="${avatar}" alt="${ev.username || 'user'}" style="
-                                width: 36px;
-                                height: 36px;
-                                border-radius: 50%;
-                                object-fit: cover;
-                                border: 1px solid var(--border-color);
-                                flex-shrink: 0;
-                            ">
+                            ${ev.profile_picture_url ? `
+                                <img src="${ev.profile_picture_url}" alt="${ev.username || 'user'}" style="
+                                    width: 36px;
+                                    height: 36px;
+                                    border-radius: 50%;
+                                    object-fit: cover;
+                                    border: 1px solid var(--border-color);
+                                    flex-shrink: 0;
+                                ">
+                            ` : `
+                                <div style="
+                                    width: 36px;
+                                    height: 36px;
+                                    border-radius: 50%;
+                                    background: #F4EFEA;
+                                    border: 1px solid #E2D9CF;
+                                    color: #3D352E;
+                                    font-family: 'Plus Jakarta Sans', sans-serif;
+                                    font-weight: 800;
+                                    font-size: 0.88rem;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    flex-shrink: 0;
+                                    text-transform: uppercase;
+                                    user-select: none;
+                                " title="@${ev.username || 'user'}">
+                                    ${initialChar}
+                                </div>
+                            `}
 
                             <div>
                                 <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.92rem; font-weight: 700; color: var(--text-primary);">

@@ -53,6 +53,7 @@ const redirectRoutes = require('./src/routes/redirect');
 
 const authRoutes = require('./src/routes/auth');
 const adminRoutes = require('./src/routes/admin');
+const historyRoutes = require('./src/routes/history');
 
 // Mount routes
 // Webhook needs raw body for HMAC signature verification
@@ -69,6 +70,7 @@ app.use('/api', setupRoutes);
 app.use('/api', mediaRoutes);
 app.use('/api', rulesRoutes);
 app.use('/api', eventsRoutes);
+app.use('/api', historyRoutes);
 app.use('/api', integrationsRoutes);
 app.use('/auth', oauthRoutes);
 app.use('/', redirectRoutes);

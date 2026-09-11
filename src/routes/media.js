@@ -11,10 +11,13 @@ router.get('/media', auth, (req, res) => {
         const type = req.query.type; // 'reels', 'feed', or all
         const userId = req.user?.id;
         const isSuperAdmin = req.user?.role === 'super_admin' && !req.isImpersonating;
+        const includeDeleted = req.query.include_deleted === 'true';
 
         let query = `
             SELECT m.*, 
-                   (SELECT COUNT(*) FROM rules r WHERE r.media_id = m.id AND r.is_active = 1) as rulesCount
+                   (SELECT COUNT(*) FROM rules r WHERE (r.media_id = m.id OR r.media_id = m.ig_media_id) AND r.is_active = 1) as rulesCount,
+                   (SELECT COUNT(*) FROM events e WHERE (e.media_ig_id = m.ig_media_id OR e.rule_id IN (SELECT id FROM rules WHERE media_id = m.id OR media_id = m.ig_media_id)) AND e.dm_status IN ('sent', 'delivered')) as dms_sent,
+                   (SELECT COUNT(*) FROM clicks c JOIN events e ON c.event_id = e.id WHERE (e.media_ig_id = m.ig_media_id OR e.rule_id IN (SELECT id FROM rules WHERE media_id = m.id OR media_id = m.ig_media_id))) as clicks
             FROM media m
         `;
         const whereClauses = [];
@@ -23,6 +26,10 @@ router.get('/media', auth, (req, res) => {
         if (!isSuperAdmin && userId) {
             whereClauses.push('(m.user_id = ? OR m.user_id IS NULL)');
             params.push(userId);
+        }
+
+        if (!includeDeleted) {
+            whereClauses.push("(m.status IS NULL OR m.status != 'deleted')");
         }
 
         if (type === 'reels') {
@@ -50,6 +57,7 @@ router.get('/media/automated', auth, (req, res) => {
         const db = getDb();
         const userId = req.user?.id;
         const isSuperAdmin = req.user?.role === 'super_admin' && !req.isImpersonating;
+        const includeDeleted = req.query.include_deleted === 'true';
         
         let rulesQuery = `
             SELECT r.*, 
@@ -67,10 +75,17 @@ router.get('/media/automated', auth, (req, res) => {
 
         // 2. Fetch all media from DB
         let mediaQuery = `SELECT * FROM media`;
+        const mediaWhereClauses = [];
         const mediaParams = [];
         if (!isSuperAdmin && userId) {
-            mediaQuery += ` WHERE (user_id = ? OR user_id IS NULL)`;
+            mediaWhereClauses.push(`(user_id = ? OR user_id IS NULL)`);
             mediaParams.push(userId);
+        }
+        if (!includeDeleted) {
+            mediaWhereClauses.push(`(status IS NULL OR status != 'deleted')`);
+        }
+        if (mediaWhereClauses.length > 0) {
+            mediaQuery += ` WHERE ` + mediaWhereClauses.join(' AND ');
         }
         mediaQuery += ` ORDER BY timestamp DESC`;
         const allMedia = db.prepare(mediaQuery).all(...mediaParams);
@@ -79,6 +94,12 @@ router.get('/media/automated', auth, (req, res) => {
             SELECT * FROM reel_stats_history WHERE media_id = ? ORDER BY month_year DESC
         `);
 
+        // Find all deleted media IDs so orphan rules on deleted posts are also excluded if !includeDeleted
+        const deletedMediaIds = new Set(
+            db.prepare("SELECT id, ig_media_id FROM media WHERE status = 'deleted'").all()
+                .flatMap(m => [String(m.id), String(m.ig_media_id)])
+        );
+
         // Group rules by media
         const mediaMap = new Map();
         const globalRules = [];
@@ -86,6 +107,11 @@ router.get('/media/automated', auth, (req, res) => {
         for (const rule of allRules) {
             if (!rule.media_id || rule.media_id === 'global') {
                 globalRules.push(rule);
+                continue;
+            }
+
+            // If the media was deleted and !includeDeleted, do not show it
+            if (!includeDeleted && deletedMediaIds.has(String(rule.media_id))) {
                 continue;
             }
 
@@ -106,7 +132,10 @@ router.get('/media/automated', auth, (req, res) => {
                 }
                 mediaMap.get(matchedMedia.id).rules.push(rule);
             } else {
-                // Rule linked to a media ID not currently in media table — never drop it!
+                // Rule linked to a media ID not currently in media table — never drop it unless it's deleted!
+                if (!includeDeleted && deletedMediaIds.has(String(rule.media_id))) {
+                    continue;
+                }
                 const placeholderKey = `orphan_${rule.media_id}`;
                 if (!mediaMap.has(placeholderKey)) {
                     mediaMap.set(placeholderKey, {

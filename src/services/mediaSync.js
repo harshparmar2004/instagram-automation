@@ -1,10 +1,12 @@
-const { getMedia, getMediaComments } = require('./instagram');
+const crypto = require('crypto');
+const { getMedia, getMediaComments, getMediaInsights } = require('./instagram');
 const { getDb, getConfig, getUserInstagramAccount, backupRules, restoreRules, backupEvents, restoreEvents } = require('../database');
 
 async function syncMedia(userId = null) {
     let token = null;
+    let acct = null;
     if (userId) {
-        const acct = getUserInstagramAccount(userId);
+        acct = getUserInstagramAccount(userId);
         token = acct ? acct.access_token : null;
     }
     if (!token) {
@@ -38,15 +40,25 @@ async function syncMedia(userId = null) {
                 break;
             }
         }
+
+        // Fetch live Instagram Insights (views & reach) for each media item
+        for (const item of allItems) {
+            try {
+                const insights = await getMediaInsights(token, item.id);
+                item.views_count = insights.views || 0;
+            } catch (e) {
+                item.views_count = 0;
+            }
+        }
         
         const db = getDb();
         const upsert = db.prepare(`
             INSERT INTO media (
                 ig_media_id, media_type, media_product_type, caption, 
                 thumbnail_url, media_url, permalink, timestamp, 
-                comments_count, like_count, synced_at, user_id
+                comments_count, like_count, views_count, status, synced_at, user_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
             ON CONFLICT(ig_media_id) DO UPDATE SET 
                 media_type = excluded.media_type,
                 media_product_type = excluded.media_product_type,
@@ -56,6 +68,8 @@ async function syncMedia(userId = null) {
                 permalink = excluded.permalink,
                 comments_count = excluded.comments_count,
                 like_count = excluded.like_count,
+                views_count = CASE WHEN excluded.views_count > 0 THEN excluded.views_count ELSE media.views_count END,
+                status = 'active',
                 synced_at = excluded.synced_at,
                 user_id = COALESCE(media.user_id, excluded.user_id)
         `);
@@ -76,11 +90,29 @@ async function syncMedia(userId = null) {
                     item.timestamp || '',
                     item.comments_count || 0,
                     item.like_count || 0,
+                    item.views_count || 0,
                     new Date().toISOString(),
                     userId
                 );
             }
         })(allItems);
+
+        // Mark any media in database not returned by live Instagram sync as deleted
+        if (allItems.length > 0) {
+            const activeIgIds = allItems.map(item => String(item.id));
+            const placeholders = activeIgIds.map(() => '?').join(',');
+            let markDeletedQuery = `UPDATE media SET status = 'deleted' WHERE ig_media_id NOT IN (${placeholders}) AND ig_media_id NOT LIKE '179001122%'`;
+            const markParams = [...activeIgIds];
+            if (userId) {
+                markDeletedQuery += ' AND (user_id = ? OR user_id IS NULL)';
+                markParams.push(userId);
+            }
+            try {
+                db.prepare(markDeletedQuery).run(...markParams);
+            } catch (delErr) {
+                console.warn('[MediaSync] Notice updating deleted media status:', delErr.message);
+            }
+        }
 
         console.log(`[MediaSync] Successfully synced ${allItems.length} media items across ${page + 1} page(s)`);
 
@@ -112,8 +144,8 @@ async function syncMedia(userId = null) {
         let totalCommentsFetched = 0;
         try {
             const mediaToFetch = allItems.length > 0 ? allItems : db.prepare("SELECT * FROM media").all();
-            const myUsername = (userAcct?.ig_username || getConfig('ig_username') || '').toLowerCase().replace('@', '').trim();
-            const myIgUserId = String(userAcct?.ig_user_id || getConfig('ig_user_id') || '').trim();
+            const myUsername = (acct?.ig_username || getConfig('ig_username') || '').toLowerCase().replace('@', '').trim();
+            const myIgUserId = String(acct?.ig_user_id || getConfig('ig_user_id') || '').trim();
             
             for (const m of mediaToFetch) {
                 const igMediaId = m.id || m.ig_media_id;
@@ -125,10 +157,10 @@ async function syncMedia(userId = null) {
                     totalCommentsFetched += comments.length;
                     console.log(`[MediaSync] Ingesting ${comments.length} real Instagram comments for media ${igMediaId}...`);
 
-                    // Find rules for this media
-                    const mediaRow = db.prepare("SELECT id FROM media WHERE ig_media_id = ?").get(igMediaId);
+                    // Find rules for this media or global/keyword-matched rules
+                    const mediaRow = db.prepare("SELECT id, caption, views_count FROM media WHERE ig_media_id = ?").get(igMediaId);
                     const mediaLocalId = mediaRow ? mediaRow.id : null;
-                    const mediaRules = db.prepare("SELECT * FROM rules WHERE media_id = ? OR media_id IS NULL ORDER BY media_id DESC").all(mediaLocalId);
+                    const allRules = db.prepare("SELECT * FROM rules WHERE is_active = 1").all();
 
                     for (const comment of comments) {
                         if (!comment.id) continue;
@@ -149,11 +181,32 @@ async function syncMedia(userId = null) {
                         // Match rule strictly by trigger keywords
                         let matchedRule = null;
                         const textLower = commentText.toLowerCase();
-                        for (const r of mediaRules) {
-                            const kws = (r.trigger_keyword || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
-                            if (kws.includes('*') || kws.some(kw => textLower.includes(kw))) {
-                                matchedRule = r;
-                                break;
+
+                        // 1. Check rules assigned to this media
+                        for (const r of allRules) {
+                            if (r.media_id === mediaLocalId || String(r.media_id) === String(igMediaId)) {
+                                const kws = (r.trigger_keyword || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+                                if (kws.includes('*') || kws.some(kw => textLower.includes(kw))) {
+                                    matchedRule = r;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // 2. Check global rules or keyword match across active rules
+                        if (!matchedRule) {
+                            for (const r of allRules) {
+                                const kws = (r.trigger_keyword || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+                                if (kws.includes('*') || kws.some(kw => textLower.includes(kw))) {
+                                    matchedRule = r;
+                                    // Auto-link rule to this active media if rule was pointing to an older/deleted post
+                                    if (mediaLocalId && r.media_id !== mediaLocalId) {
+                                        try {
+                                            db.prepare("UPDATE rules SET media_id = ? WHERE id = ?").run(mediaLocalId, r.id);
+                                        } catch(e) {}
+                                    }
+                                    break;
+                                }
                             }
                         }
 
@@ -161,11 +214,12 @@ async function syncMedia(userId = null) {
                         if (!matchedRule) continue;
 
                         const ruleIdToAttach = matchedRule.id;
+                        const trackingId = crypto.randomUUID();
 
                         const eventRes = db.prepare(`
-                            INSERT INTO events (rule_id, comment_id, comment_text, commenter_ig_id, commenter_username, media_ig_id, dm_status, created_at)
-                            VALUES (?, ?, ?, ?, ?, ?, 'delivered', ?)
-                        `).run(ruleIdToAttach, comment.id, commentText, fromId, fromUsername, igMediaId, commentTime);
+                            INSERT INTO events (rule_id, comment_id, comment_text, commenter_ig_id, commenter_username, media_ig_id, tracking_id, dm_status, created_at, user_id)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?)
+                        `).run(ruleIdToAttach, comment.id, commentText, fromId, fromUsername, igMediaId, trackingId, commentTime, userId);
 
                         // Also record conversation
                         try {
@@ -179,20 +233,27 @@ async function syncMedia(userId = null) {
                     // Update monthly stats history for this reel
                     if (mediaLocalId) {
                         try {
+                            const currentMonth = new Date().toISOString().slice(0, 7);
+                            const dmsCount = db.prepare("SELECT COUNT(*) as c FROM events WHERE media_ig_id = ? AND dm_status IN ('sent', 'delivered')").get(igMediaId)?.c || comments.length;
+                            const clicksCount = db.prepare("SELECT COUNT(*) as c FROM clicks c JOIN events e ON c.event_id = e.id WHERE e.media_ig_id = ?").get(igMediaId)?.c || 0;
+                            const itemViews = m.views_count || mediaRow?.views_count || 0;
+
                             db.prepare(`
-                                INSERT INTO reel_stats_history (media_id, month_year, views_count, comments_count, dms_sent_count, updated_at)
-                                VALUES (?, ?, ?, ?, ?, ?)
+                                INSERT INTO reel_stats_history (media_id, month_year, views_count, comments_count, dms_sent_count, clicks_count, updated_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
                                 ON CONFLICT(media_id, month_year) DO UPDATE SET 
                                     comments_count = excluded.comments_count,
                                     views_count = excluded.views_count,
                                     dms_sent_count = excluded.dms_sent_count,
+                                    clicks_count = excluded.clicks_count,
                                     updated_at = excluded.updated_at
                             `).run(
                                 mediaLocalId,
                                 currentMonth,
-                                m.views_count || 0,
+                                itemViews,
                                 comments.length,
-                                comments.length,
+                                dmsCount,
+                                clicksCount,
                                 new Date().toISOString()
                             );
                         } catch(e) {}
