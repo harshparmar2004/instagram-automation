@@ -166,6 +166,25 @@ window.rules = {
             }
         } catch(e) {}
 
+        let btnCfg = {
+            gate_type: 'buttons',
+            step1_text: "Hey there! Glad you're here ☺️\n\nTap below and I'll send you the access in just a moment ✨",
+            step1_button: "Send me the access",
+            step2_text: "Almost there !\nPlease visit my profile and tap follow to continue 😄",
+            step2_profile_button: "Visit Profile",
+            step2_confirm_button: "I'm following ✅",
+            step3_text: "Dost appko document bejhdiya hai bahut mehnat sa bnaya hai please follow",
+            step3_button: "Click me"
+        };
+        if (rule.buttons_config_json) {
+            try {
+                const parsed = JSON.parse(rule.buttons_config_json);
+                if (parsed && typeof parsed === 'object') {
+                    btnCfg = { ...btnCfg, ...parsed };
+                }
+            } catch(e) {}
+        }
+
         let variationsLines = '';
         if (rule.variations_json) {
             try {
@@ -209,19 +228,86 @@ window.rules = {
                     </select>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" id="response_text_group" style="${rule.action_type === 'follow_first' ? 'display:none;' : ''}">
                     <label>4. Message Sent to Followers in DM:</label>
-                    <textarea id="response_text" class="textarea" placeholder="e.g. Thanks for commenting! Here is your free guide..." required>${rule.response_text}</textarea>
+                    <textarea id="response_text" class="textarea" placeholder="e.g. Thanks for commenting! Here is your free guide...">${rule.response_text || ''}</textarea>
+                </div>
+
+                <div id="follow_prompt_group" class="form-group ${rule.action_type !== 'follow_first' ? 'hidden' : ''}">
+                    <div style="background:#FAF8F5; border:1.5px solid var(--accent-primary); border-radius:12px; padding:1.15rem; margin-bottom:1rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+                            <div>
+                                <strong style="color:var(--text-primary); font-size:0.95rem;">🔒 Follow Gate Configuration</strong>
+                                <p style="font-size:0.8rem; color:var(--text-secondary); margin:0.15rem 0 0 0;">Require users to follow your Instagram account before unlocking your link.</p>
+                            </div>
+                            <select id="gate_type_select" class="select" onchange="rules.onGateTypeChange(this.value)" style="width:auto; padding:0.4rem 0.8rem; font-weight:700; font-size:0.82rem;">
+                                <option value="buttons" ${btnCfg.gate_type !== 'text' ? 'selected' : ''}>🌟 3-Step Interactive Button Funnel</option>
+                                <option value="text" ${btnCfg.gate_type === 'text' ? 'selected' : ''}>💬 Simple Text Prompt ("DONE")</option>
+                            </select>
+                        </div>
+
+                        <!-- 3-STEP INTERACTIVE BUTTON BUILDER -->
+                        <div id="interactive_funnel_builder" class="${btnCfg.gate_type === 'text' ? 'hidden' : ''}">
+                            
+                            <!-- STEP 1 CARD -->
+                            <div style="background:#FFFFFF; border:1px solid var(--border-color); border-radius:10px; padding:0.85rem 1rem; margin-bottom:0.85rem;">
+                                <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                                    <span style="background:var(--accent-primary); color:#FFF; font-size:0.7rem; font-weight:800; padding:2px 7px; border-radius:4px;">STEP 1</span>
+                                    <span style="font-weight:700; font-size:0.82rem; color:var(--text-primary);">Hook DM & Quick Reply (Unlocks 24-hr messaging window)</span>
+                                </div>
+                                <textarea id="btn_step1_text" class="textarea" style="min-height:50px; font-size:0.85rem; margin-bottom:0.5rem;" placeholder="Hook message...">${btnCfg.step1_text}</textarea>
+                                <div style="display:flex; align-items:center; gap:0.6rem;">
+                                    <span style="font-size:0.78rem; font-weight:700; color:var(--text-secondary);">Tappable Button:</span>
+                                    <input type="text" id="btn_step1_button" class="input" style="flex:1; max-width:240px; padding:0.4rem 0.75rem; font-size:0.85rem; font-weight:700;" value="${btnCfg.step1_button}" placeholder="Send me the access" maxlength="20">
+                                </div>
+                            </div>
+
+                            <!-- STEP 2 CARD -->
+                            <div style="background:#FFFFFF; border:1px solid var(--border-color); border-radius:10px; padding:0.85rem 1rem; margin-bottom:0.85rem;">
+                                <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                                    <span style="background:#B45309; color:#FFF; font-size:0.7rem; font-weight:800; padding:2px 7px; border-radius:4px;">STEP 2</span>
+                                    <span style="font-weight:700; font-size:0.82rem; color:var(--text-primary);">Follow Gate (Dispatched when user taps "Send me the access")</span>
+                                </div>
+                                <textarea id="btn_step2_text" class="textarea" style="min-height:50px; font-size:0.85rem; margin-bottom:0.5rem;" placeholder="Follow gate message...">${btnCfg.step2_text}</textarea>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.65rem;">
+                                    <div>
+                                        <label style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Button 1 (Opens Profile URL):</label>
+                                        <input type="text" id="btn_step2_profile_button" class="input" style="padding:0.4rem 0.75rem; font-size:0.85rem; font-weight:700;" value="${btnCfg.step2_profile_button}" placeholder="Visit Profile" maxlength="20">
+                                    </div>
+                                    <div>
+                                        <label style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Button 2 (Follow Confirmation):</label>
+                                        <input type="text" id="btn_step2_confirm_button" class="input" style="padding:0.4rem 0.75rem; font-size:0.85rem; font-weight:700;" value="${btnCfg.step2_confirm_button}" placeholder="I'm following ✅" maxlength="20">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- STEP 3 CARD -->
+                            <div style="background:#FFFFFF; border:1px solid var(--border-color); border-radius:10px; padding:0.85rem 1rem;">
+                                <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                                    <span style="background:#15803D; color:#FFF; font-size:0.7rem; font-weight:800; padding:2px 7px; border-radius:4px;">STEP 3</span>
+                                    <span style="font-weight:700; font-size:0.82rem; color:var(--text-primary);">Deliverable DM (Dispatched when follower taps "I'm following ✅")</span>
+                                </div>
+                                <textarea id="btn_step3_text" class="textarea" style="min-height:50px; font-size:0.85rem; margin-bottom:0.5rem;" placeholder="Final thank you message...">${btnCfg.step3_text}</textarea>
+                                <div style="display:flex; align-items:center; gap:0.6rem;">
+                                    <span style="font-size:0.78rem; font-weight:700; color:var(--text-secondary);">Resource Button Title:</span>
+                                    <input type="text" id="btn_step3_button" class="input" style="flex:1; max-width:240px; padding:0.4rem 0.75rem; font-size:0.85rem; font-weight:700;" value="${btnCfg.step3_button}" placeholder="Click me" maxlength="20">
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- SIMPLE TEXT BOX -->
+                        <div id="simple_text_gate_box" class="${btnCfg.gate_type === 'text' ? '' : 'hidden'}">
+                            <label style="font-size:0.8rem; font-weight:700; color:var(--text-secondary); margin-bottom:0.35rem; display:block;">Follow Prompt Text (Sent to non-followers):</label>
+                            <textarea id="follow_prompt" class="textarea" placeholder="Please follow us first to unlock the link!">${rule.follow_prompt || 'Please follow us first, then reply "DONE" to unlock your link!'}</textarea>
+                        </div>
+
+                    </div>
                 </div>
 
                 <div id="link_url_group" class="form-group ${rule.action_type === 'direct_dm' ? 'hidden' : ''}">
-                    <label>Link / PDF Website URL:</label>
-                    <input type="url" id="link_url" class="input" placeholder="https://example.com/guide.pdf" value="${rule.link_url || ''}">
-                </div>
-                
-                <div id="follow_prompt_group" class="form-group ${rule.action_type !== 'follow_first' ? 'hidden' : ''}">
-                    <label>Follow Prompt Message (Sent if they don't follow yet):</label>
-                    <textarea id="follow_prompt" class="textarea" placeholder="Please follow us first to unlock the link!">${rule.follow_prompt || 'Please follow us first to unlock the link!'}</textarea>
+                    <label style="font-weight:700;">🔗 Deliverable Link / PDF / Website URL:</label>
+                    <input type="url" id="link_url" class="input" placeholder="https://drive.google.com/... or https://example.com/guide.pdf" value="${rule.link_url || ''}">
                 </div>
 
                 <div style="display:flex; gap: 1rem;">
@@ -323,16 +409,32 @@ window.rules = {
     onActionTypeChange(val) {
         const linkGroup = document.getElementById('link_url_group');
         const followGroup = document.getElementById('follow_prompt_group');
+        const responseGroup = document.getElementById('response_text_group');
         
         if (val === 'direct_dm') {
             linkGroup.classList.add('hidden');
             followGroup.classList.add('hidden');
+            if (responseGroup) responseGroup.style.display = 'block';
         } else if (val === 'link_dm') {
             linkGroup.classList.remove('hidden');
             followGroup.classList.add('hidden');
+            if (responseGroup) responseGroup.style.display = 'block';
         } else if (val === 'follow_first') {
             linkGroup.classList.remove('hidden');
             followGroup.classList.remove('hidden');
+            if (responseGroup) responseGroup.style.display = 'none';
+        }
+    },
+
+    onGateTypeChange(val) {
+        const funnelBox = document.getElementById('interactive_funnel_builder');
+        const textBox = document.getElementById('simple_text_gate_box');
+        if (val === 'text') {
+            if (funnelBox) funnelBox.classList.add('hidden');
+            if (textBox) textBox.classList.remove('hidden');
+        } else {
+            if (funnelBox) funnelBox.classList.remove('hidden');
+            if (textBox) textBox.classList.add('hidden');
         }
     },
 
@@ -342,16 +444,36 @@ window.rules = {
         const variationsText = document.getElementById('variations_input').value || '';
         const variationsArray = variationsText.split('\n').map(v => v.trim()).filter(Boolean);
 
+        const actionType = document.getElementById('action_type').value;
+
+        // Button funnel config
+        const gateType = document.getElementById('gate_type_select')?.value || 'buttons';
+        const buttonsConfig = {
+            gate_type: gateType,
+            step1_text: document.getElementById('btn_step1_text')?.value || "Hey there! Glad you're here ☺️\n\nTap below and I'll send you the access in just a moment ✨",
+            step1_button: (document.getElementById('btn_step1_button')?.value || "Send me the access").trim(),
+            step2_text: document.getElementById('btn_step2_text')?.value || "Almost there !\nPlease visit my profile and tap follow to continue 😄",
+            step2_profile_button: (document.getElementById('btn_step2_profile_button')?.value || "Visit Profile").trim(),
+            step2_confirm_button: (document.getElementById('btn_step2_confirm_button')?.value || "I'm following ✅").trim(),
+            step3_text: document.getElementById('btn_step3_text')?.value || "Dost appko document bejhdiya hai bahut mehnat sa bnaya hai please follow",
+            step3_button: (document.getElementById('btn_step3_button')?.value || "Click me").trim()
+        };
+
+        const responseText = actionType === 'follow_first' 
+            ? (buttonsConfig.step3_text || document.getElementById('response_text')?.value || '')
+            : (document.getElementById('response_text')?.value || '');
+
         const payload = {
             media_id: selectedMediaId,
             trigger_word: document.getElementById('trigger_word').value,
-            action_type: document.getElementById('action_type').value,
-            response_text: document.getElementById('response_text').value,
+            action_type: actionType,
+            response_text: responseText,
             link_url: document.getElementById('link_url').value,
-            follow_prompt: document.getElementById('follow_prompt').value,
+            follow_prompt: document.getElementById('follow_prompt')?.value || '',
             public_reply: document.getElementById('public_reply').value,
             delay_seconds: parseInt(document.getElementById('delay_seconds').value || 0),
             variations_json: JSON.stringify(variationsArray),
+            buttons_config_json: JSON.stringify(buttonsConfig),
             is_active: true
         };
 

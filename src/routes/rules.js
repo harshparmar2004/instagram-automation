@@ -90,7 +90,7 @@ function cleanUrl(url) {
 router.post('/rules', auth, (req, res) => {
     try {
         const db = getDb();
-        const { media_id, trigger_keyword, trigger_word, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json } = req.body;
+        const { media_id, trigger_keyword, trigger_word, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json } = req.body;
         const keyword = trigger_keyword || trigger_word;
 
         if (!keyword || !action_type) {
@@ -118,8 +118,8 @@ router.post('/rules', auth, (req, res) => {
         const userId = req.user?.id || null;
 
         const result = db.prepare(`
-            INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, created_at, updated_at, user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json, created_at, updated_at, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
             resolvedMediaId, 
             keyword, 
@@ -130,6 +130,7 @@ router.post('/rules', auth, (req, res) => {
             public_reply || null,
             parseInt(delay_seconds || 0),
             variations_json || null,
+            buttons_config_json || null,
             new Date().toISOString(), 
             new Date().toISOString(),
             userId
@@ -147,7 +148,7 @@ router.put('/rules/:id', auth, (req, res) => {
     try {
         const db = getDb();
         const { id } = req.params;
-        const { media_id, trigger_keyword, trigger_word, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json } = req.body;
+        const { media_id, trigger_keyword, trigger_word, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json } = req.body;
         const keyword = trigger_keyword || trigger_word;
         const sanitizedUrl = cleanUrl(link_url);
 
@@ -174,6 +175,7 @@ router.put('/rules/:id', auth, (req, res) => {
                     public_reply = ?,
                     delay_seconds = ?,
                     variations_json = ?,
+                    buttons_config_json = ?,
                     updated_at = ?
                 WHERE id = ?
             `).run(
@@ -186,6 +188,7 @@ router.put('/rules/:id', auth, (req, res) => {
                 public_reply || null, 
                 parseInt(delay_seconds || 0),
                 variations_json || null,
+                buttons_config_json || null,
                 new Date().toISOString(), 
                 id
             );
@@ -200,6 +203,7 @@ router.put('/rules/:id', auth, (req, res) => {
                     public_reply = ?,
                     delay_seconds = ?,
                     variations_json = ?,
+                    buttons_config_json = ?,
                     updated_at = ?
                 WHERE id = ?
             `).run(
@@ -211,6 +215,7 @@ router.put('/rules/:id', auth, (req, res) => {
                 public_reply || null, 
                 parseInt(delay_seconds || 0),
                 variations_json || null,
+                buttons_config_json || null,
                 new Date().toISOString(), 
                 id
             );

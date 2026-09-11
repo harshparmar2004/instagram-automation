@@ -232,6 +232,13 @@ async function processCommentEvent(payload) {
                     finalLink = 'https://' + finalLink;
                 }
 
+                let btnCfg = null;
+                if (rule.buttons_config_json) {
+                    try { btnCfg = JSON.parse(rule.buttons_config_json); } catch(e) {}
+                }
+
+                let messagePayload = null;
+
                 if (rule.action_type === 'direct_dm') {
                     messageToSend = baseResponse;
                 } else if (rule.action_type === 'link_dm') {
@@ -250,7 +257,24 @@ async function processCommentEvent(payload) {
                         messageToSend = baseResponse || 'Here is your requested link!';
                     }
                 } else if (rule.action_type === 'follow_first') {
-                    messageToSend = rule.follow_prompt || `Hey @${from.username || 'friend'}! 🚀 Thanks for commenting! Please follow us first, then reply "DONE" in this DM to unlock your link!`;
+                    const isButtonMode = !btnCfg || btnCfg.gate_type !== 'text';
+                    if (isButtonMode) {
+                        const step1Text = btnCfg?.step1_text || "Hey there! Glad you're here ☺️\n\nTap below and I'll send you the access in just a moment ✨";
+                        const step1Button = (btnCfg?.step1_button || "Send me the access").slice(0, 20);
+                        messageToSend = step1Text;
+                        messagePayload = {
+                            text: step1Text,
+                            quick_replies: [
+                                {
+                                    content_type: 'text',
+                                    title: step1Button,
+                                    payload: 'REQ_ACCESS'
+                                }
+                            ]
+                        };
+                    } else {
+                        messageToSend = rule.follow_prompt || `Hey @${from.username || 'friend'}! 🚀 Thanks for commenting! Please follow us first, then reply "DONE" in this DM to unlock your link!`;
+                    }
                 }
 
                 const insertEvent = db.prepare(`
@@ -278,10 +302,12 @@ async function processCommentEvent(payload) {
                 }).catch(() => {});
 
                 if (rule.action_type === 'follow_first') {
+                    const isButtonMode = !btnCfg || btnCfg.gate_type !== 'text';
+                    const initialState = isButtonMode ? 'awaiting_access_tap' : 'awaiting_reply';
                     db.prepare(`
                         INSERT INTO conversations (commenter_ig_id, rule_id, event_id, user_id, state, created_at)
-                        VALUES (?, ?, ?, ?, 'awaiting_reply', ?)
-                    `).run(from.id, rule.id, eventId, targetUserId, new Date().toISOString());
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    `).run(from.id, rule.id, eventId, targetUserId, initialState, new Date().toISOString());
                 }
 
                 const delayMs = (rule.delay_seconds || 0) * 1000;
@@ -291,6 +317,7 @@ async function processCommentEvent(payload) {
                     type: 'private_reply',
                     commentId: commentId,
                     commenterId: from.id,
+                    messagePayload: messagePayload || messageToSend,
                     messageText: messageToSend,
                     publicReply: rule.public_reply || null,
                     eventId: eventId,
@@ -315,6 +342,10 @@ async function processMessageEvent(payload) {
         for (const msgEvent of entry.messaging || []) {
             const senderId = msgEvent.sender.id;
             const text = msgEvent.message?.text;
+            const postbackPayload = msgEvent.postback?.payload || '';
+            const quickReplyPayload = msgEvent.message?.quick_reply?.payload || '';
+            const rawText = msgEvent.message?.text || msgEvent.postback?.title || '';
+            const tLower = rawText.toLowerCase().trim();
 
             // Skip self-messages from account itself
             if (senderId === igAccountId || senderId === linkedAccount?.ig_user_id || senderId === getConfig('ig_user_id')) {
@@ -346,10 +377,10 @@ async function processMessageEvent(payload) {
                 }
             }
 
-            if (!text) continue;
+            if (!rawText && !postbackPayload && !quickReplyPayload) continue;
 
-            // FOLLOW-FIRST GATE REPLY VERIFICATION STATE MACHINE
-            let convQuery = "SELECT * FROM conversations WHERE commenter_ig_id = ? AND state = 'awaiting_reply'";
+            // FOLLOW-FIRST GATE STATE MACHINE (3-Step Button Funnel & Text Fallback)
+            let convQuery = "SELECT * FROM conversations WHERE commenter_ig_id = ? AND state IN ('awaiting_access_tap', 'awaiting_follow_confirm', 'awaiting_reply')";
             const convParams = [senderId];
             if (targetUserId) {
                 convQuery += " AND (user_id = ? OR user_id IS NULL)";
@@ -359,55 +390,144 @@ async function processMessageEvent(payload) {
             const conv = db.prepare(convQuery).get(...convParams);
             if (!conv) continue;
 
-            const tLower = text.toLowerCase().trim();
-            // Accept any confirmation string: "done", "followed", etc.
-            const isFollowConfirmation = ['done', 'followed', 'following', 'i followed', "i'm following", 'following you', 'ok', 'yes'].some(kw => tLower.includes(kw));
+            const rule = db.prepare("SELECT * FROM rules WHERE id = ?").get(conv.rule_id);
+            if (!rule) continue;
 
-            if (isFollowConfirmation) {
-                console.log(`[Automation] Follower ${senderId} confirmed follow status! Delivering resource link...`);
+            let btnCfg = null;
+            if (rule.buttons_config_json) {
+                try { btnCfg = JSON.parse(rule.buttons_config_json); } catch(e) {}
+            }
 
-                const rule = db.prepare("SELECT * FROM rules WHERE id = ?").get(conv.rule_id);
-                if (!rule) continue;
+            // STAGE 1 -> STAGE 2: Follower tapped [ Send me the access ]
+            if (conv.state === 'awaiting_access_tap') {
+                const isAccessTap = postbackPayload === 'REQ_ACCESS' || 
+                                    quickReplyPayload === 'REQ_ACCESS' || 
+                                    ['access', 'send', 'send me', 'want', 'link'].some(kw => tLower.includes(kw)) ||
+                                    rawText.length > 0; // Any reply to Step 1 unlocks the 24-hr window!
 
-                const directLink = (rule.link_url || '').trim();
-                const baseResponse = (getRandomResponseText(rule) || '').trim();
-                let messageToSend = '';
-                if (directLink) {
-                    if (baseResponse && !baseResponse.includes(directLink)) {
-                        messageToSend = `${baseResponse}\n${directLink}`;
-                    } else if (baseResponse) {
-                        messageToSend = baseResponse;
-                    } else {
-                        messageToSend = `🎉 Thank you for following! Here is your requested link:\n${directLink}`;
-                    }
-                } else {
-                    messageToSend = baseResponse || '🎉 Thank you for following!';
+                if (isAccessTap) {
+                    console.log(`[Automation] Follower ${senderId} requested access! Transitioning to Follow Gate (Step 2)...`);
+                    
+                    db.prepare("UPDATE conversations SET state = 'awaiting_follow_confirm' WHERE id = ?").run(conv.id);
+
+                    const step2Text = btnCfg?.step2_text || "Almost there !\nPlease visit my profile and tap follow to continue 😄";
+                    const profileBtnTitle = (btnCfg?.step2_profile_button || "Visit Profile").slice(0, 20);
+                    const followBtnTitle = (btnCfg?.step2_confirm_button || "I'm following ✅").slice(0, 20);
+
+                    const myHandle = (linkedAccount?.ig_username || getConfig('ig_username') || '').replace('@', '').trim();
+                    const profileUrl = myHandle ? `https://instagram.com/${myHandle}` : 'https://instagram.com';
+
+                    const step2Payload = {
+                        attachment: {
+                            type: 'template',
+                            payload: {
+                                template_type: 'button',
+                                text: step2Text,
+                                buttons: [
+                                    {
+                                        type: 'web_url',
+                                        url: profileUrl,
+                                        title: profileBtnTitle
+                                    },
+                                    {
+                                        type: 'postback',
+                                        title: followBtnTitle,
+                                        payload: 'CONFIRMED_FOLLOW'
+                                    }
+                                ]
+                            }
+                        }
+                    };
+
+                    enqueue({
+                        type: 'direct_message',
+                        recipientId: senderId,
+                        messagePayload: step2Payload,
+                        messageText: step2Text,
+                        accessToken: activeToken,
+                        processAt: Date.now()
+                    });
+                    continue;
                 }
-                const trackingId = null;
+            }
 
-                const prevEvent = db.prepare("SELECT media_ig_id, commenter_username FROM events WHERE id = ?").get(conv.event_id);
-                const mediaIgId = prevEvent ? prevEvent.media_ig_id : null;
-                const username = prevEvent ? prevEvent.commenter_username : 'follower';
+            // STAGE 2 -> STAGE 3: Follower tapped [ I'm following ✅ ] or replied "DONE"
+            if (conv.state === 'awaiting_follow_confirm' || conv.state === 'awaiting_reply') {
+                const isFollowConfirmation = postbackPayload === 'CONFIRMED_FOLLOW' ||
+                                             quickReplyPayload === 'CONFIRMED_FOLLOW' ||
+                                             ['done', 'followed', 'following', 'i followed', "i'm following", 'following you', 'ok', 'yes', 'send', 'check'].some(kw => tLower.includes(kw));
 
-                const insertEvent = db.prepare(`
-                    INSERT INTO events (rule_id, commenter_ig_id, commenter_username, media_ig_id, tracking_id, user_id, created_at, dm_status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
-                `);
+                if (isFollowConfirmation) {
+                    console.log(`[Automation] Follower ${senderId} confirmed follow status! Delivering resource link (Step 3)...`);
 
-                const eventResult = insertEvent.run(
-                    rule.id, senderId, username, mediaIgId, trackingId, targetUserId, new Date().toISOString()
-                );
+                    let directLink = (rule.link_url || '').trim();
+                    if (directLink && !/^https?:\/\//i.test(directLink)) {
+                        directLink = 'https://' + directLink;
+                    }
 
-                db.prepare("UPDATE conversations SET state = 'completed', completed_at = ? WHERE id = ?").run(new Date().toISOString(), conv.id);
+                    const isButtonMode = !btnCfg || btnCfg.gate_type !== 'text';
+                    const defaultDeliverText = 'Dost appko document bejhdiya hai bahut mehnat sa bnaya hai please follow';
+                    const finalDeliverableText = btnCfg?.step3_text || (getRandomResponseText(rule) || '').trim() || defaultDeliverText;
+                    const clickBtnTitle = (btnCfg?.step3_button || 'Click me').slice(0, 20);
 
-                enqueue({
-                    type: 'direct_message',
-                    recipientId: senderId,
-                    messageText: messageToSend,
-                    eventId: eventResult.lastInsertRowid,
-                    accessToken: activeToken,
-                    processAt: Date.now()
-                });
+                    let step3Payload = null;
+                    let messageToSend = '';
+
+                    if (isButtonMode && directLink) {
+                        step3Payload = {
+                            attachment: {
+                                type: 'template',
+                                payload: {
+                                    template_type: 'button',
+                                    text: finalDeliverableText,
+                                    buttons: [
+                                        {
+                                            type: 'web_url',
+                                            url: directLink,
+                                            title: clickBtnTitle
+                                        }
+                                    ]
+                                }
+                            }
+                        };
+                        messageToSend = `${finalDeliverableText}\n${directLink}`;
+                    } else {
+                        if (directLink) {
+                            if (finalDeliverableText && !finalDeliverableText.includes(directLink)) {
+                                messageToSend = `${finalDeliverableText}\n${directLink}`;
+                            } else {
+                                messageToSend = finalDeliverableText || `🎉 Thank you for following! Here is your requested link:\n${directLink}`;
+                            }
+                        } else {
+                            messageToSend = finalDeliverableText || '🎉 Thank you for following!';
+                        }
+                    }
+
+                    const prevEvent = db.prepare("SELECT media_ig_id, commenter_username FROM events WHERE id = ?").get(conv.event_id);
+                    const mediaIgId = prevEvent ? prevEvent.media_ig_id : null;
+                    const username = prevEvent ? prevEvent.commenter_username : 'follower';
+
+                    const insertEvent = db.prepare(`
+                        INSERT INTO events (rule_id, commenter_ig_id, commenter_username, media_ig_id, tracking_id, user_id, created_at, dm_status)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+                    `);
+
+                    const eventResult = insertEvent.run(
+                        rule.id, senderId, username, mediaIgId, null, targetUserId, new Date().toISOString()
+                    );
+
+                    db.prepare("UPDATE conversations SET state = 'completed', completed_at = ? WHERE id = ?").run(new Date().toISOString(), conv.id);
+
+                    enqueue({
+                        type: 'direct_message',
+                        recipientId: senderId,
+                        messagePayload: step3Payload || messageToSend,
+                        messageText: messageToSend,
+                        eventId: eventResult.lastInsertRowid,
+                        accessToken: activeToken,
+                        processAt: Date.now()
+                    });
+                }
             }
         }
     }

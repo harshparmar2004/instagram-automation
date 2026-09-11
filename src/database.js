@@ -79,6 +79,7 @@ function getDb() {
       public_reply TEXT,
       delay_seconds INTEGER DEFAULT 0,
       variations_json TEXT,
+      buttons_config_json TEXT,
       is_active INTEGER DEFAULT 1,
       created_at TEXT,
       updated_at TEXT
@@ -154,6 +155,7 @@ function getDb() {
   try { db.exec(`ALTER TABLE rules ADD COLUMN public_reply TEXT;`); } catch (e) {}
   try { db.exec(`ALTER TABLE rules ADD COLUMN delay_seconds INTEGER DEFAULT 0;`); } catch (e) {}
   try { db.exec(`ALTER TABLE rules ADD COLUMN variations_json TEXT;`); } catch (e) {}
+  try { db.exec(`ALTER TABLE rules ADD COLUMN buttons_config_json TEXT;`); } catch (e) {}
   try { db.exec(`ALTER TABLE media ADD COLUMN views_count INTEGER DEFAULT 0;`); } catch (e) {}
   try { db.exec(`ALTER TABLE media ADD COLUMN comments_count INTEGER DEFAULT 0;`); } catch (e) {}
   try { db.exec(`ALTER TABLE media ADD COLUMN media_product_type TEXT DEFAULT 'FEED';`); } catch (e) {}

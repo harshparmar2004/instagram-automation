@@ -269,7 +269,7 @@ async function getSingleMedia(token, mediaId) {
     return res.data;
 }
 
-async function sendPrivateReply(token, commentId, commenterId, messageText) {
+async function sendPrivateReply(token, commentId, commenterId, messagePayload) {
     const isFbToken = token && token.startsWith('EAA');
     const base = isFbToken ? FB_API_BASE : IG_API_BASE;
     const igUserId = getConfig('ig_user_id');
@@ -277,12 +277,14 @@ async function sendPrivateReply(token, commentId, commenterId, messageText) {
         ? `${base}/${igUserId}/messages`
         : `${base}/me/messages`;
 
+    const messageObj = typeof messagePayload === 'string' ? { text: messagePayload } : messagePayload;
+
     // Strategy 1: Official Instagram Private Reply using recipient: { comment_id }
     try {
         console.log(`[Instagram] Dispatching Private Reply DM for comment ${commentId} to ${endpoint}...`);
         const res = await axios.post(endpoint, {
             recipient: { comment_id: commentId },
-            message: { text: messageText }
+            message: messageObj
         }, {
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -295,13 +297,32 @@ async function sendPrivateReply(token, commentId, commenterId, messageText) {
         const errorMsg = err.response?.data?.error?.message || err.message;
         console.warn(`[Instagram] Strategy 1 (comment_id) notice: ${errorMsg}`);
 
+        // If structured buttons failed, try plain text on comment_id
+        if (typeof messagePayload === 'object') {
+            const fallbackText = messagePayload.text || messagePayload.attachment?.payload?.text || 'Hey! Check your DMs!';
+            try {
+                console.log(`[Instagram] Retrying Private Reply with plain text fallback...`);
+                const resFallback = await axios.post(endpoint, {
+                    recipient: { comment_id: commentId },
+                    message: { text: fallbackText }
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                console.log(`[Instagram] ✅ Private Reply plain text delivered!`, resFallback.data);
+                return resFallback.data;
+            } catch (e) {}
+        }
+
         // Strategy 2: If commenterId is provided, fallback to direct message by recipient: { id }
         if (commenterId) {
             try {
                 console.log(`[Instagram] Strategy 2: Fallback DM to recipient id ${commenterId}...`);
                 const res2 = await axios.post(endpoint, {
                     recipient: { id: commenterId },
-                    message: { text: messageText }
+                    message: messageObj
                 }, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -312,6 +333,21 @@ async function sendPrivateReply(token, commentId, commenterId, messageText) {
                 return res2.data;
             } catch (err2) {
                 console.warn(`[Instagram] Strategy 2 notice:`, err2.response?.data?.error?.message || err2.message);
+                if (typeof messagePayload === 'object') {
+                    const fallbackText = messagePayload.text || messagePayload.attachment?.payload?.text || 'Hey! Check your DMs!';
+                    try {
+                        const res2Fallback = await axios.post(endpoint, {
+                            recipient: { id: commenterId },
+                            message: { text: fallbackText }
+                        }, {
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        return res2Fallback.data;
+                    } catch (e) {}
+                }
             }
         }
 
@@ -341,7 +377,7 @@ async function replyToComment(token, commentId, messageText) {
     }
 }
 
-async function sendDirectMessage(token, recipientId, messageText) {
+async function sendDirectMessage(token, recipientId, messagePayload) {
     const isFbToken = token && token.startsWith('EAA');
     const base = isFbToken ? FB_API_BASE : IG_API_BASE;
     const igUserId = getConfig('ig_user_id');
@@ -349,16 +385,39 @@ async function sendDirectMessage(token, recipientId, messageText) {
         ? `${base}/${igUserId}/messages`
         : `${base}/me/messages`;
 
-    const res = await axios.post(endpoint, {
-        recipient: { id: recipientId },
-        message: { text: messageText }
-    }, {
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+    const messageObj = typeof messagePayload === 'string' ? { text: messagePayload } : messagePayload;
+
+    try {
+        const res = await axios.post(endpoint, {
+            recipient: { id: recipientId },
+            message: messageObj
+        }, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        return res.data;
+    } catch (err) {
+        // Fallback to plain text if structured template failed
+        if (typeof messagePayload === 'object') {
+            const fallbackText = messagePayload.text || messagePayload.attachment?.payload?.text || 'Here is your update!';
+            console.warn('[Instagram] Template send notice, retrying with plain text fallback:', err.response?.data?.error?.message || err.message);
+            try {
+                const resFallback = await axios.post(endpoint, {
+                    recipient: { id: recipientId },
+                    message: { text: fallbackText }
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                return resFallback.data;
+            } catch(e) {}
         }
-    });
-    return res.data;
+        throw err;
+    }
 }
 
 async function subscribeWebhook(appId, appSecret, callbackUrl, verifyToken) {

@@ -56,9 +56,11 @@ async function processNext() {
             }
 
             // 2. Dispatch real Instagram Direct Message (Private Reply)
-            result = await sendPrivateReply(token, job.commentId, job.commenterId, job.messageText);
+            const payload = job.messagePayload || job.messageText;
+            result = await sendPrivateReply(token, job.commentId, job.commenterId, payload);
         } else if (job.type === 'direct_message') {
-            result = await sendDirectMessage(token, job.recipientId, job.messageText);
+            const payload = job.messagePayload || job.messageText;
+            result = await sendDirectMessage(token, job.recipientId, payload);
         }
 
         if (job.eventId) {

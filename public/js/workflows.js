@@ -213,8 +213,20 @@ window.workflows = {
 
             item.rules.forEach(rule => {
                 let actionText = 'Send Resource Link in DM';
+                let isButtonFunnel = false;
                 if (rule.action_type === 'direct_dm') { actionText = 'Send Direct Text DM (No Link)'; }
-                if (rule.action_type === 'follow_first') { actionText = 'Ask to Follow First Gate'; }
+                if (rule.action_type === 'follow_first') {
+                    let btnCfg = null;
+                    if (rule.buttons_config_json) {
+                        try { btnCfg = JSON.parse(rule.buttons_config_json); } catch(e) {}
+                    }
+                    if (!btnCfg || btnCfg.gate_type !== 'text') {
+                        actionText = '🌟 3-Step Interactive Button Funnel';
+                        isButtonFunnel = true;
+                    } else {
+                        actionText = 'Ask to Follow First (Text Reply)';
+                    }
+                }
 
                 const keywords = (rule.trigger_keyword || '').split(',').map(k => k.trim());
                 const dmsSent = rule.total_triggers !== undefined && rule.total_triggers !== null ? rule.total_triggers : 0;
@@ -235,6 +247,10 @@ window.workflows = {
                                     <span>${isActive ? '🟢' : '⏸️'}</span>
                                     <span>${isActive ? 'Active & Listening' : 'Paused'}</span>
                                 </span>
+                                ${isButtonFunnel ? `
+                                <span style="font-size:0.8rem; font-weight:800; color:#1D4ED8; display: inline-flex; align-items: center; gap: 0.35rem; background:#EFF6FF; border:1px solid #BFDBFE; padding: 3px 8px; border-radius: 6px;">
+                                    <span>🔘 Interactive Button Funnel</span>
+                                </span>` : ''}
                             </div>
 
                             <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
