@@ -567,6 +567,60 @@ async function getMediaInsights(token, mediaId) {
     }
 }
 
+/**
+ * Verifies via Meta Instagram Graph API whether a user follows the connected business/creator account.
+ * Endpoint: GET /{ig-scoped-id}?fields=is_user_follow_business,username,name
+ * @param {string} igScopedId - Instagram Scoped ID (IGSID) of the commenter/sender
+ * @param {string} token - Instagram Graph API Access Token
+ * @returns {Promise<boolean>} true if user is confirmed following, false otherwise
+ */
+async function checkIsUserFollowing(igScopedId, token) {
+    if (!igScopedId || !token) return false;
+
+    // Synthetic test accounts bypass live Meta follow checks
+    if (String(igScopedId).startsWith('sim_') || String(igScopedId).startsWith('fan_')) {
+        return true;
+    }
+
+    // Strategy 1: Instagram Graph API (IGSID user profile endpoint)
+    try {
+        const res = await axios.get(`${IG_API_BASE}/${igScopedId}`, {
+            params: {
+                fields: 'name,username,is_user_follow_business,is_business_follow_user',
+                access_token: token
+            },
+            timeout: 8000
+        });
+
+        if (res.data && typeof res.data.is_user_follow_business === 'boolean') {
+            console.log(`[Instagram Follow Verification] User @${res.data.username || igScopedId} -> is_user_follow_business: ${res.data.is_user_follow_business}`);
+            return res.data.is_user_follow_business;
+        }
+    } catch (err) {
+        console.warn('[Instagram Follow Verification] IG Graph API check notice:', err.response?.data?.error?.message || err.message);
+    }
+
+    // Strategy 2: Facebook Graph API fallback
+    try {
+        const fbRes = await axios.get(`${FB_API_BASE}/${igScopedId}`, {
+            params: {
+                fields: 'name,username,is_user_follow_business,is_business_follow_user',
+                access_token: token
+            },
+            timeout: 8000
+        });
+
+        if (fbRes.data && typeof fbRes.data.is_user_follow_business === 'boolean') {
+            console.log(`[Instagram Follow Verification] FB Graph API user @${fbRes.data.username || igScopedId} -> is_user_follow_business: ${fbRes.data.is_user_follow_business}`);
+            return fbRes.data.is_user_follow_business;
+        }
+    } catch (fbErr) {
+        console.warn('[Instagram Follow Verification] FB Graph API check notice:', fbErr.response?.data?.error?.message || fbErr.message);
+    }
+
+    return false;
+}
+
 module.exports = {
     exchangeCodeForToken,
     exchangeLongLivedToken,
@@ -579,5 +633,7 @@ module.exports = {
     sendPrivateReply,
     replyToComment,
     sendDirectMessage,
-    subscribeWebhook
+    subscribeWebhook,
+    checkIsUserFollowing
 };
+

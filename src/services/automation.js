@@ -1,5 +1,5 @@
 const { getDb, getConfig, getInstagramAccountByIgId } = require('../database');
-const { getSingleMedia } = require('./instagram');
+const { getSingleMedia, checkIsUserFollowing } = require('./instagram');
 const { enqueue } = require('./queue');
 const { syncLeadToSheet } = require('./googleSheets');
 const { v4: uuidv4 } = require('uuid');
@@ -483,7 +483,62 @@ async function processMessageEvent(payload) {
                                              ['done', 'followed', 'following', 'i followed', "i'm following", 'following you', 'ok', 'yes', 'send', 'check'].some(kw => tLower.includes(kw));
 
                 if (isFollowConfirmation) {
-                    console.log(`[Automation] Follower ${senderId} confirmed follow status! Delivering resource link (Step 3)...`);
+                    console.log(`[Automation] Follower ${senderId} tapped "I'm following ✅". Verifying live Instagram follow status with Meta...`);
+
+                    const isFollowing = await checkIsUserFollowing(senderId, activeToken);
+
+                    if (!isFollowing) {
+                        console.log(`[Automation] ⛔ Follow verification FAILED: User ${senderId} is NOT following! Enforcing Follow Gate loop.`);
+
+                        const myHandle = (linkedAccount?.ig_username || getConfig('ig_username') || '').replace('@', '').trim();
+                        const profileUrl = myHandle ? `https://instagram.com/${myHandle}` : 'https://instagram.com';
+                        const notFollowingText = btnCfg?.not_following_text || 
+                            "Wait! It looks like you're not following us yet! 👀\n\nPlease visit our profile, tap Follow, and then click \"I'm following ✅\" below to unlock your link!";
+                        const profileBtnTitle = (btnCfg?.step2_profile_button || "Visit Profile").slice(0, 20);
+                        const followBtnTitle = (btnCfg?.step2_confirm_button || "I'm following ✅").slice(0, 20);
+
+                        const isButtonMode = !btnCfg || btnCfg.gate_type !== 'text';
+                        let repromptPayload = null;
+
+                        if (isButtonMode) {
+                            repromptPayload = {
+                                attachment: {
+                                    type: 'template',
+                                    payload: {
+                                        template_type: 'button',
+                                        text: notFollowingText,
+                                        buttons: [
+                                            {
+                                                type: 'web_url',
+                                                url: profileUrl,
+                                                title: profileBtnTitle
+                                            },
+                                            {
+                                                type: 'postback',
+                                                title: followBtnTitle,
+                                                payload: 'CONFIRMED_FOLLOW'
+                                            }
+                                        ]
+                                    }
+                                }
+                            };
+                        }
+
+                        // Maintain conversation in awaiting_follow_confirm state so user can retry
+                        db.prepare("UPDATE conversations SET state = 'awaiting_follow_confirm' WHERE id = ?").run(conv.id);
+
+                        enqueue({
+                            type: 'direct_message',
+                            recipientId: senderId,
+                            messagePayload: repromptPayload || notFollowingText,
+                            messageText: notFollowingText,
+                            accessToken: activeToken,
+                            processAt: Date.now()
+                        });
+                        continue;
+                    }
+
+                    console.log(`[Automation] ✅ Follow verification PASSED: Follower ${senderId} is confirmed following! Delivering resource link (Step 3)...`);
 
                     let directLink = (rule.link_url || '').trim();
                     if (directLink && !/^https?:\/\//i.test(directLink)) {
