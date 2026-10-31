@@ -1,4 +1,4 @@
-﻿const axios = require('axios');
+const axios = require('axios');
 const { getConfig } = require('../database');
 
 let nextTimeout = null;
@@ -15,6 +15,9 @@ function getTargetUrl() {
 
     if (!url || url.includes('localhost') || url.includes('127.0.0.1')) {
         return null;
+    }
+    if (url.includes('instaauto.onrender.com')) {
+        url = 'https://instaauto-wzvc.onrender.com';
     }
     return url.replace(/\/+$/, '');
 }

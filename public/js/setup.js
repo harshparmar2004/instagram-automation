@@ -447,6 +447,17 @@ window.setup = {
                         <input type="text" id="verify_token" value="${status.verifyToken || 'creator_verify_token_2026'}" placeholder="e.g. creator_verify_token_2026" required style="width: 100%; padding: 0.7rem 1rem; font-size: 0.9rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none;">
                     </div>
 
+                    <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                        <label style="font-size: 0.84rem; font-weight: 700; color: var(--text-primary);">DM Resource Link Delivery Mode</label>
+                        <select id="link_delivery_mode" style="width: 100%; padding: 0.7rem 1rem; font-size: 0.88rem; font-weight: 600; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; outline: none;">
+                            <option value="direct" ${status.linkDeliveryMode !== 'tracked' ? 'selected' : ''}>🔗 Direct Clean Links (Recommended — Native Instagram Post/Resource Cards, Zero Redirects)</option>
+                            <option value="tracked" ${status.linkDeliveryMode === 'tracked' ? 'selected' : ''}>📊 Tracked Redirect Links (Click Count Analytics via Server)</option>
+                        </select>
+                        <div style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                            Direct links send your exact destination link (e.g. Google Drive, Instagram post, Canva) so Instagram displays full native preview cards without redirects.
+                        </div>
+                    </div>
+
                     <!-- WEBHOOK CALLBACK URL READ-ONLY COPY BOX -->
                     <div style="padding: 1.1rem 1.25rem; background: #FAF8F5; border: 1.5px solid var(--border-color); border-radius: 14px; margin-top: 0.35rem;">
                         <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.45rem;">
@@ -656,7 +667,8 @@ window.setup = {
             const payload = {
                 appId: document.getElementById('app_id').value,
                 appSecret: document.getElementById('app_secret').value,
-                verifyToken: document.getElementById('verify_token').value
+                verifyToken: document.getElementById('verify_token').value,
+                link_delivery_mode: document.getElementById('link_delivery_mode')?.value || 'direct'
             };
 
             try {

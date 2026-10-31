@@ -16,8 +16,19 @@ router.get('/r/:trackingId', (req, res) => {
             WHERE e.tracking_id = ?
         `).get(trackingId);
 
-        if (!event) {
-            return res.status(404).send('Link not found');
+        if (!event || !event.link_url) {
+            // Graceful fallback: find most recent active rule link or creator profile
+            const fallbackRule = db.prepare("SELECT link_url FROM rules WHERE is_active = 1 AND link_url IS NOT NULL AND link_url != '' ORDER BY id DESC LIMIT 1").get();
+            if (fallbackRule && fallbackRule.link_url) {
+                let dest = fallbackRule.link_url;
+                if (!/^https?:\/\//i.test(dest)) dest = 'https://' + dest;
+                return res.redirect(dest);
+            }
+            const igUsername = require('../database').getConfig('ig_username');
+            if (igUsername) {
+                return res.redirect(`https://instagram.com/${igUsername.replace('@', '')}`);
+            }
+            return res.status(404).send('Resource link expired or not found');
         }
 
         let destinationUrl = event.link_url;

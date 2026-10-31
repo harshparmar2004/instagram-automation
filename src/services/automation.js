@@ -232,10 +232,23 @@ async function processCommentEvent(payload) {
                     finalLink = 'https://' + finalLink;
                 }
 
+                // Decide whether to send the direct link or a tracked redirect link:
+                // 1. Social & interactive links (Instagram posts/reels/profiles, Threads, WhatsApp)
+                //    MUST be direct so Instagram automatically renders native in-app preview cards!
+                // 2. Direct delivery configured globally or per-rule
+                const isNativeSocialLink = finalLink.includes('instagram.com') || 
+                                           finalLink.includes('threads.net') || 
+                                           finalLink.includes('wa.me') || 
+                                           finalLink.includes('whatsapp.com');
+                const forceDirectLink = rule.link_mode === 'direct' || 
+                                        getConfig('link_delivery_mode') === 'direct' || 
+                                        isNativeSocialLink;
+
                 let trackedLink = finalLink;
-                if (finalLink) {
-                    trackingId = uuidv4();
-                    const baseUrl = process.env.PUBLIC_URL || process.env.BASE_URL || getConfig('public_url') || config.BASE_URL || 'http://localhost:3000';
+                if (finalLink && !forceDirectLink) {
+                    const crypto = require('crypto');
+                    trackingId = crypto.randomBytes(4).toString('hex');
+                    const baseUrl = typeof config.resolveBaseUrl === 'function' ? config.resolveBaseUrl() : config.BASE_URL;
                     trackedLink = `${baseUrl}/r/${trackingId}`;
                 }
 
@@ -482,11 +495,20 @@ async function processMessageEvent(payload) {
                     const finalDeliverableText = btnCfg?.step3_text || (getRandomResponseText(rule) || '').trim() || defaultDeliverText;
                     const clickBtnTitle = (btnCfg?.step3_button || 'Click me').slice(0, 20);
 
+                    const isNativeSocialLink = directLink.includes('instagram.com') || 
+                                               directLink.includes('threads.net') || 
+                                               directLink.includes('wa.me') || 
+                                               directLink.includes('whatsapp.com');
+                    const forceDirectLink = rule.link_mode === 'direct' || 
+                                            getConfig('link_delivery_mode') === 'direct' || 
+                                            isNativeSocialLink;
+
                     let trackingId = null;
                     let trackedLink = directLink;
-                    if (directLink) {
-                        trackingId = uuidv4();
-                        const baseUrl = process.env.PUBLIC_URL || process.env.BASE_URL || getConfig('public_url') || config.BASE_URL || 'http://localhost:3000';
+                    if (directLink && !forceDirectLink) {
+                        const crypto = require('crypto');
+                        trackingId = crypto.randomBytes(4).toString('hex');
+                        const baseUrl = typeof config.resolveBaseUrl === 'function' ? config.resolveBaseUrl() : config.BASE_URL;
                         trackedLink = `${baseUrl}/r/${trackingId}`;
                     }
 

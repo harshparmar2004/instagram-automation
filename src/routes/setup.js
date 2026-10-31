@@ -58,12 +58,14 @@ router.get('/status', auth, (req, res) => {
         verifyToken: verifyToken || '',
         tokenHealth: isConnected ? (tokenHealth || 'healthy') : 'disconnected',
         tokenExpiresAt: tokenExpiresAt || '',
-        mediaCount: mediaCount
+        mediaCount: mediaCount,
+        linkDeliveryMode: getConfig('link_delivery_mode') || 'direct',
+        baseUrl: typeof config.resolveBaseUrl === 'function' ? config.resolveBaseUrl() : config.BASE_URL
     });
 });
 
 router.post('/setup', auth, (req, res) => {
-    const { appId, appSecret, verifyToken, meta_app_id, meta_app_secret, webhook_verify_token } = req.body;
+    const { appId, appSecret, verifyToken, meta_app_id, meta_app_secret, webhook_verify_token, link_delivery_mode } = req.body;
     
     const id = appId || meta_app_id;
     const secret = appSecret || meta_app_secret;
@@ -72,8 +74,9 @@ router.post('/setup', auth, (req, res) => {
     if (id) setConfig('meta_app_id', id.trim());
     if (secret && secret !== '********' && !secret.includes('•')) setConfig('meta_app_secret', secret.trim());
     if (token) setConfig('webhook_verify_token', token.trim());
+    if (link_delivery_mode) setConfig('link_delivery_mode', link_delivery_mode.trim());
     
-    res.json({ success: true, message: 'Meta credentials saved successfully' });
+    res.json({ success: true, message: 'Settings saved successfully' });
 });
 
 /**
