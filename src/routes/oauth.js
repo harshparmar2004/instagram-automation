@@ -23,12 +23,14 @@ router.get('/instagram', (req, res) => {
 
     let redirectUri = req.query.redirect_uri;
     if (!redirectUri) {
-        if (config.BASE_URL && !config.BASE_URL.includes('localhost')) {
+        const protoHeader = req.headers['x-forwarded-proto'];
+        const protocol = (protoHeader ? protoHeader.split(',')[0].trim() : null) || (req.secure ? 'https' : req.protocol) || 'https';
+        const host = req.headers['x-forwarded-host'] || req.get('host');
+        if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+            redirectUri = `https://${host}/auth/instagram/callback`;
+        } else if (config.BASE_URL && !config.BASE_URL.includes('localhost')) {
             redirectUri = `${config.BASE_URL.replace(/\/$/, '')}/auth/instagram/callback`;
         } else {
-            const protoHeader = req.headers['x-forwarded-proto'];
-            const protocol = (protoHeader ? protoHeader.split(',')[0].trim() : null) || (req.secure ? 'https' : req.protocol) || 'https';
-            const host = req.headers['x-forwarded-host'] || req.get('host');
             redirectUri = `${protocol}://${host}/auth/instagram/callback`;
         }
     }

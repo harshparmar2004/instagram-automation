@@ -73,6 +73,17 @@ window.setup = {
         }, 1000);
     },
 
+    async disconnectAccount() {
+        if (!confirm('Are you sure you want to disconnect this Instagram account and clear the stored token? You can reconnect anytime.')) return;
+        try {
+            const res = await App.apiCall('POST', '/api/setup/disconnect');
+            App.showToast(res.message || 'Instagram account disconnected successfully.', 'success');
+            await this.loadStatus();
+        } catch(err) {
+            App.showToast(err.message, 'error');
+        }
+    },
+
     async clearDemoData() {
         if (!confirm('This will wipe out all mock/demo rules, fake leads, and mock media, and keep only your REAL Instagram account data. Continue?')) return;
         try {
@@ -105,7 +116,11 @@ window.setup = {
             App.showToast(`✅ Synced ${res.count !== undefined ? res.count : 0} items from Instagram!`, 'success');
             await this.loadStatus();
         } catch(e) {
-            App.showToast(`Sync notice: ${e.message}`, 'error');
+            if (e.message && (e.message.includes('session has been invalidated') || e.message.includes('Error validating access token'))) {
+                App.showToast(`⚠️ Meta Session Invalidated: Your Instagram token is no longer active. Click 'Disconnect' to clear it and reconnect with a fresh token.`, 'error');
+            } else {
+                App.showToast(`Sync notice: ${e.message}`, 'error');
+            }
         } finally {
             if (btn) {
                 btn.innerHTML = '🔄 Sync Media Now';
@@ -226,10 +241,13 @@ window.setup = {
                             </div>
                         </div>
                     </div>
-                    <div style="display: flex; gap: 0.65rem; align-items: center;">
+                    <div style="display: flex; gap: 0.65rem; align-items: center; flex-wrap: wrap;">
                         ${isConnected ? `
                             <button id="btn-sync-now" class="btn btn-secondary" style="font-weight:700; padding:0.55rem 1.15rem; font-size:0.86rem; border-radius:10px; background:#FAF8F5;" onclick="setup.syncNow()">
                                 🔄 Sync Media Now
+                            </button>
+                            <button type="button" class="btn btn-secondary" style="font-weight:700; padding:0.55rem 1.15rem; font-size:0.86rem; border-radius:10px; color: #C62828; border-color: #FFCDD2; background: #FFEBEE;" onclick="setup.disconnectAccount()">
+                                🔌 Disconnect
                             </button>
                         ` : ''}
                         <button class="btn btn-secondary" style="font-weight:700; padding:0.55rem 1.15rem; font-size:0.86rem; border-radius:10px;" onclick="setup.startMetaOAuth()">
@@ -251,7 +269,7 @@ window.setup = {
                             Fast Creator Token Connect & Reel Sync
                         </h2>
                     </div>
-                    <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
                         <span class="badge ${hasSavedToken ? 'badge-green' : 'badge-orange'}" style="font-size: 0.8rem; font-weight: 800; padding: 0.35rem 0.75rem;">
                             ${hasSavedToken ? `🟢 Token Stored (${status.tokenPreview || 'Active'})` : '⚠️ Token Required'}
                         </span>
@@ -262,11 +280,16 @@ window.setup = {
                 </p>
 
                 ${hasSavedToken ? `
-                    <div style="padding: 0.9rem 1.25rem; background: #E8F5E9; border: 1.5px solid #4CAF50; border-radius: 12px; color: #1B5E20; font-size: 0.88rem; font-weight: 600; display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.15rem;">
-                        <span style="font-size: 1.4rem;">🛡️</span>
-                        <div>
-                            <strong>Account & Automations Permanently Saved:</strong> Your Instagram account, credentials, and all automation rules are securely saved in the database. You <strong>do NOT need to reconnect</strong> when you log in!
+                    <div style="padding: 0.9rem 1.25rem; background: #E8F5E9; border: 1.5px solid #4CAF50; border-radius: 12px; color: #1B5E20; font-size: 0.88rem; font-weight: 600; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.85rem; margin-bottom: 1.15rem;">
+                        <div style="display: flex; align-items: center; gap: 0.85rem;">
+                            <span style="font-size: 1.4rem;">🛡️</span>
+                            <div>
+                                <strong>Connected Account Saved:</strong> Active in database. If you received an invalid session error or changed your password, click <strong>Disconnect & Clear</strong> to paste a fresh token.
+                            </div>
                         </div>
+                        <button type="button" onclick="setup.disconnectAccount()" style="padding: 0.45rem 1rem; font-size: 0.82rem; font-weight: 700; border-radius: 8px; background: #FFEBEE; border: 1px solid #FFCDD2; color: #C62828; cursor: pointer; white-space: nowrap;">
+                            🔌 Disconnect & Clear
+                        </button>
                     </div>
                 ` : ''}
 
@@ -281,9 +304,9 @@ window.setup = {
                                     Instagram Access Token ${hasSavedToken ? '<span style="color:#2E7D32; font-weight:700;">(✓ Stored & Saved)</span>' : '<span style="color:#E53935; font-weight:700;">(Required)</span>'}
                                 </label>
                                 ${hasSavedToken ? `
-                                    <span style="font-size: 0.76rem; color: #2E7D32; font-weight: 700;">
-                                        ✓ Saved in database
-                                    </span>
+                                    <button type="button" onclick="document.getElementById('creator_token_input').value=''; document.getElementById('creator_token_input').focus(); App.showToast('Cleared. Paste fresh token now.', 'info');" style="background: none; border: none; font-size: 0.78rem; color: var(--accent-primary); font-weight: 700; cursor: pointer; text-decoration: underline;">
+                                        ✏️ Paste Fresh Token
+                                    </button>
                                 ` : ''}
                             </div>
                             <div style="position: relative; display: flex; align-items: center; width: 100%;">
@@ -326,6 +349,10 @@ window.setup = {
                         </button>
 
                         ${hasSavedToken ? `
+                            <button type="button" class="btn btn-secondary" onclick="setup.disconnectAccount()" style="padding: 0.75rem 1.35rem; font-size: 0.88rem; font-weight: 700; border-radius: 10px; color: #C62828; border-color: #FFCDD2; background: #FFEBEE;">
+                                🔌 Disconnect
+                            </button>
+
                             <button type="button" id="btn-quick-scan" class="btn btn-secondary" onclick="setup.syncNow()" style="padding: 0.75rem 1.35rem; font-size: 0.88rem; font-weight: 700; border-radius: 10px; background: #FAF8F5; border: 1px solid var(--border-color); color: #0369A1; margin-left: auto;">
                                 🔄 Rescan Reels (${mediaCount} Synced)
                             </button>
@@ -592,7 +619,22 @@ window.setup = {
                 await this.loadStatus();
             } catch (err) {
                 if (errorBox) {
-                    errorBox.innerHTML = `⚠️ <strong>Connection Notice:</strong> ${err.message}`;
+                    const isSessionError = err.message && (err.message.includes('session has been invalidated') || err.message.includes('Error validating access token'));
+                    errorBox.innerHTML = `
+                        <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                            <div>⚠️ <strong>Connection Notice:</strong> ${err.message}</div>
+                            ${isSessionError ? `
+                                <div style="font-size:0.8rem; background:rgba(255,255,255,0.7); padding:8px 12px; border-radius:8px; border:1px solid #FFCDD2;">
+                                    💡 <strong>Session Invalidated:</strong> Meta revoked your previous token session (due to password change or security checkpoint). Click the button below to wipe the dead token, then paste a fresh token.
+                                    <div style="margin-top:0.4rem;">
+                                        <button type="button" class="btn btn-sm" style="background:#C62828; color:#fff; border:none; padding:5px 12px; border-radius:6px; font-weight:700; cursor:pointer;" onclick="setup.disconnectAccount()">
+                                            🔌 Clear Dead Token Now
+                                        </button>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
                     errorBox.style.display = 'block';
                 }
                 App.showToast(err.message, 'error');

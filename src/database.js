@@ -705,6 +705,28 @@ function getAdminMetrics() {
   };
 }
 
+function disconnectUserInstagramAccount(userId) {
+  const db = getDb();
+  const now = new Date().toISOString();
+  if (userId) {
+    db.prepare(`
+      UPDATE instagram_accounts
+      SET access_token = '',
+          is_active = 0,
+          token_expires_at = NULL,
+          updated_at = ?
+      WHERE user_id = ?
+    `).run(now, userId);
+  }
+  // Also clear global config
+  setConfig('access_token', '');
+  setConfig('token_expires_at', '');
+  setConfig('ig_user_id', '');
+  setConfig('ig_username', '');
+  setConfig('ig_profile_pic', '');
+  return true;
+}
+
 module.exports = {
   getDb,
   getConfig,
@@ -727,5 +749,6 @@ module.exports = {
   getAllUsers,
   updateUserStatus,
   deleteUser,
-  getAdminMetrics
+  getAdminMetrics,
+  disconnectUserInstagramAccount
 };

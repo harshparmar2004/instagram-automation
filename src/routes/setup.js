@@ -1,5 +1,5 @@
 const express = require('express');
-const { getDb, getConfig, setConfig, backupRules, backupEvents, getUserInstagramAccount, saveUserInstagramAccount } = require('../database');
+const { getDb, getConfig, setConfig, backupRules, backupEvents, getUserInstagramAccount, saveUserInstagramAccount, disconnectUserInstagramAccount } = require('../database');
 const auth = require('../middleware/auth');
 const { subscribeWebhook, getUserProfile } = require('../services/instagram');
 const { seedDemoData } = require('../seedData');
@@ -151,6 +151,21 @@ router.post('/setup/save-credentials', auth, (req, res) => {
 });
 
 /**
+ * 🔌 Disconnect Instagram Account Endpoint
+ * Clears stored access tokens, username, user ID, and deactivates the account connection.
+ */
+router.post('/setup/disconnect', auth, (req, res) => {
+    try {
+        const userId = req.user?.id;
+        disconnectUserInstagramAccount(userId);
+        res.json({ success: true, message: 'Instagram account disconnected and tokens purged successfully.' });
+    } catch (err) {
+        console.error('[Setup] Error disconnecting account:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
  * ⚡ Creator 1-Click Token Connection & Sync Endpoint
  * Connects, validates with Meta, syncs Reels, and saves everything permanently for user.
  */
@@ -161,14 +176,23 @@ async function handleConnectAndScan(req, res) {
         const userAcct = userId ? getUserInstagramAccount(userId) : null;
         
         let tokenToUse = (accessToken || '').trim();
+        const hasInput = !!tokenToUse && !tokenToUse.includes('•') && !tokenToUse.includes('***');
         const isMetaToken = (tokenToUse.startsWith('IG') || tokenToUse.startsWith('EAA')) && tokenToUse.length >= 30;
-        // Fallback to saved token if empty, masked, or not a Meta token (e.g. password autofill)
-        if (!tokenToUse || tokenToUse.includes('•') || tokenToUse.includes('***') || !isMetaToken) {
+
+        // If user submitted an explicit token, ensure it meets Meta token prefix requirements
+        if (hasInput && !isMetaToken) {
+            return res.status(400).json({ 
+                error: "Invalid token format. Instagram access tokens must start with 'IG' or 'EAA' and be at least 30 characters." 
+            });
+        }
+
+        // Only fall back to saved token if no input was provided
+        if (!hasInput) {
             tokenToUse = userAcct?.access_token || getConfig('access_token');
         }
 
         if (!tokenToUse || !tokenToUse.trim()) {
-            return res.status(400).json({ error: 'Instagram Access Token is required. Please paste your token.' });
+            return res.status(400).json({ error: 'Instagram Access Token is required. Please paste your token or connect via Meta OAuth.' });
         }
 
         let targetUsername = (username || userAcct?.ig_username || getConfig('ig_username') || '').replace('@', '').trim();
@@ -189,12 +213,13 @@ async function handleConnectAndScan(req, res) {
                 profilePic = profile.profile_picture_url;
             }
         } catch (profileErr) {
-            console.warn('[Setup] Profile auto-lookup notice:', profileErr.message);
-            if (!resolvedIgUserId && !targetUsername) {
-                return res.status(400).json({
-                    error: `Meta rejected token: ${profileErr.message}. Ensure token is valid and has 'instagram_basic' permission.`
-                });
-            }
+            const metaErrMsg = profileErr.response?.data?.error?.message || profileErr.message;
+            console.warn('[Setup] Profile auto-lookup notice:', metaErrMsg);
+            
+            // If Meta explicitly rejected the token (session invalidated, expired, invalid signature), block saving!
+            return res.status(400).json({
+                error: `Meta rejected token: ${metaErrMsg}. Please generate a fresh token or use 1-Click Meta OAuth.`
+            });
         }
 
         const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
