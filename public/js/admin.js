@@ -66,20 +66,20 @@ const adminView = {
                             <div style="font-size: 0.8rem; color: #736E68;">Search, inspect, and manage tenant workspaces.</div>
                         </div>
 
-                        <!-- Filter & Search Controls -->
-                        <div style="display: flex; gap: 0.65rem; align-items: center; flex-wrap: wrap;">
+                        <!-- Filter & Search Controls (Longer Search Bar & Compact Controls) -->
+                        <div style="display: flex; gap: 0.65rem; align-items: center; flex-wrap: wrap; flex: 1; justify-content: flex-end; min-width: 320px;">
                             <input 
                                 type="text" 
                                 id="admin-search-input" 
-                                placeholder="Search by name, email, or @handle..." 
+                                placeholder="Search by creator name, email, or @handle..." 
                                 value="${this.searchQuery}"
                                 oninput="adminView.handleSearch(this.value)"
-                                style="padding: 0.5rem 0.85rem; font-size: 0.84rem; border-radius: 8px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none; min-width: 250px;"
+                                style="padding: 0.45rem 0.85rem; font-size: 0.8rem; border-radius: 8px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none; width: 100%; min-width: 320px; max-width: 520px;"
                             />
                             <select 
                                 id="admin-status-filter"
                                 onchange="adminView.handleStatusFilter(this.value)"
-                                style="padding: 0.5rem 0.85rem; font-size: 0.84rem; border-radius: 8px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none; cursor: pointer;"
+                                style="padding: 0.45rem 0.8rem; font-size: 0.8rem; border-radius: 8px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none; cursor: pointer; flex-shrink: 0;"
                             >
                                 <option value="all" ${this.statusFilter === 'all' ? 'selected' : ''}>All Statuses</option>
                                 <option value="active" ${this.statusFilter === 'active' ? 'selected' : ''}>Active Only</option>
@@ -88,26 +88,27 @@ const adminView = {
                         </div>
                     </div>
 
-                    <!-- Table Container -->
+                    <!-- Table Container with Serial Number & Sleek Typography -->
                     <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.86rem;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.82rem;">
                             <thead>
-                                <tr style="background: #FAF8F5; border-bottom: 1px solid #E6E1D8; color: #736E68; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.03em;">
-                                    <th style="padding: 0.85rem 1.25rem;">Creator / User</th>
-                                    <th style="padding: 0.85rem 1rem;">Role</th>
-                                    <th style="padding: 0.85rem 1rem;">Instagram Account</th>
-                                    <th style="padding: 0.85rem 1rem;">Rules</th>
-                                    <th style="padding: 0.85rem 1rem;">Leads</th>
-                                    <th style="padding: 0.85rem 1rem;">Status</th>
-                                    <th style="padding: 0.85rem 1rem;">Joined</th>
-                                    <th style="padding: 0.85rem 1.25rem; text-align: right;">Actions</th>
+                                <tr style="background: #FAF8F5; border-bottom: 1px solid #E6E1D8; color: #736E68; font-size: 0.72rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">
+                                    <th style="padding: 0.65rem 0.75rem; width: 44px; text-align: center;">#</th>
+                                    <th style="padding: 0.65rem 1rem;">Creator / User</th>
+                                    <th style="padding: 0.65rem 0.85rem;">Role</th>
+                                    <th style="padding: 0.65rem 0.85rem;">Instagram Account</th>
+                                    <th style="padding: 0.65rem 0.75rem; text-align: center;">Rules</th>
+                                    <th style="padding: 0.65rem 0.75rem; text-align: center;">Leads</th>
+                                    <th style="padding: 0.65rem 0.75rem; text-align: center;">Status</th>
+                                    <th style="padding: 0.65rem 0.85rem;">Joined</th>
+                                    <th style="padding: 0.65rem 1rem; text-align: right;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="admin-users-tbody">
                                 <tr>
-                                    <td colspan="8" style="padding: 2.5rem; text-align: center; color: #736E68;">
+                                    <td colspan="9" style="padding: 2.5rem; text-align: center; color: #736E68;">
                                         <span class="spinner" style="width: 24px; height: 24px; display: inline-block;"></span>
-                                        <div style="margin-top: 0.5rem;">Loading user directory...</div>
+                                        <div style="margin-top: 0.5rem; font-size: 0.8rem;">Loading creator directory...</div>
                                     </td>
                                 </tr>
                             </tbody>
@@ -196,10 +197,21 @@ const adminView = {
             filtered = filtered.filter(u => u.status === this.statusFilter);
         }
 
+        // Sort: Super Admin ALWAYS #1 on top, then subsequent users ranked chronologically by join date (created_at ASC)
+        filtered.sort((a, b) => {
+            const aIsSuper = a.role === 'super_admin';
+            const bIsSuper = b.role === 'super_admin';
+            if (aIsSuper && !bIsSuper) return -1;
+            if (!aIsSuper && bIsSuper) return 1;
+            const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return timeA - timeB;
+        });
+
         if (filtered.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="padding: 2.5rem; text-align: center; color: #736E68;">
+                    <td colspan="9" style="padding: 2.5rem; text-align: center; color: #736E68;">
                         <div style="font-size: 1.2rem; margin-bottom: 0.35rem;">🔍</div>
                         <div style="font-weight: 600;">No creators found</div>
                         <div style="font-size: 0.8rem; color: #A09890; margin-top: 0.2rem;">Try adjusting your search query or filters.</div>
@@ -209,7 +221,7 @@ const adminView = {
             return;
         }
 
-        tbody.innerHTML = filtered.map(user => {
+        tbody.innerHTML = filtered.map((user, index) => {
             const isSuper = user.role === 'super_admin';
             const isActive = user.status === 'active';
             const hasIg = !!user.ig_username;
@@ -218,65 +230,78 @@ const adminView = {
 
             return `
                 <tr style="border-bottom: 1px solid #F5F1EA; transition: background 0.15s ease;" onmouseover="this.style.background='#FAF8F5'" onmouseout="this.style.background='transparent'">
-                    <td style="padding: 1rem 1.25rem;">
-                        <div style="display: flex; align-items: center; gap: 0.75rem;">
-                            <div style="width: 34px; height: 34px; border-radius: 50%; background: #FAF0EC; color: #D97757; font-weight: 800; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; border: 1px solid #E6E1D8; flex-shrink: 0;">
+                    <!-- Serial Number / Dictionary Rank -->
+                    <td style="padding: 0.65rem 0.75rem; text-align: center; font-weight: 800; font-size: 0.76rem; color: ${isSuper ? '#B45309' : '#8A847C'};">
+                        ${isSuper && index === 0 ? '👑 1' : (index + 1)}
+                    </td>
+
+                    <!-- Creator / User Identity -->
+                    <td style="padding: 0.65rem 1rem;">
+                        <div style="display: flex; align-items: center; gap: 0.65rem;">
+                            <div style="width: 28px; height: 28px; border-radius: 50%; background: #FAF0EC; color: #D97757; font-weight: 800; font-size: 0.74rem; display: flex; align-items: center; justify-content: center; border: 1px solid #E6E1D8; flex-shrink: 0;">
                                 ${initials}
                             </div>
                             <div style="overflow: hidden;">
-                                <div style="font-weight: 700; color: #2C2A29; line-height: 1.2;">${user.name || 'Unnamed Creator'}</div>
-                                <div style="font-size: 0.76rem; color: #736E68; margin-top: 0.15rem;">${user.email}</div>
+                                <div style="font-weight: 700; font-size: 0.82rem; color: #2C2A29; line-height: 1.2;">${user.name || 'Unnamed Creator'}</div>
+                                <div style="font-size: 0.72rem; color: #736E68; margin-top: 0.1rem;">${user.email}</div>
                             </div>
                         </div>
                     </td>
 
-                    <td style="padding: 1rem;">
-                        <span style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; padding: 2px 7px; border-radius: 5px; ${isSuper ? 'background: #FEF3C7; color: #B45309;' : 'background: #FAF0EC; color: #D97757;'}">
+                    <!-- Role Badge -->
+                    <td style="padding: 0.65rem 0.85rem;">
+                        <span style="font-size: 0.68rem; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 5px; ${isSuper ? 'background: #FEF3C7; color: #B45309;' : 'background: #FAF0EC; color: #D97757;'}">
                             ${isSuper ? '👑 Super Admin' : 'Creator'}
                         </span>
                     </td>
 
-                    <td style="padding: 1rem;">
+                    <!-- Instagram Account -->
+                    <td style="padding: 0.65rem 0.85rem;">
                         ${hasIg ? `
-                            <div style="display: flex; align-items: center; gap: 0.35rem; font-weight: 700; color: #2C2A29;">
-                                <span style="color: #2E7D32; font-size: 0.75rem;">●</span>
+                            <div style="display: flex; align-items: center; gap: 0.35rem; font-weight: 700; font-size: 0.8rem; color: #2C2A29;">
+                                <span style="color: #2E7D32; font-size: 0.7rem;">●</span>
                                 <span>@${user.ig_username}</span>
                             </div>
                         ` : `
-                            <span style="font-size: 0.78rem; color: #A09890; font-style: italic;">Not Connected</span>
+                            <span style="font-size: 0.74rem; color: #A09890; font-style: italic;">Not Connected</span>
                         `}
                     </td>
 
-                    <td style="padding: 1rem;">
-                        <span style="font-weight: 700; color: #2C2A29; background: #F5F1EA; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem;">
+                    <!-- Rules Count -->
+                    <td style="padding: 0.65rem 0.75rem; text-align: center;">
+                        <span style="font-weight: 700; color: #2C2A29; background: #F5F1EA; padding: 2px 7px; border-radius: 5px; font-size: 0.76rem;">
                             ${user.rules_count || 0}
                         </span>
                     </td>
 
-                    <td style="padding: 1rem;">
-                        <span style="font-weight: 700; color: #2E7D32; background: #E8F5E9; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem;">
+                    <!-- Leads Count -->
+                    <td style="padding: 0.65rem 0.75rem; text-align: center;">
+                        <span style="font-weight: 700; color: #2E7D32; background: #E8F5E9; padding: 2px 7px; border-radius: 5px; font-size: 0.76rem;">
                             ${user.leads_count || 0}
                         </span>
                     </td>
 
-                    <td style="padding: 1rem;">
-                        <span style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; padding: 2px 7px; border-radius: 5px; ${isActive ? 'background: #E8F5E9; color: #2E7D32;' : 'background: #FEE2E2; color: #DC2626;'}">
+                    <!-- Status -->
+                    <td style="padding: 0.65rem 0.75rem; text-align: center;">
+                        <span style="font-size: 0.68rem; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 5px; ${isActive ? 'background: #E8F5E9; color: #2E7D32;' : 'background: #FEE2E2; color: #DC2626;'}">
                             ${isActive ? 'Active' : 'Suspended'}
                         </span>
                     </td>
 
-                    <td style="padding: 1rem; color: #736E68; font-size: 0.8rem;">
+                    <!-- Joined Date -->
+                    <td style="padding: 0.65rem 0.85rem; color: #736E68; font-size: 0.76rem;">
                         ${joinedDate}
                     </td>
 
-                    <td style="padding: 1rem 1.25rem; text-align: right;">
-                        <div style="display: flex; justify-content: flex-end; gap: 0.45rem; align-items: center;">
+                    <!-- Action Controls -->
+                    <td style="padding: 0.65rem 1rem; text-align: right;">
+                        <div style="display: flex; justify-content: flex-end; gap: 0.35rem; align-items: center;">
                             <!-- Impersonate / Inspect Workspace -->
                             <button 
                                 onclick="adminView.impersonateUser(${user.id}, '${(user.name || user.email).replace(/'/g, "\\'")}')"
                                 title="Inspect this creator's automations & workspace"
                                 class="btn btn-secondary"
-                                style="padding: 0.35rem 0.65rem; font-size: 0.76rem; font-weight: 700; display: flex; align-items: center; gap: 0.25rem;"
+                                style="padding: 0.25rem 0.55rem; font-size: 0.72rem; font-weight: 700; display: flex; align-items: center; gap: 0.2rem;"
                             >
                                 <span>👁️</span> View
                             </button>
@@ -287,7 +312,7 @@ const adminView = {
                                     onclick="adminView.toggleStatus(${user.id}, '${isActive ? 'suspended' : 'active'}')"
                                     title="${isActive ? 'Suspend User Access' : 'Activate User Access'}"
                                     class="btn btn-secondary"
-                                    style="padding: 0.35rem 0.65rem; font-size: 0.76rem; font-weight: 700; color: ${isActive ? '#DC2626' : '#2E7D32'};"
+                                    style="padding: 0.25rem 0.55rem; font-size: 0.72rem; font-weight: 700; color: ${isActive ? '#DC2626' : '#2E7D32'};"
                                 >
                                     ${isActive ? 'Pause' : 'Activate'}
                                 </button>
@@ -299,7 +324,7 @@ const adminView = {
                                     onclick="adminView.deleteUser(${user.id}, '${(user.name || user.email).replace(/'/g, "\\'")}')"
                                     title="Delete User Workspace"
                                     class="btn btn-secondary"
-                                    style="padding: 0.35rem 0.55rem; font-size: 0.76rem; font-weight: 700; color: #DC2626;"
+                                    style="padding: 0.25rem 0.45rem; font-size: 0.72rem; font-weight: 700; color: #DC2626;"
                                 >
                                     🗑️
                                 </button>

@@ -184,9 +184,10 @@ function getDb() {
     }
   } catch (err) {}
 
-  // 1. Startup sync: Initialize Super Admin & promote admin users FIRST so foreign keys succeed
+  // 1. Startup sync: Initialize Super Admin & restore users FIRST so foreign keys succeed
   try {
     initSuperAdminAndMigrate(db);
+    restoreUsers(db);
   } catch (e) {
     console.warn('[Database] Super admin migration notice:', e.message);
   }
@@ -591,6 +592,67 @@ function restoreEvents(dbInstance) {
   }
 }
 
+function backupUsers(database) {
+  try {
+    const fs = require('fs');
+    const dataDir = path.join(__dirname, '..', 'data');
+    const users = database.prepare("SELECT id, name, email, role, status, created_at, updated_at FROM users").all();
+    if (users && users.length > 0) {
+      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(path.join(dataDir, 'users.json'), JSON.stringify(users, null, 2));
+    }
+  } catch (e) {
+    console.warn('[Database] Failed to backup users:', e.message);
+  }
+}
+
+function restoreUsers(database) {
+  try {
+    const fs = require('fs');
+    const dataDir = path.join(__dirname, '..', 'data');
+    const uFile = path.join(dataDir, 'users.json');
+    if (!fs.existsSync(uFile)) return 0;
+    const users = JSON.parse(fs.readFileSync(uFile, 'utf8'));
+    if (!Array.isArray(users)) return 0;
+    const adminPassword = process.env.ADMIN_PASSWORD || 'Harsh@2004';
+    const newHash = hashPassword(adminPassword);
+    let count = 0;
+    for (const u of users) {
+      try {
+        database.prepare(`
+          INSERT INTO users (id, name, email, password_hash, role, status, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            email = excluded.email,
+            role = excluded.role,
+            status = excluded.status,
+            password_hash = CASE WHEN excluded.role = 'super_admin' THEN ? ELSE users.password_hash END,
+            updated_at = excluded.updated_at
+        `).run(u.id, u.name, u.email, newHash, u.role, u.status || 'active', u.created_at || new Date().toISOString(), u.updated_at || new Date().toISOString(), newHash);
+        count++;
+      } catch (err) {
+        try {
+          database.prepare(`
+            INSERT INTO users (name, email, password_hash, role, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(email) DO UPDATE SET
+              role = excluded.role,
+              status = excluded.status,
+              password_hash = CASE WHEN excluded.role = 'super_admin' THEN ? ELSE users.password_hash END,
+              updated_at = excluded.updated_at
+          `).run(u.name, u.email, newHash, u.role, u.status || 'active', u.created_at || new Date().toISOString(), u.updated_at || new Date().toISOString(), newHash);
+          count++;
+        } catch(e) {}
+      }
+    }
+    return count;
+  } catch (e) {
+    console.warn('[Database] Failed to restore users:', e.message);
+    return 0;
+  }
+}
+
 function initSuperAdminAndMigrate(database) {
   const adminEmail = (process.env.ADMIN_EMAIL || 'harshparmar686630@gmail.com').toLowerCase().trim();
   const adminPassword = process.env.ADMIN_PASSWORD || 'Harsh@2004';
@@ -685,6 +747,8 @@ function createUser({ name, email, password, role = 'user' }) {
     INSERT INTO users (name, email, password_hash, role, status, created_at, updated_at)
     VALUES (?, ?, ?, ?, 'active', ?, ?)
   `).run(name.trim(), cleanEmail, hash, role, now, now);
+
+  try { backupUsers(db); } catch(e) {}
 
   return getUserById(res.lastInsertRowid);
 }
@@ -816,7 +880,7 @@ function getAllUsers(search = '') {
     const s = `%${search.trim()}%`;
     params.push(s, s, s);
   }
-  query += ` ORDER BY u.id DESC`;
+  query += ` ORDER BY (CASE WHEN u.role = 'super_admin' THEN 0 ELSE 1 END) ASC, u.id ASC`;
   return db.prepare(query).all(...params);
 }
 
@@ -888,6 +952,8 @@ module.exports = {
   restoreRules,
   backupEvents,
   restoreEvents,
+  backupUsers,
+  restoreUsers,
   hashPassword,
   verifyPassword,
   createUser,
