@@ -20,6 +20,8 @@ const App = {
         loginScreen: document.getElementById('login-screen'),
         loginForm: document.getElementById('login-form'),
         registerForm: document.getElementById('register-form'),
+        otpForm: document.getElementById('otp-form'),
+        otpCodeInput: document.getElementById('otp-code-input'),
         loginEmailInput: document.getElementById('login-email'),
         passwordInput: document.getElementById('password'),
         dashboard: document.getElementById('dashboard'),
@@ -70,6 +72,16 @@ const App = {
                 const email = document.getElementById('reg-email').value.trim();
                 const pwd = document.getElementById('reg-password').value;
                 await this.register(name, email, pwd);
+            });
+        }
+
+        // OTP verification event
+        if (this.elements.otpForm) {
+            this.elements.otpForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const otp = (this.elements.otpCodeInput?.value || '').trim();
+                const email = window.pendingOtpEmail || (document.getElementById('otp-target-email')?.textContent || '').trim();
+                await this.verifyOtp(email, otp);
             });
         }
 
@@ -126,6 +138,11 @@ const App = {
 
                 this.showToast(`Welcome back, ${data.user.name || 'Creator'}!`, 'success');
                 this.showDashboard();
+            } else if (data.needsVerification) {
+                if (typeof showOtpScreen === 'function') {
+                    showOtpScreen(data.email, data.simulated, data.devOtp);
+                }
+                this.showToast('Please enter the 6-digit verification code sent to your email', 'info');
             } else {
                 // Fallback attempt for legacy single password token
                 const legacyRes = await fetch(this.getApiUrl('/api/status'), {
@@ -162,10 +179,66 @@ const App = {
         btn.disabled = true;
 
         try {
-            const res = await fetch(this.getApiUrl('/api/auth/register'), {
+            const res = await fetch(this.getApiUrl('/api/auth/register-initiate'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, email, password })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                if (data.needsVerification) {
+                    if (typeof showOtpScreen === 'function') {
+                        showOtpScreen(data.email, data.simulated, data.devOtp);
+                    }
+                    this.showToast(data.message || 'Verification code sent to your email!', 'info');
+                    return;
+                }
+
+                if (data.token) {
+                    this.state.token = data.token;
+                    this.state.user = {
+                        ...data.user,
+                        instagram: data.instagramAccount || null,
+                        ig_username: data.instagramAccount?.username || null
+                    };
+                    localStorage.setItem('auth_token', data.token);
+                    localStorage.setItem('dashboard_password', data.token);
+                    localStorage.setItem('auth_user', JSON.stringify(this.state.user));
+                    sessionStorage.setItem('auth_token', data.token);
+                    sessionStorage.setItem('dashboard_password', data.token);
+                    sessionStorage.setItem('auth_user', JSON.stringify(this.state.user));
+
+                    this.showToast(`🎉 Account created! Welcome, ${data.user.name}!`, 'success');
+                    this.showDashboard();
+                    this.navigate('setup');
+                }
+            } else {
+                this.showToast(data.error || 'Registration failed', 'error');
+            }
+        } catch (err) {
+            console.error('[Register Error]:', err);
+            this.showToast('Connection error during registration', 'error');
+        } finally {
+            btn.innerHTML = origHtml;
+            btn.disabled = false;
+        }
+    },
+
+    async verifyOtp(email, otp) {
+        const btn = document.getElementById('btn-verify-otp');
+        const origHtml = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.innerHTML = '<span class="spinner"></span> Verifying Code...';
+            btn.disabled = true;
+        }
+
+        try {
+            const res = await fetch(this.getApiUrl('/api/auth/verify-otp'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, otp })
             });
 
             const data = await res.json();
@@ -184,19 +257,20 @@ const App = {
                 sessionStorage.setItem('dashboard_password', data.token);
                 sessionStorage.setItem('auth_user', JSON.stringify(this.state.user));
 
-                this.showToast(`🎉 Account created! Welcome, ${data.user.name}!`, 'success');
+                this.showToast(`🎉 Email verified! Welcome to InstaAuto, ${data.user.name}!`, 'success');
                 this.showDashboard();
-                // Direct new creators to Connect/Setup page
                 this.navigate('setup');
             } else {
-                this.showToast(data.error || 'Registration failed', 'error');
+                this.showToast(data.error || 'Verification failed. Please check the 6-digit code.', 'error');
             }
         } catch (err) {
-            console.error('[Register Error]:', err);
-            this.showToast('Connection error during registration', 'error');
+            console.error('[OTP Verify Error]:', err);
+            this.showToast('Connection error verifying OTP code', 'error');
         } finally {
-            btn.innerHTML = origHtml;
-            btn.disabled = false;
+            if (btn) {
+                btn.innerHTML = origHtml;
+                btn.disabled = false;
+            }
         }
     },
 

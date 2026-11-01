@@ -1,6 +1,42 @@
-const Database = require('better-sqlite3');
+let Database;
+try {
+  const BSqlite = require('better-sqlite3');
+  // Verify native binary binding is present
+  const testDb = new BSqlite(':memory:');
+  testDb.close();
+  Database = BSqlite;
+} catch (e) {
+  // Built-in node:sqlite fallback (Node 22.5+ / Node 24+)
+  const { DatabaseSync } = require('node:sqlite');
+  Database = class NodeSqliteAdapter {
+    constructor(dbPath) {
+      this.db = new DatabaseSync(dbPath);
+    }
+    pragma(str) {
+      try { this.db.exec(`PRAGMA ${str};`); } catch (err) {}
+    }
+    exec(sql) {
+      return this.db.exec(sql);
+    }
+    prepare(sql) {
+      const stmt = this.db.prepare(sql);
+      return {
+        all: (...params) => stmt.all(...params),
+        get: (...params) => stmt.get(...params),
+        run: (...params) => {
+          const res = stmt.run(...params);
+          return {
+            lastInsertRowid: Number(res.lastInsertRowid),
+            changes: Number(res.changes)
+          };
+        }
+      };
+    }
+  };
+}
 const path = require('path');
 const crypto = require('crypto');
+const { encryptToken, decryptToken } = require('./utils/crypto');
 
 let db;
 
@@ -150,6 +186,16 @@ function getDb() {
       created_at TEXT,
       updated_at TEXT
     );
+    CREATE TABLE IF NOT EXISTS email_verifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL COLLATE NOCASE,
+      otp_hash TEXT NOT NULL,
+      type TEXT DEFAULT 'registration',
+      attempts_count INTEGER DEFAULT 0,
+      expires_at TEXT NOT NULL,
+      is_consumed INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
   `);
 
   // Safe migrations
@@ -168,6 +214,7 @@ function getDb() {
   try { db.exec(`ALTER TABLE conversations ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
   try { db.exec(`ALTER TABLE rules ADD COLUMN is_deleted INTEGER DEFAULT 0;`); } catch (e) {}
   try { db.exec(`ALTER TABLE reel_stats_history ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0;`); } catch (e) {}
 
   // 0. Startup sync: Restore settings from settings.json into config table
   try {
@@ -928,24 +975,112 @@ function initSuperAdminAndMigrate(database) {
   }
 }
 
-function createUser({ name, email, password, role = 'user' }) {
+function createUser({ name, email, password, role = 'user', email_verified = 0, status = 'active' }) {
   const db = getDb();
   const cleanEmail = email.trim().toLowerCase();
   const hash = hashPassword(password);
   const now = new Date().toISOString();
 
+  // If user exists with pending or unverified status, update their info
+  const existing = getUserByEmail(cleanEmail);
+  if (existing) {
+    if (existing.email_verified === 0 || existing.status === 'pending_verification') {
+      db.prepare(`
+        UPDATE users 
+        SET name = ?, password_hash = ?, role = ?, status = ?, email_verified = ?, updated_at = ?
+        WHERE id = ?
+      `).run(name.trim(), hash, role, status, email_verified, now, existing.id);
+      try { backupUsers(db); } catch(e) {}
+      return getUserById(existing.id);
+    }
+  }
+
   const res = db.prepare(`
-    INSERT INTO users (name, email, password_hash, role, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, 'active', ?, ?)
-  `).run(name.trim(), cleanEmail, hash, role, now, now);
+    INSERT INTO users (name, email, password_hash, role, status, email_verified, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(name.trim(), cleanEmail, hash, role, status, email_verified, now, now);
 
   try { backupUsers(db); } catch(e) {}
 
   return getUserById(res.lastInsertRowid);
 }
 
+function createEmailVerification({ email, otp, type = 'registration', expiresMinutes = 10 }) {
+  const db = getDb();
+  const cleanEmail = email.trim().toLowerCase();
+  const otpHash = crypto.createHash('sha256').update(String(otp).trim()).digest('hex');
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + expiresMinutes * 60 * 1000).toISOString();
+
+  db.prepare(`
+    UPDATE email_verifications 
+    SET is_consumed = 1 
+    WHERE email = ? AND type = ? AND is_consumed = 0
+  `).run(cleanEmail, type);
+
+  const res = db.prepare(`
+    INSERT INTO email_verifications (email, otp_hash, type, attempts_count, expires_at, is_consumed, created_at)
+    VALUES (?, ?, ?, 0, ?, 0, ?)
+  `).run(cleanEmail, otpHash, type, expiresAt, now.toISOString());
+
+  return { id: res.lastInsertRowid, email: cleanEmail, expiresAt };
+}
+
+function getLatestEmailVerification(email, type = 'registration') {
+  const db = getDb();
+  const cleanEmail = email.trim().toLowerCase();
+  return db.prepare(`
+    SELECT * FROM email_verifications 
+    WHERE email = ? AND type = ? AND is_consumed = 0 
+    ORDER BY id DESC LIMIT 1
+  `).get(cleanEmail, type);
+}
+
+function verifyOtpCode(email, otp, type = 'registration') {
+  const db = getDb();
+  const cleanEmail = email.trim().toLowerCase();
+  const record = getLatestEmailVerification(cleanEmail, type);
+
+  if (!record) {
+    return { valid: false, error: 'No pending verification code found. Please request a new code.' };
+  }
+
+  if (record.attempts_count >= 5) {
+    db.prepare('UPDATE email_verifications SET is_consumed = 1 WHERE id = ?').run(record.id);
+    return { valid: false, error: 'Too many incorrect attempts. Please request a new code.' };
+  }
+
+  if (new Date(record.expires_at) < new Date()) {
+    db.prepare('UPDATE email_verifications SET is_consumed = 1 WHERE id = ?').run(record.id);
+    return { valid: false, error: 'Verification code has expired. Please request a new code.' };
+  }
+
+  const incomingHash = crypto.createHash('sha256').update(String(otp).trim()).digest('hex');
+  if (incomingHash !== record.otp_hash) {
+    const newCount = record.attempts_count + 1;
+    db.prepare('UPDATE email_verifications SET attempts_count = ? WHERE id = ?').run(newCount, record.id);
+    const remaining = 5 - newCount;
+    return { valid: false, error: `Invalid verification code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.` };
+  }
+
+  // Success
+  db.prepare('UPDATE email_verifications SET is_consumed = 1 WHERE id = ?').run(record.id);
+  return { valid: true };
+}
+
+function markUserEmailVerified(userId) {
+  const db = getDb();
+  db.prepare(`
+    UPDATE users 
+    SET email_verified = 1, status = 'active', updated_at = ? 
+    WHERE id = ?
+  `).run(new Date().toISOString(), userId);
+  backupUsers(db);
+  return getUserById(userId);
+}
+
 function getUserById(id) {
-  return getDb().prepare('SELECT id, name, email, role, status, created_at, updated_at FROM users WHERE id = ?').get(id);
+  return getDb().prepare('SELECT id, name, email, role, status, email_verified, created_at, updated_at FROM users WHERE id = ?').get(id);
 }
 
 function getUserByEmail(email) {
@@ -971,7 +1106,7 @@ function validateSession(token) {
   if (!token) return null;
   const db = getDb();
   const session = db.prepare(`
-    SELECT s.token, s.expires_at, u.id, u.name, u.email, u.role, u.status
+    SELECT s.token, s.expires_at, u.id, u.name, u.email, u.role, u.status, u.email_verified
     FROM user_sessions s
     JOIN users u ON s.user_id = u.id
     WHERE s.token = ?
@@ -1019,10 +1154,11 @@ function getUserInstagramAccount(userId) {
           const exp = getConfig('token_expires_at') || new Date(Date.now() + 60 * 86400000).toISOString();
           const now = new Date().toISOString();
           try {
+            const encryptedLegacyToken = encryptToken(legacyToken);
             const res = db.prepare(`
               INSERT INTO instagram_accounts (user_id, ig_user_id, ig_username, ig_name, profile_pic, access_token, token_expires_at, is_active, created_at, updated_at)
               VALUES (?, ?, ?, 'Harsh Parmar', ?, ?, ?, 1, ?, ?)
-            `).run(userId, igId, igUser, pic, legacyToken, exp, now, now);
+            `).run(userId, igId, igUser, pic, encryptedLegacyToken, exp, now, now);
             acct = db.prepare('SELECT * FROM instagram_accounts WHERE id = ?').get(res.lastInsertRowid);
             backupInstagramAccounts(db);
           } catch (e) {}
@@ -1031,12 +1167,19 @@ function getUserInstagramAccount(userId) {
     }
   }
 
+  if (acct && acct.access_token) {
+    acct.access_token = decryptToken(acct.access_token);
+  }
+
   return acct;
 }
 
 function saveUserInstagramAccount(userId, { igUserId, igUsername, igName, profilePic, accessToken, tokenExpiresAt }) {
   const db = getDb();
   const now = new Date().toISOString();
+
+  // Encrypt access token before storing
+  const safeToken = accessToken ? encryptToken(accessToken) : accessToken;
 
   const existing = db.prepare('SELECT id FROM instagram_accounts WHERE user_id = ?').get(userId);
   let saved;
@@ -1052,14 +1195,14 @@ function saveUserInstagramAccount(userId, { igUserId, igUsername, igName, profil
           is_active = 1,
           updated_at = ?
       WHERE id = ?
-    `).run(igUserId, igUsername, igName, profilePic, accessToken, tokenExpiresAt, now, existing.id);
+    `).run(igUserId, igUsername, igName, profilePic, safeToken, tokenExpiresAt, now, existing.id);
     saved = getUserInstagramAccount(userId);
   } else {
     const res = db.prepare(`
       INSERT INTO instagram_accounts (user_id, ig_user_id, ig_username, ig_name, profile_pic, access_token, token_expires_at, is_active, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-    `).run(userId, igUserId || null, igUsername || 'creator', igName || null, profilePic || null, accessToken, tokenExpiresAt || null, now, now);
-    saved = db.prepare('SELECT * FROM instagram_accounts WHERE id = ?').get(res.lastInsertRowid);
+    `).run(userId, igUserId || null, igUsername || 'creator', igName || null, profilePic || null, safeToken, tokenExpiresAt || null, now, now);
+    saved = getUserInstagramAccount(userId);
   }
 
   // Super admin sync & automated backup
@@ -1084,13 +1227,18 @@ function saveUserInstagramAccount(userId, { igUserId, igUsername, igName, profil
 
 function getInstagramAccountByIgId(igUserId) {
   if (!igUserId) return null;
-  return getDb().prepare(`
+  const acct = getDb().prepare(`
     SELECT a.*, u.id as owner_id, u.name as owner_name, u.email as owner_email, u.status as owner_status
     FROM instagram_accounts a
     JOIN users u ON a.user_id = u.id
     WHERE a.ig_user_id = ? AND a.is_active = 1 AND u.status = 'active'
     LIMIT 1
   `).get(igUserId);
+
+  if (acct && acct.access_token) {
+    acct.access_token = decryptToken(acct.access_token);
+  }
+  return acct;
 }
 
 function getAllUsers(search = '') {
@@ -1207,5 +1355,9 @@ module.exports = {
   updateUserStatus,
   deleteUser,
   getAdminMetrics,
-  disconnectUserInstagramAccount
+  disconnectUserInstagramAccount,
+  createEmailVerification,
+  getLatestEmailVerification,
+  verifyOtpCode,
+  markUserEmailVerified
 };

@@ -12,5 +12,19 @@
     "is_active": 1,
     "created_at": "2026-09-09T16:12:28.217Z",
     "updated_at": "2026-11-01T06:25:15.198Z"
+  },
+  {
+    "id": 2,
+    "user_id": 19,
+    "ig_user_id": "17841400000001",
+    "ig_username": "alex_creator",
+    "ig_name": null,
+    "profile_pic": null,
+    "access_token": "enc:9a4a3e1eefe6d8e13c3b096a5312434b:ca99ca47af88c7e80f59c42311e9d499:eb6c2bfc3bdd3d5328e770a4d530125c1d5c8e3012a3a5bb1fbe1885f572403d2c87465933",
+    "token_type": "long_lived",
+    "token_expires_at": null,
+    "is_active": 1,
+    "created_at": "2026-11-01T09:17:01.436Z",
+    "updated_at": "2026-11-01T09:17:01.436Z"
   }
 ]

@@ -10,5 +10,6 @@
   "redirect_uri": "http://localhost:5098/auth/instagram/callback",
   "meta_app_secret": "demo_secret_key_8888",
   "webhook_verify_token": "creator_verify_token_2026",
-  "webhook_subscribed": "1"
+  "webhook_subscribed": "1",
+  "encryption_key": "instaauto_vault_key_2026_super_secure"
 }
