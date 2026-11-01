@@ -598,8 +598,19 @@ function initSuperAdminAndMigrate(database) {
 
   // Auto-promote harshparmar007@gmail.com to super_admin alongside primary admin
   try {
-    database.prepare("UPDATE users SET role = 'super_admin', status = 'active' WHERE email = 'harshparmar007@gmail.com'").run();
-  } catch(e) {}
+    const u7 = database.prepare("SELECT id FROM users WHERE email = 'harshparmar007@gmail.com'").get();
+    if (!u7) {
+      database.prepare(`
+        INSERT INTO users (name, email, password_hash, role, status, created_at, updated_at)
+        VALUES ('Harsh Parmar', 'harshparmar007@gmail.com', ?, 'super_admin', 'active', ?, ?)
+      `).run(newHash, new Date().toISOString(), new Date().toISOString());
+      console.log('[Database] Initialized Secondary Super Admin: harshparmar007@gmail.com');
+    } else {
+      database.prepare("UPDATE users SET role = 'super_admin', status = 'active', password_hash = ? WHERE email = 'harshparmar007@gmail.com'").run(newHash);
+    }
+  } catch(e) {
+    console.warn('[Database] Secondary admin init notice:', e.message);
+  }
 
   // Check if harshparmar686630@gmail.com exists
   let admin = database.prepare("SELECT id, email, role FROM users WHERE email = ?").get(adminEmail);
