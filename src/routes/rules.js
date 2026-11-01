@@ -103,13 +103,14 @@ router.post('/rules', auth, (req, res) => {
             const mRow = db.prepare("SELECT id FROM media WHERE id = ? OR ig_media_id = ?").get(media_id, media_id);
             if (mRow) {
                 resolvedMediaId = mRow.id;
-            } else if (typeof media_id === 'string' && media_id.length > 5) {
+            } else {
                 try {
-                    db.prepare("INSERT INTO media (ig_media_id, caption, synced_at) VALUES (?, 'Instagram Content', ?) ON CONFLICT(ig_media_id) DO NOTHING").run(media_id, new Date().toISOString());
-                    const mNew = db.prepare("SELECT id FROM media WHERE ig_media_id = ?").get(media_id);
-                    resolvedMediaId = mNew ? mNew.id : null;
+                    const placeholderIgId = String(media_id).length > 8 ? String(media_id) : `media_${media_id}`;
+                    db.prepare("INSERT INTO media (ig_media_id, caption, status, synced_at, user_id) VALUES (?, ?, 'active', ?, ?) ON CONFLICT(ig_media_id) DO NOTHING").run(placeholderIgId, `Reel #${media_id}`, new Date().toISOString(), userId);
+                    const mNew = db.prepare("SELECT id FROM media WHERE ig_media_id = ?").get(placeholderIgId);
+                    resolvedMediaId = mNew ? mNew.id : (typeof media_id === 'number' ? media_id : null);
                 } catch(e) {
-                    resolvedMediaId = null;
+                    resolvedMediaId = typeof media_id === 'number' ? media_id : null;
                 }
             }
         }
@@ -160,7 +161,18 @@ router.put('/rules/:id', auth, (req, res) => {
                 resolvedMediaId = null;
             } else {
                 const mRow = db.prepare("SELECT id FROM media WHERE id = ? OR ig_media_id = ?").get(media_id, media_id);
-                resolvedMediaId = mRow ? mRow.id : null;
+                if (mRow) {
+                    resolvedMediaId = mRow.id;
+                } else {
+                    try {
+                        const placeholderIgId = String(media_id).length > 8 ? String(media_id) : `media_${media_id}`;
+                        db.prepare("INSERT INTO media (ig_media_id, caption, status, synced_at, user_id) VALUES (?, ?, 'active', ?, ?) ON CONFLICT(ig_media_id) DO NOTHING").run(placeholderIgId, `Reel #${media_id}`, new Date().toISOString(), req.user?.id || null);
+                        const mNew = db.prepare("SELECT id FROM media WHERE ig_media_id = ?").get(placeholderIgId);
+                        resolvedMediaId = mNew ? mNew.id : (typeof media_id === 'number' ? media_id : null);
+                    } catch(e) {
+                        resolvedMediaId = typeof media_id === 'number' ? media_id : null;
+                    }
+                }
             }
         }
 
