@@ -264,6 +264,14 @@ function getDb() {
     restoreEvents(db);
   } catch (e) {}
 
+  // 3. Startup sync: Hydrate from Turso Cloud if configured
+  try {
+    const { hydrateLocalFromTurso } = require('./services/turso');
+    hydrateLocalFromTurso(db).catch(err => {
+      console.warn('[Database] Turso startup hydration notice:', err.message);
+    });
+  } catch (e) {}
+
   return db;
 }
 
@@ -370,6 +378,21 @@ function backupMedia(dbInstance) {
     const fs = require('fs');
     const mediaPath = path.join(__dirname, '..', 'data', 'media.json');
     fs.writeFileSync(mediaPath, JSON.stringify(media, null, 2), 'utf8');
+
+    // Cloud replication to Turso
+    try {
+      const { batch } = require('./services/turso');
+      if (media.length > 0) {
+        const stmts = media.map(m => ({
+          sql: `INSERT INTO media (id, ig_media_id, media_type, media_product_type, caption, thumbnail_url, media_url, permalink, timestamp, synced_at, views_count, comments_count, like_count, status, user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(ig_media_id) DO UPDATE SET caption = excluded.caption, comments_count = excluded.comments_count, like_count = excluded.like_count, views_count = excluded.views_count, status = excluded.status, synced_at = excluded.synced_at`,
+          params: [m.id, m.ig_media_id, m.media_type, m.media_product_type, m.caption, m.thumbnail_url, m.media_url, m.permalink, m.timestamp, m.synced_at, m.views_count, m.comments_count, m.like_count, m.status, m.user_id]
+        }));
+        batch(stmts).catch(() => {});
+      }
+    } catch(e) {}
+
     return media;
   } catch (e) {
     console.warn('[Database] Failed to backup media:', e.message);
@@ -471,6 +494,21 @@ function backupRules(dbInstance) {
     const fs = require('fs');
     const rulesPath = path.join(__dirname, '..', 'data', 'rules.json');
     fs.writeFileSync(rulesPath, JSON.stringify(rules, null, 2), 'utf8');
+
+    // Cloud replication to Turso
+    try {
+      const { batch } = require('./services/turso');
+      if (rules.length > 0) {
+        const stmts = rules.map(r => ({
+          sql: `INSERT INTO rules (id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json, is_active, is_deleted, created_at, updated_at, user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET trigger_keyword = excluded.trigger_keyword, response_text = excluded.response_text, link_url = excluded.link_url, public_reply = excluded.public_reply, is_active = excluded.is_active, is_deleted = excluded.is_deleted, updated_at = excluded.updated_at`,
+          params: [r.id, r.media_id, r.trigger_keyword, r.action_type, r.response_text, r.link_url, r.follow_prompt, r.public_reply, r.delay_seconds, r.variations_json, r.buttons_config_json, r.is_active, r.is_deleted, r.created_at, r.updated_at, r.user_id]
+        }));
+        batch(stmts).catch(() => {});
+      }
+    } catch(e) {}
+
     return rules;
   } catch (e) {
     console.warn('[Database] Failed to backup rules:', e.message);
@@ -664,10 +702,22 @@ function backupUsers(database) {
   try {
     const fs = require('fs');
     const dataDir = path.join(__dirname, '..', 'data');
-    const users = database.prepare("SELECT id, name, email, role, status, created_at, updated_at FROM users").all();
+    const users = database.prepare("SELECT id, name, email, password_hash, role, status, email_verified, created_at, updated_at FROM users").all();
     if (users && users.length > 0) {
       if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
       fs.writeFileSync(path.join(dataDir, 'users.json'), JSON.stringify(users, null, 2));
+
+      // Cloud replication to Turso
+      try {
+        const { batch } = require('./services/turso');
+        const stmts = users.map(u => ({
+          sql: `INSERT INTO users (id, name, email, password_hash, role, status, email_verified, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET name = excluded.name, email = excluded.email, password_hash = excluded.password_hash, role = excluded.role, status = excluded.status, email_verified = excluded.email_verified, updated_at = excluded.updated_at`,
+          params: [u.id, u.name, u.email, u.password_hash, u.role, u.status, u.email_verified || 0, u.created_at, u.updated_at]
+        }));
+        batch(stmts).catch(() => {});
+      } catch (e) {}
     }
   } catch (e) {
     console.warn('[Database] Failed to backup users:', e.message);
@@ -739,6 +789,20 @@ function backupSettings(database) {
       }
     }
     fs.writeFileSync(settingsPath, JSON.stringify(current, null, 2), 'utf8');
+
+    // Cloud replication to Turso
+    try {
+      const { batch } = require('./services/turso');
+      const validRows = rows.filter(r => r.value && !r.value.includes('••••') && !r.value.includes('***'));
+      if (validRows.length > 0) {
+        const stmts = validRows.map(r => ({
+          sql: 'INSERT INTO config (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
+          params: [r.key, r.value, new Date().toISOString()]
+        }));
+        batch(stmts).catch(() => {});
+      }
+    } catch (e) {}
+
     return current;
   } catch (e) {
     console.warn('[Database] Failed to backup settings:', e.message);
@@ -787,6 +851,18 @@ function backupInstagramAccounts(database) {
     const accounts = db.prepare('SELECT * FROM instagram_accounts WHERE is_active = 1').all();
     if (accounts && accounts.length > 0) {
       fs.writeFileSync(acctsPath, JSON.stringify(accounts, null, 2), 'utf8');
+
+      // Cloud replication to Turso
+      try {
+        const { batch } = require('./services/turso');
+        const stmts = accounts.map(a => ({
+          sql: `INSERT INTO instagram_accounts (id, user_id, ig_user_id, ig_username, ig_name, profile_pic, access_token, token_type, token_expires_at, is_active, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET user_id = excluded.user_id, ig_user_id = excluded.ig_user_id, ig_username = excluded.ig_username, profile_pic = excluded.profile_pic, access_token = excluded.access_token, token_expires_at = excluded.token_expires_at, is_active = excluded.is_active, updated_at = excluded.updated_at`,
+          params: [a.id, a.user_id, a.ig_user_id, a.ig_username, a.ig_name, a.profile_pic, a.access_token, a.token_type || 'long_lived', a.token_expires_at, a.is_active, a.created_at, a.updated_at]
+        }));
+        batch(stmts).catch(() => {});
+      } catch (e) {}
     }
     return accounts;
   } catch (e) {
@@ -1023,6 +1099,14 @@ function createEmailVerification({ email, otp, type = 'registration', expiresMin
     VALUES (?, ?, ?, 0, ?, 0, ?)
   `).run(cleanEmail, otpHash, type, expiresAt, now.toISOString());
 
+  try {
+    const { asyncSync } = require('./services/turso');
+    asyncSync(`
+      INSERT INTO email_verifications (id, email, otp_hash, type, attempts_count, expires_at, is_consumed, created_at)
+      VALUES (?, ?, ?, 0, ?, 0, ?)
+    `, [res.lastInsertRowid, cleanEmail, otpHash, type, expiresAt, now.toISOString()]);
+  } catch (e) {}
+
   return { id: res.lastInsertRowid, email: cleanEmail, expiresAt };
 }
 
@@ -1047,11 +1131,19 @@ function verifyOtpCode(email, otp, type = 'registration') {
 
   if (record.attempts_count >= 5) {
     db.prepare('UPDATE email_verifications SET is_consumed = 1 WHERE id = ?').run(record.id);
+    try {
+      const { asyncSync } = require('./services/turso');
+      asyncSync('UPDATE email_verifications SET is_consumed = 1 WHERE id = ?', [record.id]);
+    } catch (e) {}
     return { valid: false, error: 'Too many incorrect attempts. Please request a new code.' };
   }
 
   if (new Date(record.expires_at) < new Date()) {
     db.prepare('UPDATE email_verifications SET is_consumed = 1 WHERE id = ?').run(record.id);
+    try {
+      const { asyncSync } = require('./services/turso');
+      asyncSync('UPDATE email_verifications SET is_consumed = 1 WHERE id = ?', [record.id]);
+    } catch (e) {}
     return { valid: false, error: 'Verification code has expired. Please request a new code.' };
   }
 
@@ -1059,12 +1151,20 @@ function verifyOtpCode(email, otp, type = 'registration') {
   if (incomingHash !== record.otp_hash) {
     const newCount = record.attempts_count + 1;
     db.prepare('UPDATE email_verifications SET attempts_count = ? WHERE id = ?').run(newCount, record.id);
+    try {
+      const { asyncSync } = require('./services/turso');
+      asyncSync('UPDATE email_verifications SET attempts_count = ? WHERE id = ?', [newCount, record.id]);
+    } catch (e) {}
     const remaining = 5 - newCount;
     return { valid: false, error: `Invalid verification code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.` };
   }
 
   // Success
   db.prepare('UPDATE email_verifications SET is_consumed = 1 WHERE id = ?').run(record.id);
+  try {
+    const { asyncSync } = require('./services/turso');
+    asyncSync('UPDATE email_verifications SET is_consumed = 1 WHERE id = ?', [record.id]);
+  } catch (e) {}
   return { valid: true };
 }
 
@@ -1264,7 +1364,14 @@ function getAllUsers(search = '') {
 }
 
 function updateUserStatus(userId, status) {
-  return getDb().prepare('UPDATE users SET status = ?, updated_at = ? WHERE id = ?').run(status, new Date().toISOString(), userId);
+  const now = new Date().toISOString();
+  const res = getDb().prepare('UPDATE users SET status = ?, updated_at = ? WHERE id = ?').run(status, now, userId);
+  try {
+    const { asyncSync } = require('./services/turso');
+    asyncSync('UPDATE users SET status = ?, updated_at = ? WHERE id = ?', [status, now, userId]);
+  } catch (e) {}
+  try { backupUsers(getDb()); } catch (e) {}
+  return res;
 }
 
 function deleteUser(userId) {
@@ -1274,7 +1381,24 @@ function deleteUser(userId) {
   db.prepare('DELETE FROM rules WHERE user_id = ?').run(userId);
   db.prepare('DELETE FROM media WHERE user_id = ?').run(userId);
   db.prepare('DELETE FROM events WHERE user_id = ?').run(userId);
-  return db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+  const res = db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+
+  try {
+    const { asyncSync } = require('./services/turso');
+    asyncSync('DELETE FROM users WHERE id = ?', [userId]);
+    asyncSync('DELETE FROM instagram_accounts WHERE user_id = ?', [userId]);
+    asyncSync('DELETE FROM rules WHERE user_id = ?', [userId]);
+    asyncSync('DELETE FROM media WHERE user_id = ?', [userId]);
+    asyncSync('DELETE FROM events WHERE user_id = ?', [userId]);
+  } catch (e) {}
+
+  try {
+    backupUsers(db);
+    backupInstagramAccounts(db);
+    backupRules(db);
+  } catch (e) {}
+
+  return res;
 }
 
 function getAdminMetrics() {

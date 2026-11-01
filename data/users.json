@@ -3,8 +3,10 @@
     "id": 1,
     "name": "Harsh Parmar",
     "email": "harshparmar686630@gmail.com",
+    "password_hash": "03cdac92cc2faf28c67c9b4eac6ad8b9:76b23b23d9c7ab5d4bbd8d4dcaea434db6b820ff96e405ce81aac60bdcede6298d4f1adca3b0802e308704a4fa9860e904eb8e9602dafee216ad5e58beb311ea",
     "role": "super_admin",
     "status": "active",
+    "email_verified": 1,
     "created_at": "2026-09-09T16:12:28.212Z",
     "updated_at": "2026-11-01T00:00:00.000Z"
   },
@@ -12,8 +14,10 @@
     "id": 7,
     "name": "raj tayde",
     "email": "harshparmar007@gmail.com",
+    "password_hash": "03cdac92cc2faf28c67c9b4eac6ad8b9:76b23b23d9c7ab5d4bbd8d4dcaea434db6b820ff96e405ce81aac60bdcede6298d4f1adca3b0802e308704a4fa9860e904eb8e9602dafee216ad5e58beb311ea",
     "role": "super_admin",
     "status": "active",
+    "email_verified": 0,
     "created_at": "2026-09-09T16:24:49.411Z",
     "updated_at": "2026-11-01T00:00:00.000Z"
   },
@@ -21,8 +25,10 @@
     "id": 19,
     "name": "Alex Rivera",
     "email": "test_creator_1793524621389@example.com",
+    "password_hash": "8f4d566a7fc574c822d2bc7db01afba3:5d92a57ae7a66ac3ae83368f5a4f352238184c906450ab5215e7baf257167cb911625b34e382264bcc37c491aaa0d860ed5005d4d4d434b0d466bc76890c3450",
     "role": "user",
     "status": "active",
+    "email_verified": 0,
     "created_at": "2026-11-01T09:17:01.431Z",
     "updated_at": "2026-11-01T09:17:01.434Z"
   },
@@ -30,8 +36,10 @@
     "id": 20,
     "name": "Sarah Creator",
     "email": "creator_1793524677666@teststudio.com",
+    "password_hash": "fef8a838ad55f87ca621ec919d25a1c7:e79744376a4c53afe216d3999482a94594c16428db1ba7e1662e224f28d7add47fdb282612914a7adbb298f3d1b5c720b868b4505ca2dbc234523dd203d29c63",
     "role": "user",
     "status": "active",
+    "email_verified": 0,
     "created_at": "2026-11-01T09:17:57.854Z",
     "updated_at": "2026-11-01T09:17:57.934Z"
   }
