@@ -1,8 +1,8 @@
 // App core logic - Multi-Tenant Creator Studio & Super Admin
 const App = {
     state: {
-        token: sessionStorage.getItem('auth_token') || sessionStorage.getItem('dashboard_password') || null,
-        user: JSON.parse(sessionStorage.getItem('auth_user') || 'null'),
+        token: localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || localStorage.getItem('dashboard_password') || sessionStorage.getItem('dashboard_password') || null,
+        user: JSON.parse(localStorage.getItem('auth_user') || sessionStorage.getItem('auth_user') || 'null'),
         impersonateUserId: sessionStorage.getItem('impersonate_user_id') || null,
         impersonateUserName: sessionStorage.getItem('impersonate_user_name') || null,
         currentView: window.location.hash.slice(1) || 'dashboard',
@@ -112,6 +112,9 @@ const App = {
             if (res.ok && data.token) {
                 this.state.token = data.token;
                 this.state.user = data.user;
+                localStorage.setItem('auth_token', data.token);
+                localStorage.setItem('dashboard_password', data.token);
+                localStorage.setItem('auth_user', JSON.stringify(data.user));
                 sessionStorage.setItem('auth_token', data.token);
                 sessionStorage.setItem('dashboard_password', data.token);
                 sessionStorage.setItem('auth_user', JSON.stringify(data.user));
@@ -126,6 +129,9 @@ const App = {
                 if (legacyRes.ok) {
                     this.state.token = password;
                     this.state.user = { name: 'Super Admin', email: 'admin@instaauto.app', role: 'super_admin' };
+                    localStorage.setItem('auth_token', password);
+                    localStorage.setItem('dashboard_password', password);
+                    localStorage.setItem('auth_user', JSON.stringify(this.state.user));
                     sessionStorage.setItem('auth_token', password);
                     sessionStorage.setItem('dashboard_password', password);
                     sessionStorage.setItem('auth_user', JSON.stringify(this.state.user));
@@ -162,6 +168,9 @@ const App = {
             if (res.ok && data.token) {
                 this.state.token = data.token;
                 this.state.user = data.user;
+                localStorage.setItem('auth_token', data.token);
+                localStorage.setItem('dashboard_password', data.token);
+                localStorage.setItem('auth_user', JSON.stringify(data.user));
                 sessionStorage.setItem('auth_token', data.token);
                 sessionStorage.setItem('dashboard_password', data.token);
                 sessionStorage.setItem('auth_user', JSON.stringify(data.user));
@@ -191,6 +200,7 @@ const App = {
             if (res.ok) {
                 const data = await res.json();
                 this.state.user = data.user;
+                localStorage.setItem('auth_user', JSON.stringify(data.user));
                 sessionStorage.setItem('auth_user', JSON.stringify(data.user));
                 this.showDashboard();
             } else {
@@ -297,6 +307,9 @@ const App = {
         this.state.user = null;
         this.state.impersonateUserId = null;
         this.state.impersonateUserName = null;
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('dashboard_password');
+        localStorage.removeItem('auth_user');
         sessionStorage.removeItem('auth_token');
         sessionStorage.removeItem('dashboard_password');
         sessionStorage.removeItem('auth_user');

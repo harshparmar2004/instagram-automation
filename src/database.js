@@ -184,8 +184,13 @@ function getDb() {
     }
   } catch (err) {}
 
-  // Startup sync: Restore automations & events from JSON backup if needed
+  // Startup sync: Restore media, automations & events from JSON backup if needed
   try {
+    db.prepare("UPDATE media SET status = 'active' WHERE status = 'deleted'").run();
+  } catch (e) {}
+
+  try {
+    restoreMedia(db);
     restoreRules(db);
     restoreEvents(db);
   } catch (e) {}
@@ -296,6 +301,107 @@ function setConfig(key, value) {
   updateEnvFile(key, strVal);
 }
 
+function backupMedia(dbInstance) {
+  try {
+    const database = dbInstance || getDb();
+    const media = database.prepare("SELECT * FROM media WHERE status != 'deleted'").all();
+    const fs = require('fs');
+    const mediaPath = path.join(__dirname, '..', 'data', 'media.json');
+    fs.writeFileSync(mediaPath, JSON.stringify(media, null, 2), 'utf8');
+    return media;
+  } catch (e) {
+    console.warn('[Database] Failed to backup media:', e.message);
+    return [];
+  }
+}
+
+function restoreMedia(dbInstance) {
+  try {
+    const fs = require('fs');
+    const mediaPath = path.join(__dirname, '..', 'data', 'media.json');
+    if (!fs.existsSync(mediaPath)) return 0;
+
+    const database = dbInstance || getDb();
+    const data = JSON.parse(fs.readFileSync(mediaPath, 'utf8'));
+    if (!Array.isArray(data) || data.length === 0) return 0;
+
+    let restored = 0;
+    const upsert = database.prepare(`
+      INSERT INTO media (
+        id, ig_media_id, media_type, media_product_type, caption,
+        thumbnail_url, media_url, permalink, timestamp,
+        comments_count, like_count, views_count, status, synced_at, user_id
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+      ON CONFLICT(ig_media_id) DO UPDATE SET
+        media_type = excluded.media_type,
+        media_product_type = excluded.media_product_type,
+        caption = excluded.caption,
+        thumbnail_url = excluded.thumbnail_url,
+        media_url = excluded.media_url,
+        permalink = excluded.permalink,
+        comments_count = excluded.comments_count,
+        like_count = excluded.like_count,
+        views_count = CASE WHEN excluded.views_count > 0 THEN excluded.views_count ELSE media.views_count END,
+        status = 'active',
+        synced_at = excluded.synced_at,
+        user_id = COALESCE(media.user_id, excluded.user_id)
+    `);
+
+    for (const m of data) {
+      if (!m.ig_media_id) continue;
+      try {
+        upsert.run(
+          m.id,
+          m.ig_media_id,
+          m.media_type || '',
+          m.media_product_type || (m.media_type === 'VIDEO' ? 'REELS' : 'FEED'),
+          m.caption || '',
+          m.thumbnail_url || m.media_url || '',
+          m.media_url || m.thumbnail_url || '',
+          m.permalink || '',
+          m.timestamp || '',
+          m.comments_count || 0,
+          m.like_count || 0,
+          m.views_count || 0,
+          m.synced_at || new Date().toISOString(),
+          m.user_id || 1
+        );
+        restored++;
+      } catch (err) {
+        try {
+          database.prepare(`
+            INSERT OR IGNORE INTO media (
+              ig_media_id, media_type, media_product_type, caption,
+              thumbnail_url, media_url, permalink, timestamp,
+              comments_count, like_count, views_count, status, synced_at, user_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+          `).run(
+            m.ig_media_id,
+            m.media_type || '',
+            m.media_product_type || (m.media_type === 'VIDEO' ? 'REELS' : 'FEED'),
+            m.caption || '',
+            m.thumbnail_url || m.media_url || '',
+            m.media_url || m.thumbnail_url || '',
+            m.permalink || '',
+            m.timestamp || '',
+            m.comments_count || 0,
+            m.like_count || 0,
+            m.views_count || 0,
+            m.synced_at || new Date().toISOString(),
+            m.user_id || 1
+          );
+          restored++;
+        } catch (e2) {}
+      }
+    }
+    return restored;
+  } catch (e) {
+    console.warn('[Database] Failed to restore media from media.json:', e.message);
+    return 0;
+  }
+}
+
 function backupRules(dbInstance) {
   try {
     const database = dbInstance || getDb();
@@ -314,7 +420,7 @@ function restoreRules(dbInstance) {
   try {
     const fs = require('fs');
     const rulesPath = path.join(__dirname, '..', 'data', 'rules.json');
-    if (!fs.existsSync(rulesPath)) return;
+    if (!fs.existsSync(rulesPath)) return 0;
 
     const database = dbInstance || getDb();
     const data = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
@@ -323,20 +429,31 @@ function restoreRules(dbInstance) {
     let restoredCount = 0;
     const checkStmt = database.prepare('SELECT id FROM rules WHERE id = ? OR (trigger_keyword = ? AND response_text = ?)');
     const insertStmtWithId = database.prepare(`
-      INSERT INTO rules (id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO rules (id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, created_at, updated_at, user_id, buttons_config_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const r of data) {
       const existing = checkStmt.get(r.id, r.trigger_keyword, r.response_text);
       if (!existing) {
-        // Safely verify if media_id exists in media table to avoid foreign key errors on fresh deploys
-        let resolvedMediaId = null;
-        if (r.media_id) {
+        let resolvedMediaId = r.media_id;
+        if (r.media_id && r.media_id !== 'global') {
           try {
             const m = database.prepare('SELECT id FROM media WHERE id = ? OR ig_media_id = ?').get(r.media_id, r.media_id);
-            if (m) resolvedMediaId = m.id;
-          } catch(e) {}
+            if (m) {
+              resolvedMediaId = m.id;
+            } else {
+              // Create placeholder in media table so reel-specific relation is never lost
+              const placeholderIgId = String(r.media_id).startsWith('1') ? String(r.media_id) : `media_${r.media_id}`;
+              const placeholder = database.prepare(`
+                INSERT INTO media (ig_media_id, caption, media_type, media_product_type, status, user_id, timestamp)
+                VALUES (?, ?, 'REEL', 'REELS', 'active', ?, ?)
+              `).run(placeholderIgId, `Automation Post #${r.media_id}`, r.user_id || 1, new Date().toISOString());
+              resolvedMediaId = placeholder.lastInsertRowid;
+            }
+          } catch(e) {
+            resolvedMediaId = r.media_id;
+          }
         }
 
         try {
@@ -353,14 +470,16 @@ function restoreRules(dbInstance) {
             r.variations_json || null,
             r.is_active !== undefined ? r.is_active : 1,
             r.created_at || new Date().toISOString(),
-            r.updated_at || new Date().toISOString()
+            r.updated_at || new Date().toISOString(),
+            r.user_id || 1,
+            r.buttons_config_json || null
           );
           restoredCount++;
         } catch (insertErr) {
           try {
             database.prepare(`
-              INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, created_at, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, created_at, updated_at, user_id, buttons_config_json)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).run(
               resolvedMediaId,
               r.trigger_keyword,
@@ -373,7 +492,9 @@ function restoreRules(dbInstance) {
               r.variations_json || null,
               r.is_active !== undefined ? r.is_active : 1,
               r.created_at || new Date().toISOString(),
-              r.updated_at || new Date().toISOString()
+              r.updated_at || new Date().toISOString(),
+              r.user_id || 1,
+              r.buttons_config_json || null
             );
             restoredCount++;
           } catch (e2) {}
@@ -474,6 +595,11 @@ function initSuperAdminAndMigrate(database) {
   const adminEmail = (process.env.ADMIN_EMAIL || 'harshparmar686630@gmail.com').toLowerCase().trim();
   const adminPassword = process.env.ADMIN_PASSWORD || 'Harsh@2004';
   const newHash = hashPassword(adminPassword);
+
+  // Auto-promote harshparmar007@gmail.com to super_admin alongside primary admin
+  try {
+    database.prepare("UPDATE users SET role = 'super_admin', status = 'active' WHERE email = 'harshparmar007@gmail.com'").run();
+  } catch(e) {}
 
   // Check if harshparmar686630@gmail.com exists
   let admin = database.prepare("SELECT id, email, role FROM users WHERE email = ?").get(adminEmail);
@@ -601,11 +727,25 @@ function deleteSession(token) {
 
 function getUserInstagramAccount(userId) {
   const db = getDb();
-  return db.prepare(`
+  let acct = db.prepare(`
     SELECT * FROM instagram_accounts 
     WHERE user_id = ? AND is_active = 1 
     ORDER BY id DESC LIMIT 1
   `).get(userId);
+
+  if (!acct && userId) {
+    // If user is super admin or admin creator, fallback to active studio account
+    const u = db.prepare('SELECT role, email FROM users WHERE id = ?').get(userId);
+    if (u && (u.role === 'super_admin' || (u.email && u.email.includes('harshparmar')))) {
+      acct = db.prepare(`
+        SELECT * FROM instagram_accounts 
+        WHERE is_active = 1 
+        ORDER BY id DESC LIMIT 1
+      `).get();
+    }
+  }
+
+  return acct;
 }
 
 function saveUserInstagramAccount(userId, { igUserId, igUsername, igName, profilePic, accessToken, tokenExpiresAt }) {
@@ -731,6 +871,8 @@ module.exports = {
   getDb,
   getConfig,
   setConfig,
+  backupMedia,
+  restoreMedia,
   backupRules,
   restoreRules,
   backupEvents,

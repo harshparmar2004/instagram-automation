@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { getMedia, getMediaComments, getMediaInsights } = require('./instagram');
-const { getDb, getConfig, getUserInstagramAccount, backupRules, restoreRules, backupEvents, restoreEvents } = require('../database');
+const { getDb, getConfig, getUserInstagramAccount, backupRules, restoreRules, backupEvents, restoreEvents, backupMedia } = require('../database');
 
 async function syncMedia(userId = null) {
     let token = null;
@@ -97,21 +97,11 @@ async function syncMedia(userId = null) {
             }
         })(allItems);
 
-        // Mark any media in database not returned by live Instagram sync as deleted
-        if (allItems.length > 0) {
-            const activeIgIds = allItems.map(item => String(item.id));
-            const placeholders = activeIgIds.map(() => '?').join(',');
-            let markDeletedQuery = `UPDATE media SET status = 'deleted' WHERE ig_media_id NOT IN (${placeholders}) AND ig_media_id NOT LIKE '179001122%'`;
-            const markParams = [...activeIgIds];
-            if (userId) {
-                markDeletedQuery += ' AND (user_id = ? OR user_id IS NULL)';
-                markParams.push(userId);
-            }
-            try {
-                db.prepare(markDeletedQuery).run(...markParams);
-            } catch (delErr) {
-                console.warn('[MediaSync] Notice updating deleted media status:', delErr.message);
-            }
+        // Persist all synced media to data/media.json for restart persistence
+        try {
+            backupMedia(db);
+        } catch (backupErr) {
+            console.warn('[MediaSync] Notice backing up media:', backupErr.message);
         }
 
         console.log(`[MediaSync] Successfully synced ${allItems.length} media items across ${page + 1} page(s)`);
@@ -199,12 +189,6 @@ async function syncMedia(userId = null) {
                                 const kws = (r.trigger_keyword || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
                                 if (kws.includes('*') || kws.some(kw => textLower.includes(kw))) {
                                     matchedRule = r;
-                                    // Auto-link rule to this active media if rule was pointing to an older/deleted post
-                                    if (mediaLocalId && r.media_id !== mediaLocalId) {
-                                        try {
-                                            db.prepare("UPDATE rules SET media_id = ? WHERE id = ?").run(mediaLocalId, r.id);
-                                        } catch(e) {}
-                                    }
                                     break;
                                 }
                             }
