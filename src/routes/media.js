@@ -25,7 +25,7 @@ router.get('/media', auth, (req, res) => {
         const params = [];
 
         if (!isSuperAdmin && userId) {
-            whereClauses.push('(m.user_id = ? OR m.user_id IS NULL)');
+            whereClauses.push('m.user_id = ?');
             params.push(userId);
         }
 
@@ -69,7 +69,7 @@ router.get('/media/automated', auth, (req, res) => {
         `;
         const rulesParams = [];
         if (!isSuperAdmin && userId) {
-            rulesQuery += ` WHERE (r.user_id = ? OR r.user_id IS NULL)`;
+            rulesQuery += ` WHERE r.user_id = ?`;
             rulesParams.push(userId);
         }
         rulesQuery += ` ORDER BY r.created_at DESC`;
@@ -80,7 +80,7 @@ router.get('/media/automated', auth, (req, res) => {
         const mediaWhereClauses = [];
         const mediaParams = [];
         if (!isSuperAdmin && userId) {
-            mediaWhereClauses.push(`(user_id = ? OR user_id IS NULL)`);
+            mediaWhereClauses.push(`user_id = ?`);
             mediaParams.push(userId);
         }
         if (!includeDeleted) {

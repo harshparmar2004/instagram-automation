@@ -50,7 +50,7 @@ router.get('/rules', auth, (req, res) => {
         }
 
         if (!isSuperAdmin && userId) {
-            whereClauses.push('(r.user_id = ? OR r.user_id IS NULL)');
+            whereClauses.push('r.user_id = ?');
             params.push(userId);
         }
 
@@ -74,10 +74,28 @@ router.get('/rules', auth, (req, res) => {
     }
 });
 
+function checkRuleOwnership(db, ruleId, user, isImpersonating = false) {
+    if (!ruleId || !user) return { allowed: false, error: 'Unauthorized' };
+    const rule = db.prepare('SELECT * FROM rules WHERE id = ?').get(ruleId);
+    if (!rule) return { allowed: false, notFound: true, error: 'Rule not found' };
+
+    const isSuperAdmin = (user.role === 'super_admin' || (user.email && user.email.includes('harshparmar'))) && !isImpersonating;
+    if (isSuperAdmin) return { allowed: true, rule };
+
+    if (rule.user_id && rule.user_id === user.id) return { allowed: true, rule };
+
+    return { allowed: false, error: 'Access denied: You do not have permission to access this rule.' };
+}
+
 router.get('/rules/:id', auth, (req, res) => {
     try {
         const db = getDb();
         const { id } = req.params;
+        const check = checkRuleOwnership(db, id, req.user, req.isImpersonating);
+        if (!check.allowed) {
+            return res.status(check.notFound ? 404 : 403).json({ error: check.error });
+        }
+
         const rule = db.prepare(`
             SELECT r.*, r.trigger_keyword as trigger_word, m.ig_media_id, m.thumbnail_url, m.caption, m.permalink
             FROM rules r 
@@ -85,9 +103,6 @@ router.get('/rules/:id', auth, (req, res) => {
             WHERE r.id = ?
         `).get(id);
 
-        if (!rule) {
-            return res.status(404).json({ error: 'Rule not found' });
-        }
         res.json(rule);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -159,6 +174,11 @@ router.put('/rules/:id', auth, (req, res) => {
     try {
         const db = getDb();
         const { id } = req.params;
+        const check = checkRuleOwnership(db, id, req.user, req.isImpersonating);
+        if (!check.allowed) {
+            return res.status(check.notFound ? 404 : 403).json({ error: check.error });
+        }
+
         const { media_id, trigger_keyword, trigger_word, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json } = req.body;
         const keyword = trigger_keyword || trigger_word;
         const sanitizedUrl = cleanUrl(link_url);
@@ -302,10 +322,12 @@ router.patch('/rules/:id/toggle', auth, (req, res) => {
     try {
         const db = getDb();
         const { id } = req.params;
+        const check = checkRuleOwnership(db, id, req.user, req.isImpersonating);
+        if (!check.allowed) {
+            return res.status(check.notFound ? 404 : 403).json({ error: check.error });
+        }
         
-        const rule = db.prepare('SELECT is_active FROM rules WHERE id = ?').get(id);
-        if (!rule) return res.status(404).json({ error: 'Not found' });
-
+        const rule = check.rule;
         const newStatus = rule.is_active === 1 ? 0 : 1;
         db.prepare('UPDATE rules SET is_active = ?, updated_at = ? WHERE id = ?').run(newStatus, new Date().toISOString(), id);
 
@@ -321,6 +343,11 @@ router.delete('/rules/:id', auth, (req, res) => {
     try {
         const db = getDb();
         const { id } = req.params;
+        const check = checkRuleOwnership(db, id, req.user, req.isImpersonating);
+        if (!check.allowed) {
+            return res.status(check.notFound ? 404 : 403).json({ error: check.error });
+        }
+
         const result = db.prepare('UPDATE rules SET is_deleted = 1, is_active = 0, updated_at = ? WHERE id = ?').run(new Date().toISOString(), id);
 
         if (result.changes === 0) {
@@ -339,6 +366,11 @@ router.post('/rules/:id/restore', auth, (req, res) => {
     try {
         const db = getDb();
         const { id } = req.params;
+        const check = checkRuleOwnership(db, id, req.user, req.isImpersonating);
+        if (!check.allowed) {
+            return res.status(check.notFound ? 404 : 403).json({ error: check.error });
+        }
+
         const result = db.prepare('UPDATE rules SET is_deleted = 0, is_active = 1, updated_at = ? WHERE id = ?').run(new Date().toISOString(), id);
 
         if (result.changes === 0) {
@@ -357,6 +389,11 @@ router.delete('/rules/:id/permanent', auth, (req, res) => {
     try {
         const db = getDb();
         const { id } = req.params;
+        const check = checkRuleOwnership(db, id, req.user, req.isImpersonating);
+        if (!check.allowed) {
+            return res.status(check.notFound ? 404 : 403).json({ error: check.error });
+        }
+
         db.prepare('DELETE FROM events WHERE rule_id = ?').run(id);
         db.prepare('DELETE FROM conversations WHERE rule_id = ?').run(id);
         const result = db.prepare('DELETE FROM rules WHERE id = ?').run(id);

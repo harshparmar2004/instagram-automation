@@ -25,7 +25,7 @@ router.get('/events', auth, (req, res) => {
         const params = [];
 
         if (!isSuperAdmin && userId) {
-            query += ' AND (e.user_id = ? OR e.user_id IS NULL)';
+            query += ' AND e.user_id = ?';
             params.push(userId);
         }
 
