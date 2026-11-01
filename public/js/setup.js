@@ -172,6 +172,26 @@ window.setup = {
     async loadStatus() {
         try {
             const status = await App.apiCall('GET', '/api/status');
+            if (status.connected && status.username) {
+                if (App.state.user) {
+                    App.state.user.ig_username = status.username;
+                    App.state.user.instagram = {
+                        username: status.username,
+                        igUserId: status.igUserId,
+                        profilePic: status.profilePic
+                    };
+                    localStorage.setItem('auth_user', JSON.stringify(App.state.user));
+                    sessionStorage.setItem('auth_user', JSON.stringify(App.state.user));
+                    App.updateUserBadge();
+                }
+            } else if (!status.connected && App.state.user) {
+                delete App.state.user.ig_username;
+                delete App.state.user.instagram;
+                localStorage.setItem('auth_user', JSON.stringify(App.state.user));
+                sessionStorage.setItem('auth_user', JSON.stringify(App.state.user));
+                App.updateUserBadge();
+            }
+
             let sheetInfo = {};
             try {
                 sheetInfo = await App.apiCall('GET', '/api/integrations/sheets');

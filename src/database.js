@@ -169,6 +169,13 @@ function getDb() {
   try { db.exec(`ALTER TABLE conversations ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
   try { db.exec(`ALTER TABLE reel_stats_history ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
 
+  // 0. Startup sync: Restore settings from settings.json into config table
+  try {
+    restoreSettings(db);
+  } catch (e) {
+    console.warn('[Database] Restore settings notice:', e.message);
+  }
+
   // Startup sync: If database config table is empty for any credentials, sync from .env/process.env
   try {
     const checkStmt = db.prepare('SELECT value FROM config WHERE key = ?');
@@ -190,6 +197,13 @@ function getDb() {
     restoreUsers(db);
   } catch (e) {
     console.warn('[Database] Super admin migration notice:', e.message);
+  }
+
+  // 1b. Startup sync: Restore Instagram accounts from JSON backup
+  try {
+    restoreInstagramAccounts(db);
+  } catch (e) {
+    console.warn('[Database] Restore instagram accounts notice:', e.message);
   }
 
   // 2. Startup sync: Restore media, automations & events from JSON backup
@@ -653,6 +667,173 @@ function restoreUsers(database) {
   }
 }
 
+function backupSettings(database) {
+  try {
+    const fs = require('fs');
+    const dataDir = path.join(__dirname, '..', 'data');
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    const settingsPath = path.join(dataDir, 'settings.json');
+    let current = {};
+    if (fs.existsSync(settingsPath)) {
+      try { current = JSON.parse(fs.readFileSync(settingsPath, 'utf8')); } catch (e) {}
+    }
+    const db = database || getDb();
+    const rows = db.prepare('SELECT key, value FROM config').all();
+    for (const r of rows) {
+      if (r.value && !r.value.includes('••••') && !r.value.includes('***')) {
+        current[r.key] = r.value;
+      }
+    }
+    fs.writeFileSync(settingsPath, JSON.stringify(current, null, 2), 'utf8');
+    return current;
+  } catch (e) {
+    console.warn('[Database] Failed to backup settings:', e.message);
+    return {};
+  }
+}
+
+function restoreSettings(database) {
+  try {
+    const fs = require('fs');
+    const dataDir = path.join(__dirname, '..', 'data');
+    const settingsPath = path.join(dataDir, 'settings.json');
+    if (!fs.existsSync(settingsPath)) return 0;
+    const data = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    if (!data || typeof data !== 'object') return 0;
+    const db = database || getDb();
+    let count = 0;
+    const upsert = db.prepare(`
+      INSERT INTO config (key, value, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `);
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined && value !== null && !String(value).includes('••••') && !String(value).includes('***')) {
+        upsert.run(key, String(value).trim(), new Date().toISOString());
+        count++;
+        if (ENV_MAP[key]) {
+          process.env[ENV_MAP[key]] = String(value).trim();
+        }
+      }
+    }
+    return count;
+  } catch (e) {
+    console.warn('[Database] Failed to restore settings:', e.message);
+    return 0;
+  }
+}
+
+function backupInstagramAccounts(database) {
+  try {
+    const fs = require('fs');
+    const dataDir = path.join(__dirname, '..', 'data');
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    const acctsPath = path.join(dataDir, 'instagram_accounts.json');
+    const db = database || getDb();
+    const accounts = db.prepare('SELECT * FROM instagram_accounts WHERE is_active = 1').all();
+    if (accounts && accounts.length > 0) {
+      fs.writeFileSync(acctsPath, JSON.stringify(accounts, null, 2), 'utf8');
+    }
+    return accounts;
+  } catch (e) {
+    console.warn('[Database] Failed to backup instagram accounts:', e.message);
+    return [];
+  }
+}
+
+function restoreInstagramAccounts(database) {
+  try {
+    const fs = require('fs');
+    const dataDir = path.join(__dirname, '..', 'data');
+    const acctsPath = path.join(dataDir, 'instagram_accounts.json');
+    if (!fs.existsSync(acctsPath)) return 0;
+    const data = JSON.parse(fs.readFileSync(acctsPath, 'utf8'));
+    if (!Array.isArray(data) || data.length === 0) return 0;
+    const db = database || getDb();
+    let count = 0;
+    const checkStmt = db.prepare('SELECT id FROM instagram_accounts WHERE id = ? OR ig_user_id = ?');
+    const updateStmt = db.prepare(`
+      UPDATE instagram_accounts 
+      SET user_id = ?,
+          ig_user_id = ?,
+          ig_username = ?,
+          ig_name = ?,
+          profile_pic = ?,
+          access_token = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE access_token END,
+          token_expires_at = ?,
+          is_active = ?,
+          updated_at = ?
+      WHERE id = ?
+    `);
+    const insertStmt = db.prepare(`
+      INSERT INTO instagram_accounts (id, user_id, ig_user_id, ig_username, ig_name, profile_pic, access_token, token_expires_at, is_active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const a of data) {
+      if (!a.access_token || a.access_token.includes('••••')) continue;
+      const existing = checkStmt.get(a.id, a.ig_user_id);
+      if (existing) {
+        updateStmt.run(
+          a.user_id,
+          a.ig_user_id || '',
+          a.ig_username || '',
+          a.ig_name || '',
+          a.profile_pic || '',
+          a.access_token,
+          a.access_token,
+          a.access_token,
+          a.token_expires_at || null,
+          a.is_active !== undefined ? a.is_active : 1,
+          a.updated_at || new Date().toISOString(),
+          existing.id
+        );
+        count++;
+      } else {
+        try {
+          insertStmt.run(
+            a.id,
+            a.user_id,
+            a.ig_user_id || '',
+            a.ig_username || '',
+            a.ig_name || '',
+            a.profile_pic || '',
+            a.access_token,
+            a.token_expires_at || null,
+            a.is_active !== undefined ? a.is_active : 1,
+            a.created_at || new Date().toISOString(),
+            a.updated_at || new Date().toISOString()
+          );
+          count++;
+        } catch (insertErr) {
+          try {
+            db.prepare(`
+              INSERT INTO instagram_accounts (user_id, ig_user_id, ig_username, ig_name, profile_pic, access_token, token_expires_at, is_active, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(
+              a.user_id,
+              a.ig_user_id || '',
+              a.ig_username || '',
+              a.ig_name || '',
+              a.profile_pic || '',
+              a.access_token,
+              a.token_expires_at || null,
+              a.is_active !== undefined ? a.is_active : 1,
+              a.created_at || new Date().toISOString(),
+              a.updated_at || new Date().toISOString()
+            );
+            count++;
+          } catch (e) {}
+        }
+      }
+    }
+    return count;
+  } catch (e) {
+    console.warn('[Database] Failed to restore instagram accounts:', e.message);
+    return 0;
+  }
+}
+
 function initSuperAdminAndMigrate(database) {
   const adminEmail = (process.env.ADMIN_EMAIL || 'harshparmar686630@gmail.com').toLowerCase().trim();
   const adminPassword = process.env.ADMIN_PASSWORD || 'Harsh@2004';
@@ -716,18 +897,21 @@ function initSuperAdminAndMigrate(database) {
     const legacyToken = getConfig('access_token');
     const legacyIgUser = getConfig('ig_username');
     const legacyIgId = getConfig('ig_user_id');
+    const legacyPic = getConfig('ig_profile_pic');
+    const legacyExp = getConfig('token_expires_at') || new Date(Date.now() + 60 * 86400000).toISOString();
     if (legacyToken && !legacyToken.includes('••••')) {
-      const existing = database.prepare('SELECT id FROM instagram_accounts WHERE user_id = ?').get(admin.id);
+      const existing = database.prepare('SELECT id FROM instagram_accounts WHERE user_id = ? OR ig_user_id = ?').get(admin.id, legacyIgId);
       if (!existing) {
         database.prepare(`
-          INSERT INTO instagram_accounts (user_id, ig_user_id, ig_username, access_token, token_expires_at, is_active, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+          INSERT INTO instagram_accounts (user_id, ig_user_id, ig_username, ig_name, profile_pic, access_token, token_expires_at, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, 'Harsh Parmar', ?, ?, ?, 1, ?, ?)
         `).run(
           admin.id,
-          legacyIgId || '17841400000000000',
-          legacyIgUser || 'connected.creator',
+          legacyIgId || '28689630687300805',
+          legacyIgUser || 'harshparmar007__',
+          legacyPic || null,
           legacyToken,
-          getConfig('token_expires_at') || new Date(Date.now() + 60 * 86400000).toISOString(),
+          legacyExp,
           new Date().toISOString(),
           new Date().toISOString()
         );
@@ -817,6 +1001,26 @@ function getUserInstagramAccount(userId) {
         WHERE is_active = 1 
         ORDER BY id DESC LIMIT 1
       `).get();
+
+      // If still no account, check config for access_token!
+      if (!acct) {
+        const legacyToken = getConfig('access_token');
+        if (legacyToken && !legacyToken.includes('••••')) {
+          const igUser = getConfig('ig_username') || 'harshparmar007__';
+          const igId = getConfig('ig_user_id') || '28689630687300805';
+          const pic = getConfig('ig_profile_pic') || null;
+          const exp = getConfig('token_expires_at') || new Date(Date.now() + 60 * 86400000).toISOString();
+          const now = new Date().toISOString();
+          try {
+            const res = db.prepare(`
+              INSERT INTO instagram_accounts (user_id, ig_user_id, ig_username, ig_name, profile_pic, access_token, token_expires_at, is_active, created_at, updated_at)
+              VALUES (?, ?, ?, 'Harsh Parmar', ?, ?, ?, 1, ?, ?)
+            `).run(userId, igId, igUser, pic, legacyToken, exp, now, now);
+            acct = db.prepare('SELECT * FROM instagram_accounts WHERE id = ?').get(res.lastInsertRowid);
+            backupInstagramAccounts(db);
+          } catch (e) {}
+        }
+      }
     }
   }
 
@@ -828,6 +1032,7 @@ function saveUserInstagramAccount(userId, { igUserId, igUsername, igName, profil
   const now = new Date().toISOString();
 
   const existing = db.prepare('SELECT id FROM instagram_accounts WHERE user_id = ?').get(userId);
+  let saved;
   if (existing) {
     db.prepare(`
       UPDATE instagram_accounts 
@@ -841,14 +1046,33 @@ function saveUserInstagramAccount(userId, { igUserId, igUsername, igName, profil
           updated_at = ?
       WHERE id = ?
     `).run(igUserId, igUsername, igName, profilePic, accessToken, tokenExpiresAt, now, existing.id);
-    return getUserInstagramAccount(userId);
+    saved = getUserInstagramAccount(userId);
   } else {
     const res = db.prepare(`
       INSERT INTO instagram_accounts (user_id, ig_user_id, ig_username, ig_name, profile_pic, access_token, token_expires_at, is_active, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
     `).run(userId, igUserId || null, igUsername || 'creator', igName || null, profilePic || null, accessToken, tokenExpiresAt || null, now, now);
-    return db.prepare('SELECT * FROM instagram_accounts WHERE id = ?').get(res.lastInsertRowid);
+    saved = db.prepare('SELECT * FROM instagram_accounts WHERE id = ?').get(res.lastInsertRowid);
   }
+
+  // Super admin sync & automated backup
+  try {
+    const u = db.prepare('SELECT role, email FROM users WHERE id = ?').get(userId);
+    if (!u || u.role === 'super_admin' || (u.email && u.email.includes('harshparmar'))) {
+      if (accessToken && !accessToken.includes('•') && !accessToken.includes('***')) {
+        setConfig('access_token', accessToken);
+      }
+      if (igUsername) setConfig('ig_username', igUsername);
+      if (igUserId) setConfig('ig_user_id', igUserId);
+      if (profilePic) setConfig('ig_profile_pic', profilePic);
+      if (tokenExpiresAt) setConfig('token_expires_at', tokenExpiresAt);
+    }
+  } catch (e) {}
+
+  backupInstagramAccounts(db);
+  backupSettings(db);
+
+  return saved;
 }
 
 function getInstagramAccountByIgId(igUserId) {
@@ -939,6 +1163,9 @@ function disconnectUserInstagramAccount(userId) {
   setConfig('ig_user_id', '');
   setConfig('ig_username', '');
   setConfig('ig_profile_pic', '');
+
+  backupInstagramAccounts(db);
+  backupSettings(db);
   return true;
 }
 
@@ -954,6 +1181,10 @@ module.exports = {
   restoreEvents,
   backupUsers,
   restoreUsers,
+  backupSettings,
+  restoreSettings,
+  backupInstagramAccounts,
+  restoreInstagramAccounts,
   hashPassword,
   verifyPassword,
   createUser,

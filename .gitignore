@@ -4,7 +4,6 @@ node_modules
 *.db-*
 data/*.db
 data/*.db-*
-data/settings.json
 logs/
 .DS_Store
 

@@ -1,0 +1,14 @@
+{
+  "google_sheet_webhook_url": "https://script.google.com/macros/s/AKfycb_sample_test/exec",
+  "google_sheet_sync_enabled": "1",
+  "access_token": "IGAAZAUVG4y1kpBZAGF5RnUwR25YTUNNbzh4VFJnRFpIZAWRwYTFZAZAUdQd19tb0VUV2ZA0OVVHcjYzeW1mVlBfX0w2QVhtR00yT21ITERpQTRMX1YxZAEk0VFBhaEhWU3RZATEVXa1EyVzVpSm1YYVdyc2oxaDFrQ3ZAuTHVSbHo2MnlxRQZDZD",
+  "ig_username": "harshparmar007__",
+  "ig_user_id": "28689630687300805",
+  "token_expires_at": "2026-11-10T18:17:53.621Z",
+  "ig_profile_pic": "https://scontent.cdninstagram.com/v/t51.82787-19/581599966_18085625753054621_731374289077452032_n.jpg?stp=dst-jpg_s206x206_tt6&_nc_cat=109&ccb=7-5&_nc_sid=bf7eb4&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLnd3dy4xMDgwLkMzIn0%3D&_nc_ohc=4qH9zFPWvOoQ7kNvwGhe9kO&_nc_oc=AdrkgnYN1hJu2y5ypI_8Fhk1I1xBeX-3RwDp5XNmFK2ctFfViL8ApnvfE-aVLDLYDDjjRSNWGYrr2KacRJqQBz-G&_nc_zt=24&_nc_ht=scontent.cdninstagram.com&edm=AP4hL3IEAAAA&_nc_gid=pB09pDbkVdQFVbzvsWsBhw&_nc_tpa=Q5bMBQL8zdyBWcaF5ncXE2nFA6IpuCjEYSj9Hi3Iq-kN13yK89IHzQ0N6dqmjKIqnmsVCuF8Sd-NkbRXvA&oh=00_AQI8TQoCVesLAxKzMbfSbGwN4ezlyohk4FfTHHsi_3j7VA&oe=6AA4952F",
+  "meta_app_id": "28028411953483811",
+  "redirect_uri": "http://localhost:5098/auth/instagram/callback",
+  "meta_app_secret": "demo_secret_key_8888",
+  "webhook_verify_token": "creator_verify_token_2026",
+  "webhook_subscribed": "1"
+}

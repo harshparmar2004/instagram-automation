@@ -111,13 +111,17 @@ const App = {
 
             if (res.ok && data.token) {
                 this.state.token = data.token;
-                this.state.user = data.user;
+                this.state.user = {
+                    ...data.user,
+                    instagram: data.instagramAccount,
+                    ig_username: data.instagramAccount?.username
+                };
                 localStorage.setItem('auth_token', data.token);
                 localStorage.setItem('dashboard_password', data.token);
-                localStorage.setItem('auth_user', JSON.stringify(data.user));
+                localStorage.setItem('auth_user', JSON.stringify(this.state.user));
                 sessionStorage.setItem('auth_token', data.token);
                 sessionStorage.setItem('dashboard_password', data.token);
-                sessionStorage.setItem('auth_user', JSON.stringify(data.user));
+                sessionStorage.setItem('auth_user', JSON.stringify(this.state.user));
 
                 this.showToast(`Welcome back, ${data.user.name || 'Creator'}!`, 'success');
                 this.showDashboard();
@@ -167,13 +171,17 @@ const App = {
 
             if (res.ok && data.token) {
                 this.state.token = data.token;
-                this.state.user = data.user;
+                this.state.user = {
+                    ...data.user,
+                    instagram: data.instagramAccount || null,
+                    ig_username: data.instagramAccount?.username || null
+                };
                 localStorage.setItem('auth_token', data.token);
                 localStorage.setItem('dashboard_password', data.token);
-                localStorage.setItem('auth_user', JSON.stringify(data.user));
+                localStorage.setItem('auth_user', JSON.stringify(this.state.user));
                 sessionStorage.setItem('auth_token', data.token);
                 sessionStorage.setItem('dashboard_password', data.token);
-                sessionStorage.setItem('auth_user', JSON.stringify(data.user));
+                sessionStorage.setItem('auth_user', JSON.stringify(this.state.user));
 
                 this.showToast(`🎉 Account created! Welcome, ${data.user.name}!`, 'success');
                 this.showDashboard();
@@ -199,9 +207,13 @@ const App = {
 
             if (res.ok) {
                 const data = await res.json();
-                this.state.user = data.user;
-                localStorage.setItem('auth_user', JSON.stringify(data.user));
-                sessionStorage.setItem('auth_user', JSON.stringify(data.user));
+                this.state.user = {
+                    ...data.user,
+                    instagram: data.instagramAccount,
+                    ig_username: data.instagramAccount?.username
+                };
+                localStorage.setItem('auth_user', JSON.stringify(this.state.user));
+                sessionStorage.setItem('auth_user', JSON.stringify(this.state.user));
                 this.showDashboard();
             } else {
                 // Try legacy check
@@ -249,6 +261,7 @@ const App = {
         const igHandle = user.instagram?.username || user.ig_username;
         if (this.elements.sidebarUserHandle) {
             this.elements.sidebarUserHandle.textContent = igHandle ? `@${igHandle}` : '@not_connected';
+            this.elements.sidebarUserHandle.style.color = igHandle ? '#2E7D32' : 'var(--text-secondary)';
         }
 
         // Show/hide Super Admin tab
