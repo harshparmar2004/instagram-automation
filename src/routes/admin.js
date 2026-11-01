@@ -66,6 +66,23 @@ router.post('/users/:id/status', (req, res) => {
     }
 });
 
+// POST /api/admin/users/:id/role
+router.post('/users/:id/role', (req, res) => {
+    try {
+        const userId = Number(req.params.id);
+        const { role } = req.body || {};
+        if (!['super_admin', 'admin', 'user'].includes(role)) {
+            return res.status(400).json({ error: 'Role must be super_admin, admin, or user' });
+        }
+        const db = getDb();
+        db.prepare("UPDATE users SET role = ?, updated_at = ? WHERE id = ?").run(role, new Date().toISOString(), userId);
+        res.json({ success: true, message: `User role updated to ${role}` });
+    } catch (err) {
+        console.error('[Admin Role Error]:', err);
+        res.status(500).json({ error: 'Failed to update user role' });
+    }
+});
+
 // DELETE /api/admin/users/:id
 router.delete('/users/:id', (req, res) => {
     try {
