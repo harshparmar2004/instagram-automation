@@ -20,7 +20,7 @@ router.get('/rules', auth, (req, res) => {
             }
         } catch(e) {}
 
-        const { media_id } = req.query;
+        const { media_id, status } = req.query;
         const userId = req.user?.id;
         const userObj = userId ? db.prepare('SELECT email, role FROM users WHERE id = ?').get(userId) : null;
         const isSuperAdmin = (req.user?.role === 'super_admin' || userObj?.role === 'super_admin' || (userObj?.email && userObj.email.includes('harshparmar'))) && !req.isImpersonating;
@@ -32,6 +32,22 @@ router.get('/rules', auth, (req, res) => {
         `;
         const whereClauses = [];
         const params = [];
+
+        // Status filtering: active, paused, deleted, or all_with_deleted
+        if (status === 'deleted') {
+            whereClauses.push('r.is_deleted = 1');
+        } else if (status === 'all_with_deleted') {
+            // Include everything
+        } else if (status === 'active') {
+            whereClauses.push('(r.is_deleted = 0 OR r.is_deleted IS NULL)');
+            whereClauses.push('r.is_active = 1');
+        } else if (status === 'paused') {
+            whereClauses.push('(r.is_deleted = 0 OR r.is_deleted IS NULL)');
+            whereClauses.push('r.is_active = 0');
+        } else {
+            // Default: show active and paused, exclude deleted
+            whereClauses.push('(r.is_deleted = 0 OR r.is_deleted IS NULL)');
+        }
 
         if (!isSuperAdmin && userId) {
             whereClauses.push('(r.user_id = ? OR r.user_id IS NULL)');
@@ -104,14 +120,7 @@ router.post('/rules', auth, (req, res) => {
             if (mRow) {
                 resolvedMediaId = mRow.id;
             } else {
-                try {
-                    const placeholderIgId = String(media_id).length > 8 ? String(media_id) : `media_${media_id}`;
-                    db.prepare("INSERT INTO media (ig_media_id, caption, status, synced_at, user_id) VALUES (?, ?, 'active', ?, ?) ON CONFLICT(ig_media_id) DO NOTHING").run(placeholderIgId, `Reel #${media_id}`, new Date().toISOString(), userId);
-                    const mNew = db.prepare("SELECT id FROM media WHERE ig_media_id = ?").get(placeholderIgId);
-                    resolvedMediaId = mNew ? mNew.id : (typeof media_id === 'number' ? media_id : null);
-                } catch(e) {
-                    resolvedMediaId = typeof media_id === 'number' ? media_id : null;
-                }
+                resolvedMediaId = typeof media_id === 'number' ? media_id : null;
             }
         }
 
@@ -164,14 +173,7 @@ router.put('/rules/:id', auth, (req, res) => {
                 if (mRow) {
                     resolvedMediaId = mRow.id;
                 } else {
-                    try {
-                        const placeholderIgId = String(media_id).length > 8 ? String(media_id) : `media_${media_id}`;
-                        db.prepare("INSERT INTO media (ig_media_id, caption, status, synced_at, user_id) VALUES (?, ?, 'active', ?, ?) ON CONFLICT(ig_media_id) DO NOTHING").run(placeholderIgId, `Reel #${media_id}`, new Date().toISOString(), req.user?.id || null);
-                        const mNew = db.prepare("SELECT id FROM media WHERE ig_media_id = ?").get(placeholderIgId);
-                        resolvedMediaId = mNew ? mNew.id : (typeof media_id === 'number' ? media_id : null);
-                    } catch(e) {
-                        resolvedMediaId = typeof media_id === 'number' ? media_id : null;
-                    }
+                    resolvedMediaId = typeof media_id === 'number' ? media_id : null;
                 }
             }
         }
@@ -319,13 +321,53 @@ router.delete('/rules/:id', auth, (req, res) => {
     try {
         const db = getDb();
         const { id } = req.params;
-        db.prepare('DELETE FROM events WHERE rule_id = ?').run(id);
-        db.prepare('DELETE FROM conversations WHERE rule_id = ?').run(id);
-        db.prepare('DELETE FROM rules WHERE id = ?').run(id);
+        const result = db.prepare('UPDATE rules SET is_deleted = 1, is_active = 0, updated_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+
+        if (result.changes === 0) {
+            return res.status(404).json({ error: 'Rule not found' });
+        }
 
         try { backupRules(db); } catch(e) { console.error('Error backing up rules:', e); }
 
-        res.json({ success: true, message: 'Rule and its trigger history deleted successfully' });
+        res.json({ success: true, message: 'Automation moved to Deleted Automations' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/rules/:id/restore', auth, (req, res) => {
+    try {
+        const db = getDb();
+        const { id } = req.params;
+        const result = db.prepare('UPDATE rules SET is_deleted = 0, is_active = 1, updated_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+
+        if (result.changes === 0) {
+            return res.status(404).json({ error: 'Rule not found' });
+        }
+
+        try { backupRules(db); } catch(e) { console.error('Error backing up rules:', e); }
+
+        res.json({ success: true, message: 'Automation restored successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.delete('/rules/:id/permanent', auth, (req, res) => {
+    try {
+        const db = getDb();
+        const { id } = req.params;
+        db.prepare('DELETE FROM events WHERE rule_id = ?').run(id);
+        db.prepare('DELETE FROM conversations WHERE rule_id = ?').run(id);
+        const result = db.prepare('DELETE FROM rules WHERE id = ?').run(id);
+
+        if (result.changes === 0) {
+            return res.status(404).json({ error: 'Rule not found' });
+        }
+
+        try { backupRules(db); } catch(e) { console.error('Error backing up rules:', e); }
+
+        res.json({ success: true, message: 'Automation permanently deleted' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

@@ -122,10 +122,10 @@ window.rules = {
     },
 
     async deleteRule(id) {
-        if (!confirm('Are you sure you want to delete this rule?')) return;
+        if (!confirm('Are you sure you want to delete this rule? It will be moved to Deleted Automations and can be restored anytime.')) return;
         try {
             await App.apiCall('DELETE', `/api/rules/${id}`);
-            App.showToast('Rule deleted', 'success');
+            App.showToast('Rule moved to Deleted Automations', 'success');
             if (window.workflows && typeof window.workflows.refresh === 'function') window.workflows.refresh();
             this.loadRules();
         } catch (err) {

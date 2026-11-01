@@ -39,12 +39,13 @@ window.workflows = {
                             </select>
                         </div>
 
-                        <!-- Status Filter (Active / Paused) -->
-                        <div style="flex: 1; min-width: 150px;">
+                        <!-- Status Filter (Active / Paused / Deleted) -->
+                        <div style="flex: 1; min-width: 170px;">
                             <select id="workflow-status-filter" class="select" onchange="workflows.applyFilters()" style="padding: 0.65rem 1rem; font-size: 0.88rem; font-weight: 600;">
-                                <option value="">All Statuses</option>
+                                <option value="">All Statuses (Active & Paused)</option>
                                 <option value="active" ${this.statusFilter==='active'?'selected':''}>🟢 Active Only</option>
                                 <option value="paused" ${this.statusFilter==='paused'?'selected':''}>⏸️ Paused Only</option>
+                                <option value="deleted" ${this.statusFilter==='deleted'?'selected':''}>🗑️ Deleted Automations</option>
                             </select>
                         </div>
 
@@ -76,7 +77,7 @@ window.workflows = {
     async refresh() {
         if (document.getElementById('workflows-content')) {
             try {
-                this.rawItems = await App.apiCall('GET', '/api/media/automated');
+                this.rawItems = await App.apiCall('GET', '/api/media/automated?include_deleted=true');
                 this.applyFilters();
             } catch(e) {}
         }
@@ -84,7 +85,7 @@ window.workflows = {
 
     async loadWorkflows() {
         try {
-            this.rawItems = await App.apiCall('GET', '/api/media/automated');
+            this.rawItems = await App.apiCall('GET', '/api/media/automated?include_deleted=true');
             this.applyFilters();
         } catch (err) {
             document.getElementById('workflows-content').innerHTML = `
@@ -110,17 +111,28 @@ window.workflows = {
         this.rawItems.forEach(item => {
             const isGlobal = item.id === 'global';
             const caption = (item.caption || '').toLowerCase();
-            const matchingRules = item.rules.filter(rule => {
+            const matchingRules = (item.rules || []).filter(rule => {
                 const keyword = (rule.trigger_keyword || '').toLowerCase();
                 const link = (rule.link_url || '').toLowerCase();
                 const response = (rule.response_text || '').toLowerCase();
 
                 const matchesSearch = !this.search || keyword.includes(this.search) || link.includes(this.search) || caption.includes(this.search) || response.includes(this.search);
                 const matchesAction = !this.actionFilter || rule.action_type === this.actionFilter;
-                const isRuleActive = rule.is_active === 1 || rule.is_active === true || rule.is_active === '1';
-                const matchesStatus = !this.statusFilter || 
-                    (this.statusFilter === 'active' && isRuleActive) || 
-                    (this.statusFilter === 'paused' && !isRuleActive);
+                
+                const isRuleDeleted = rule.is_deleted === 1 || rule.is_deleted === true || rule.is_deleted === '1';
+                const isRuleActive = (rule.is_active === 1 || rule.is_active === true || rule.is_active === '1') && !isRuleDeleted;
+
+                let matchesStatus = true;
+                if (this.statusFilter === 'deleted') {
+                    matchesStatus = isRuleDeleted;
+                } else if (this.statusFilter === 'active') {
+                    matchesStatus = isRuleActive;
+                } else if (this.statusFilter === 'paused') {
+                    matchesStatus = !isRuleActive && !isRuleDeleted;
+                } else {
+                    // Default / All Statuses: show active and paused, hide deleted
+                    matchesStatus = !isRuleDeleted;
+                }
 
                 return matchesSearch && matchesAction && matchesStatus;
             });
@@ -154,13 +166,28 @@ window.workflows = {
         const countBadge = document.getElementById('workflow-count-badge');
         let activeCount = 0;
         let totalCount = 0;
+        let deletedCount = 0;
         filtered.forEach(i => {
             i.rules.forEach(r => {
-                totalCount++;
-                if (r.is_active === 1 || r.is_active === true || r.is_active === '1') activeCount++;
+                const isDel = r.is_deleted === 1 || r.is_deleted === true || r.is_deleted === '1';
+                if (isDel) {
+                    deletedCount++;
+                } else {
+                    totalCount++;
+                    if (r.is_active === 1 || r.is_active === true || r.is_active === '1') activeCount++;
+                }
             });
         });
-        if (countBadge) countBadge.textContent = `${activeCount} Active / ${totalCount} Total`;
+
+        if (countBadge) {
+            if (this.statusFilter === 'deleted') {
+                countBadge.textContent = `${deletedCount} Deleted Automation${deletedCount === 1 ? '' : 's'}`;
+                countBadge.style.color = '#B91C1C';
+            } else {
+                countBadge.textContent = `${activeCount} Active / ${totalCount} Total`;
+                countBadge.style.color = 'var(--accent-primary)';
+            }
+        }
 
         this.renderBlocks(filtered);
     },
@@ -176,11 +203,32 @@ window.workflows = {
     },
 
     async deleteRule(ruleId) {
-        if (!confirm('Are you sure you want to delete this automation rule?')) return;
+        if (!confirm('Are you sure you want to delete this automation? It will be moved to Deleted Automations and can be restored anytime.')) return;
         try {
             await App.apiCall('DELETE', `/api/rules/${ruleId}`);
-            App.showToast('Automation deleted successfully', 'success');
-            this.refresh();
+            App.showToast('Automation moved to Deleted Automations', 'success');
+            await this.loadWorkflows();
+        } catch(e) {
+            App.showToast(e.message, 'error');
+        }
+    },
+
+    async restoreRule(ruleId) {
+        try {
+            await App.apiCall('POST', `/api/rules/${ruleId}/restore`);
+            App.showToast('Automation restored successfully! It is now active.', 'success');
+            await this.loadWorkflows();
+        } catch(e) {
+            App.showToast(e.message, 'error');
+        }
+    },
+
+    async permanentDeleteRule(ruleId) {
+        if (!confirm('Are you sure you want to PERMANENTLY delete this automation? This cannot be undone.')) return;
+        try {
+            await App.apiCall('DELETE', `/api/rules/${ruleId}/permanent`);
+            App.showToast('Automation permanently deleted', 'success');
+            await this.loadWorkflows();
         } catch(e) {
             App.showToast(e.message, 'error');
         }
@@ -232,28 +280,44 @@ window.workflows = {
                 const dmsSent = rule.total_triggers !== undefined && rule.total_triggers !== null ? rule.total_triggers : 0;
                 const clicks = rule.total_clicks !== undefined && rule.total_clicks !== null ? rule.total_clicks : 0;
                 const ctr = dmsSent > 0 ? Math.round((clicks / dmsSent) * 100) : 0;
-                const isActive = rule.is_active !== 0;
+                const isDeleted = rule.is_deleted === 1 || rule.is_deleted === true || rule.is_deleted === '1';
+                const isActive = (rule.is_active !== 0 && !isDeleted);
 
                 html += `
                     <!-- FULL-SCREEN WIDE WORKFLOW CONTAINER (ZERO PILLS) -->
                     <div class="card" style="padding: 0; overflow: hidden; border: 1px solid var(--border-color); background: #FFFFFF; box-shadow: 0 4px 20px rgba(44,42,41,0.03); border-radius: 16px; width: 100%;">
                         
                         <!-- CARD HEADER BAR -->
-                        <div style="padding: 0.85rem 1.5rem; background: #FAF8F5; border-bottom: 1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
+                        <div style="padding: 0.85rem 1.5rem; background: ${isDeleted ? '#FEF2F2' : '#FAF8F5'}; border-bottom: 1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
                             <div style="display:flex; align-items:center; gap:0.75rem;">
                                 <span style="font-family:'Plus Jakarta Sans', sans-serif; font-size:0.85rem; font-weight:800; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.04em;">AUTOMATION RULE #${rule.id}</span>
                                 <span style="color:var(--border-color);">•</span>
+                                ${isDeleted ? `
+                                <span style="font-size:0.85rem; font-weight:800; color:#991B1B; display: inline-flex; align-items: center; gap: 0.35rem; background: #FEE2E2; border: 1px solid #FECACA; padding: 3px 8px; border-radius: 6px;">
+                                    <span>🗑️</span>
+                                    <span>Deleted Automation</span>
+                                </span>
+                                ` : `
                                 <span style="font-size:0.85rem; font-weight:800; color:${isActive ? '#1B5E20' : '#B45309'}; display: inline-flex; align-items: center; gap: 0.35rem; background: ${isActive ? '#E8F5E9' : '#FEF3C7'}; padding: 3px 8px; border-radius: 6px;">
                                     <span>${isActive ? '🟢' : '⏸️'}</span>
                                     <span>${isActive ? 'Active & Listening' : 'Paused'}</span>
                                 </span>
-                                ${isButtonFunnel ? `
+                                `}
+                                ${isButtonFunnel && !isDeleted ? `
                                 <span style="font-size:0.8rem; font-weight:800; color:#1D4ED8; display: inline-flex; align-items: center; gap: 0.35rem; background:#EFF6FF; border:1px solid #BFDBFE; padding: 3px 8px; border-radius: 6px;">
                                     <span>🔘 Interactive Button Funnel</span>
                                 </span>` : ''}
                             </div>
 
                             <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                                ${isDeleted ? `
+                                <button class="btn btn-primary btn-sm" style="font-size:0.82rem; font-weight:800; padding:0.4rem 1.1rem; border-radius: 8px; background:#2E7D32; border:1.5px solid #2E7D32; color:#FFFFFF; cursor:pointer;" onclick="workflows.restoreRule(${rule.id})">
+                                    ♻️ Restore Automation
+                                </button>
+                                <button class="btn btn-danger btn-sm" style="font-size:0.8rem; font-weight:600; padding:0.35rem 0.85rem;" onclick="workflows.permanentDeleteRule(${rule.id})">
+                                    Delete Permanently
+                                </button>
+                                ` : `
                                 <button class="btn btn-sm" style="font-size:0.82rem; font-weight:800; padding:0.4rem 1rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; ${isActive ? 'background:#FFFFFF; border:1.5px solid #D1C9BE; color:#4B5563;' : 'background:#2E7D32; border:1.5px solid #2E7D32; color:#FFFFFF;'}" onclick="workflows.toggleRuleStatus(${rule.id})" title="${isActive ? 'Click to Pause this automation' : 'Click to Activate this automation'}">
                                     ${isActive ? '⏸️ Pause' : '🟢 Activate'}
                                 </button>
@@ -269,6 +333,7 @@ window.workflows = {
                                 <button class="btn btn-danger btn-sm" style="font-size:0.8rem; font-weight:600; padding:0.35rem 0.85rem;" onclick="workflows.deleteRule(${rule.id})">
                                     Delete
                                 </button>
+                                `}
                             </div>
                         </div>
 

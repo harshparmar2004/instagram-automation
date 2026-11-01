@@ -33,6 +33,7 @@ const App = {
         modalBody: document.getElementById('modal-body'),
         closeModalBtn: document.getElementById('close-modal-btn'),
         sidebarUserBadge: document.getElementById('sidebar-user-badge'),
+        sidebarUserDot: document.getElementById('sidebar-user-dot'),
         sidebarUserHandle: document.getElementById('sidebar-user-handle'),
         sidebarUserName: document.getElementById('sidebar-user-name'),
         sidebarUserEmail: document.getElementById('sidebar-user-email'),
@@ -259,9 +260,17 @@ const App = {
 
         // Handle connected Instagram handle display
         const igHandle = user.instagram?.username || user.ig_username;
+        const dot = this.elements.sidebarUserDot || document.getElementById('sidebar-user-dot');
         if (this.elements.sidebarUserHandle) {
             this.elements.sidebarUserHandle.textContent = igHandle ? `@${igHandle}` : '@not_connected';
             this.elements.sidebarUserHandle.style.color = igHandle ? '#2E7D32' : 'var(--text-secondary)';
+        }
+        if (this.elements.sidebarUserBadge) {
+            this.elements.sidebarUserBadge.style.color = igHandle ? '#2E7D32' : 'var(--text-secondary)';
+        }
+        if (dot) {
+            dot.style.background = igHandle ? '#2E7D32' : '#9CA3AF';
+            dot.style.boxShadow = igHandle ? '0 0 6px rgba(46,125,50,0.4)' : 'none';
         }
 
         // Show/hide Super Admin tab

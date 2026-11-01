@@ -165,8 +165,8 @@ function getDb() {
   try { db.exec(`ALTER TABLE events ADD COLUMN synced_to_sheet INTEGER DEFAULT 0;`); } catch (e) {}
   try { db.exec(`ALTER TABLE rules ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
   try { db.exec(`ALTER TABLE media ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
-  try { db.exec(`ALTER TABLE events ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
   try { db.exec(`ALTER TABLE conversations ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
+  try { db.exec(`ALTER TABLE rules ADD COLUMN is_deleted INTEGER DEFAULT 0;`); } catch (e) {}
   try { db.exec(`ALTER TABLE reel_stats_history ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
 
   // 0. Startup sync: Restore settings from settings.json into config table
@@ -444,13 +444,21 @@ function restoreRules(dbInstance) {
     let restoredCount = 0;
     const checkStmt = database.prepare('SELECT id FROM rules WHERE id = ? OR (trigger_keyword = ? AND response_text = ?)');
     const insertStmtWithId = database.prepare(`
-      INSERT INTO rules (id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, created_at, updated_at, user_id, buttons_config_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO rules (id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, is_deleted, created_at, updated_at, user_id, buttons_config_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const r of data) {
       const existing = checkStmt.get(r.id, r.trigger_keyword, r.response_text);
-      if (!existing) {
+      if (existing) {
+        if (r.is_deleted !== undefined) {
+          database.prepare('UPDATE rules SET is_deleted = ?, is_active = ? WHERE id = ?').run(
+            r.is_deleted ? 1 : 0,
+            r.is_active !== undefined ? r.is_active : (r.is_deleted ? 0 : 1),
+            existing.id
+          );
+        }
+      } else {
         let resolvedMediaId = r.media_id;
         if (r.media_id && r.media_id !== 'global') {
           try {
@@ -458,18 +466,15 @@ function restoreRules(dbInstance) {
             if (m) {
               resolvedMediaId = m.id;
             } else {
-              // Create placeholder in media table so reel-specific relation is never lost
-              const placeholderIgId = String(r.media_id).startsWith('1') ? String(r.media_id) : `media_${r.media_id}`;
-              const placeholder = database.prepare(`
-                INSERT INTO media (ig_media_id, caption, media_type, media_product_type, status, user_id, timestamp)
-                VALUES (?, ?, 'REEL', 'REELS', 'active', ?, ?)
-              `).run(placeholderIgId, `Automation Post #${r.media_id}`, r.user_id || 1, new Date().toISOString());
-              resolvedMediaId = placeholder.lastInsertRowid;
+              resolvedMediaId = null;
             }
           } catch(e) {
-            resolvedMediaId = r.media_id;
+            resolvedMediaId = null;
           }
         }
+
+        const isDeleted = r.is_deleted ? 1 : 0;
+        const isActive = r.is_active !== undefined ? r.is_active : (isDeleted ? 0 : 1);
 
         try {
           insertStmtWithId.run(
@@ -483,7 +488,8 @@ function restoreRules(dbInstance) {
             r.public_reply || null,
             r.delay_seconds || 0,
             r.variations_json || null,
-            r.is_active !== undefined ? r.is_active : 1,
+            isActive,
+            isDeleted,
             r.created_at || new Date().toISOString(),
             r.updated_at || new Date().toISOString(),
             r.user_id || 1,
@@ -493,8 +499,8 @@ function restoreRules(dbInstance) {
         } catch (insertErr) {
           try {
             database.prepare(`
-              INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, created_at, updated_at, user_id, buttons_config_json)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, is_deleted, created_at, updated_at, user_id, buttons_config_json)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).run(
               resolvedMediaId,
               r.trigger_keyword,
@@ -505,7 +511,8 @@ function restoreRules(dbInstance) {
               r.public_reply || null,
               r.delay_seconds || 0,
               r.variations_json || null,
-              r.is_active !== undefined ? r.is_active : 1,
+              isActive,
+              isDeleted,
               r.created_at || new Date().toISOString(),
               r.updated_at || new Date().toISOString(),
               r.user_id || 1,
