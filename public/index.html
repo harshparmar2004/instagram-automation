@@ -42,128 +42,241 @@
 <body class="bg-cream-50 text-cream-800 antialiased min-h-screen">
     <div id="toast-container" class="toast-container"></div>
     
-    <!-- CLEAN DEDICATED AUTH SCREEN (SIGN IN & REGISTER) -->
+    <!-- CLEAN DEDICATED AUTH SCREEN (SIGN IN & REGISTER - 60% SHOWCASE / 40% AUTH SPLIT) -->
     <div id="login-screen" class="login-screen active">
-        <div class="login-card-box" style="max-width: 440px; width: 100%;">
-            <div class="login-header-text" style="text-align: left; margin-bottom: 1.4rem;">
-                <div style="display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.15rem;">
-                    <img src="favicon.png?v=5" alt="InstaAuto Logo" style="width: 44px; height: 44px; object-fit: contain; background: transparent;" />
-                    <div>
-                        <h1 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.45rem; color: #2C2A29; letter-spacing: -0.03em; margin: 0; line-height: 1.1;">InstaAuto</h1>
-                        <div style="font-size: 0.72rem; font-weight: 700; color: #D97757; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.15rem;">Creator Automation SaaS</div>
+        <div class="auth-split-wrapper">
+            <!-- Left 60%: Interactive Animated Showcase -->
+            <div class="auth-showcase-panel">
+                <div class="showcase-badge-pill">
+                    <span class="showcase-pulse-dot"></span>
+                    <span class="showcase-badge-text">Meta Graph API Verified</span>
+                    <span class="showcase-badge-sep">•</span>
+                    <span class="showcase-badge-sub">250 DMs / Hour Official Rate Limit</span>
+                </div>
+
+                <div>
+                    <h1 class="showcase-headline">
+                        Automate Instagram comments into <span class="highlight-terracotta">instant VIP DMs</span>
+                    </h1>
+                    <p class="showcase-subhead" style="margin-top: 0.5rem;">
+                        Scale creator engagement 24/7 without getting rate-limited or shadowbanned. Pure official API pipeline with end-to-end multi-tenant isolation.
+                    </p>
+                </div>
+
+                <!-- Stage Box with Visual Simulation Pipeline -->
+                <div class="showcase-stage-box">
+                    <!-- Floating Stat Pills -->
+                    <div class="floating-stat-pill pill-top-right">
+                        <div class="stat-icon-wrap" style="color: #D97757;">⚡</div>
+                        <div>
+                            <div class="stat-title">0.38s Latency</div>
+                            <div class="stat-desc">Sub-second webhook response</div>
+                        </div>
+                    </div>
+
+                    <div class="floating-stat-pill pill-bottom-left">
+                        <div class="stat-icon-wrap" style="color: #2E7D32;">🛡️</div>
+                        <div>
+                            <div class="stat-title">100% Meta Safe</div>
+                            <div class="stat-desc">Zero scraping • Official Token</div>
+                        </div>
+                    </div>
+
+                    <!-- Step 1: Follower Comment Card -->
+                    <div class="stage-step-card comment-card">
+                        <div class="step-card-header">
+                            <div class="user-meta-avatar">
+                                <div class="avatar-inner">👩‍💻</div>
+                                <span class="online-ring"></span>
+                            </div>
+                            <div style="flex: 1;">
+                                <div class="username-row">
+                                    <span class="username">@sophia.creator</span>
+                                    <span class="comment-time">just now</span>
+                                </div>
+                                <div class="reel-tag">commented on your Reel</div>
+                            </div>
+                            <span class="badge badge-purple" style="font-size: 0.68rem; padding: 0.15rem 0.5rem;">Incoming</span>
+                        </div>
+                        <div class="comment-bubble">
+                            "Can you please send me the <strong>LINK</strong>? Want the early access template! 🔥"
+                        </div>
+                    </div>
+
+                    <!-- Connector: Live Matched Keyword Beam -->
+                    <div class="stage-flow-connector">
+                        <div class="flow-beam-line">
+                            <div class="flow-pulse-particle"></div>
+                        </div>
+                        <div class="flow-trigger-chip">
+                            <span class="trigger-bolt">⚡</span>
+                            <span>Rule matched: <strong>"LINK"</strong> • Auto-DM triggered</span>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Instant Delivered DM Card -->
+                    <div class="stage-step-card dm-card">
+                        <div class="dm-header">
+                            <div class="dm-brand-info">
+                                <img src="favicon.png?v=5" alt="Bot" class="dm-bot-avatar" />
+                                <div>
+                                    <div class="dm-bot-name">
+                                        <span>InstaAuto Bot</span>
+                                        <span class="verified-badge">✓</span>
+                                    </div>
+                                    <div class="dm-status-text">Delivered via Instagram Direct</div>
+                                </div>
+                            </div>
+                            <span class="dm-badge-pill">Meta API 200 OK</span>
+                        </div>
+                        <div class="dm-message-bubble">
+                            <p class="dm-text">
+                                Hey Sophia! Here is your exclusive early access link to the creator bundle with 20% off:
+                            </p>
+                            <div class="dm-cta-button">
+                                <span>🚀 Open Creator Portal</span>
+                                <span>→</span>
+                            </div>
+                            <div class="dm-link-preview">
+                                <span>https://instaauto.io/vip-access</span>
+                                <span class="link-seen">Seen • 1s ago</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Auth Mode Switcher Tabs -->
-                <div style="display: flex; background: #F5F1EA; padding: 4px; border-radius: 12px; margin-bottom: 1.25rem;">
-                    <button type="button" id="tab-btn-login" onclick="switchAuthTab('login')" style="flex: 1; padding: 0.6rem; border-radius: 9px; font-weight: 700; font-size: 0.85rem; border: none; cursor: pointer; background: #FFFFFF; color: #2C2A29; box-shadow: 0 2px 6px rgba(0,0,0,0.06); transition: all 0.2s;">
-                        Sign In
-                    </button>
-                    <button type="button" id="tab-btn-register" onclick="switchAuthTab('register')" style="flex: 1; padding: 0.6rem; border-radius: 9px; font-weight: 700; font-size: 0.85rem; border: none; cursor: pointer; background: transparent; color: #736E68; transition: all 0.2s;">
-                        Create Account
-                    </button>
-                </div>
-
-                <div id="auth-heading-login">
-                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.35rem; color: #2C2A29; margin: 0 0 0.35rem 0; letter-spacing: -0.02em;">Welcome Back 👋</h2>
-                    <p style="font-size: 0.86rem; color: #736E68; margin: 0; line-height: 1.45;">Enter your email & password to access your automation workspace.</p>
-                </div>
-
-                <div id="auth-heading-register" style="display: none;">
-                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.35rem; color: #2C2A29; margin: 0 0 0.35rem 0; letter-spacing: -0.02em;">Start Free as Creator 🚀</h2>
-                    <p style="font-size: 0.86rem; color: #736E68; margin: 0; line-height: 1.45;">Create your dedicated workspace. Connect your Instagram in seconds.</p>
-                </div>
-
-                <div id="auth-heading-otp" style="display: none;">
-                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.35rem; color: #2C2A29; margin: 0 0 0.35rem 0; letter-spacing: -0.02em;">Verify Your Email ✉️</h2>
-                    <p style="font-size: 0.86rem; color: #736E68; margin: 0; line-height: 1.45;">We sent a 6-digit confirmation code to your inbox.</p>
+                <!-- Feature Pillars Bottom Row -->
+                <div class="showcase-feature-tags">
+                    <span class="feat-tag">🔐 AES-256 Encrypted Secrets</span>
+                    <span class="feat-tag">⚡ libSQL Edge Replicas</span>
+                    <span class="feat-tag">👑 Admin Multi-Tenant Support</span>
                 </div>
             </div>
 
-            <!-- SIGN IN FORM -->
-            <form id="login-form">
-                <div class="form-group" style="text-align: left; margin-bottom: 1rem;">
-                    <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.4rem; display: block;">Email Address</label>
-                    <input type="email" id="login-email" class="input" placeholder="harshparmar686630@gmail.com or creator@domain.com" required style="width: 100%; padding: 0.75rem 1rem; font-size: 0.92rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none;">
-                </div>
+            <!-- Right 40%: Focused Authentication Card -->
+            <div class="auth-form-panel">
+                <div class="login-card-box">
+                    <div class="login-header-text" style="text-align: left; margin-bottom: 1.4rem;">
+                        <div style="display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.15rem;">
+                            <img src="favicon.png?v=5" alt="InstaAuto Logo" style="width: 44px; height: 44px; object-fit: contain; background: transparent;" />
+                            <div>
+                                <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.45rem; color: #2C2A29; letter-spacing: -0.03em; margin: 0; line-height: 1.1;">InstaAuto</h2>
+                                <div style="font-size: 0.72rem; font-weight: 700; color: #D97757; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.15rem;">Creator Automation SaaS</div>
+                            </div>
+                        </div>
 
-                <div class="form-group" style="position: relative; text-align: left; margin-bottom: 1.25rem;">
-                    <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.4rem; display: block;">Password</label>
-                    <input type="password" id="password" class="input" placeholder="Enter your password" required style="width: 100%; padding: 0.75rem 2.6rem 0.75rem 1rem; font-size: 0.92rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none;">
-                    <button type="button" id="btn-toggle-login-pwd" onclick="toggleLoginPassword('password', 'btn-toggle-login-pwd')" style="position: absolute; right: 12px; top: 34px; background: none; border: none; font-size: 1.05rem; cursor: pointer; color: #736E68;" title="Toggle Password Visibility">👁️</button>
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
-                        <span style="font-size: 0.76rem; color: #8C827A;">
-                            Default: <code style="font-weight: 700; color: #D97757; background: #FAF0EC; padding: 0.1rem 0.35rem; border-radius: 6px;">Harsh@2004</code>
-                        </span>
-                        <a href="javascript:void(0)" onclick="autofillSuperAdmin()" style="font-size: 0.76rem; font-weight: 700; color: #D97757; text-decoration: none;">👑 Autofill Super Admin</a>
+                        <!-- Auth Mode Switcher Tabs -->
+                        <div id="auth-tabs-container" style="display: flex; background: #F5F1EA; padding: 4px; border-radius: 12px; margin-bottom: 1.25rem;">
+                            <button type="button" id="tab-btn-login" onclick="switchAuthTab('login')" style="flex: 1; padding: 0.6rem; border-radius: 9px; font-weight: 700; font-size: 0.85rem; border: none; cursor: pointer; background: #FFFFFF; color: #2C2A29; box-shadow: 0 2px 6px rgba(0,0,0,0.06); transition: all 0.2s;">
+                                Sign In
+                            </button>
+                            <button type="button" id="tab-btn-register" onclick="switchAuthTab('register')" style="flex: 1; padding: 0.6rem; border-radius: 9px; font-weight: 700; font-size: 0.85rem; border: none; cursor: pointer; background: transparent; color: #736E68; transition: all 0.2s;">
+                                Create Account
+                            </button>
+                        </div>
+
+                        <div id="auth-heading-login">
+                            <h3 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.35rem; color: #2C2A29; margin: 0 0 0.35rem 0; letter-spacing: -0.02em;">Welcome Back 👋</h3>
+                            <p style="font-size: 0.86rem; color: #736E68; margin: 0; line-height: 1.45;">Enter your credentials to access your automation workspace.</p>
+                        </div>
+
+                        <div id="auth-heading-register" style="display: none;">
+                            <h3 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.35rem; color: #2C2A29; margin: 0 0 0.35rem 0; letter-spacing: -0.02em;">Start Free as Creator 🚀</h3>
+                            <p style="font-size: 0.86rem; color: #736E68; margin: 0; line-height: 1.45;">Create your dedicated workspace. Connect your Instagram in seconds.</p>
+                        </div>
+
+                        <div id="auth-heading-otp" style="display: none;">
+                            <h3 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.35rem; color: #2C2A29; margin: 0 0 0.35rem 0; letter-spacing: -0.02em;">Verify Your Email ✉️</h3>
+                            <p style="font-size: 0.86rem; color: #736E68; margin: 0; line-height: 1.45;">We sent a 6-digit confirmation code to your inbox.</p>
+                        </div>
+                    </div>
+
+                    <!-- SIGN IN FORM -->
+                    <form id="login-form">
+                        <div class="form-group" style="text-align: left; margin-bottom: 1rem;">
+                            <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.4rem; display: block;">Email Address</label>
+                            <input type="email" id="login-email" class="input" placeholder="harshparmar686630@gmail.com or creator@domain.com" required style="width: 100%; padding: 0.75rem 1rem; font-size: 0.92rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none;">
+                        </div>
+
+                        <div class="form-group" style="position: relative; text-align: left; margin-bottom: 1.25rem;">
+                            <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.4rem; display: block;">Password</label>
+                            <input type="password" id="password" class="input" placeholder="Enter your password" required style="width: 100%; padding: 0.75rem 2.6rem 0.75rem 1rem; font-size: 0.92rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none;">
+                            <button type="button" id="btn-toggle-login-pwd" onclick="toggleLoginPassword('password', 'btn-toggle-login-pwd')" style="position: absolute; right: 12px; top: 34px; background: none; border: none; font-size: 1.05rem; cursor: pointer; color: #736E68;" title="Toggle Password Visibility">👁️</button>
+                            
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+                                <span style="font-size: 0.76rem; color: #8C827A;">
+                                    Default: <code style="font-weight: 700; color: #D97757; background: #FAF0EC; padding: 0.1rem 0.35rem; border-radius: 6px;">Harsh@2004</code>
+                                </span>
+                                <a href="javascript:void(0)" onclick="autofillSuperAdmin()" style="font-size: 0.76rem; font-weight: 700; color: #D97757; text-decoration: none;">👑 Autofill Super Admin</a>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-full" style="padding: 0.85rem 1.5rem; font-size: 0.95rem; font-weight: 800; border-radius: 12px; box-shadow: 0 4px 14px rgba(217, 119, 87, 0.3);">
+                            <span>Sign In to Workspace →</span>
+                        </button>
+                    </form>
+
+                    <!-- REGISTER FORM -->
+                    <form id="register-form" style="display: none;">
+                        <div class="form-group" style="text-align: left; margin-bottom: 0.85rem;">
+                            <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.35rem; display: block;">Full Name</label>
+                            <input type="text" id="reg-name" class="input" placeholder="e.g. Alex Rivera" required style="width: 100%; padding: 0.75rem 1rem; font-size: 0.92rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none;">
+                        </div>
+
+                        <div class="form-group" style="text-align: left; margin-bottom: 0.85rem;">
+                            <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.35rem; display: block;">Email Address</label>
+                            <input type="email" id="reg-email" class="input" placeholder="e.g. alex@creatorstudio.com" required style="width: 100%; padding: 0.75rem 1rem; font-size: 0.92rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none;">
+                        </div>
+
+                        <div class="form-group" style="position: relative; text-align: left; margin-bottom: 1.25rem;">
+                            <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.35rem; display: block;">Password (min 6 chars)</label>
+                            <input type="password" id="reg-password" class="input" placeholder="Create a secure password" minlength="6" required style="width: 100%; padding: 0.75rem 2.6rem 0.75rem 1rem; font-size: 0.92rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none;">
+                            <button type="button" id="btn-toggle-reg-pwd" onclick="toggleLoginPassword('reg-password', 'btn-toggle-reg-pwd')" style="position: absolute; right: 12px; top: 34px; background: none; border: none; font-size: 1.05rem; cursor: pointer; color: #736E68;" title="Toggle Password Visibility">👁️</button>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-full" style="padding: 0.85rem 1.5rem; font-size: 0.95rem; font-weight: 800; border-radius: 12px; box-shadow: 0 4px 14px rgba(217, 119, 87, 0.3);">
+                            <span>Create Creator Account →</span>
+                        </button>
+                    </form>
+
+                    <!-- OTP VERIFICATION FORM -->
+                    <form id="otp-form" style="display: none;">
+                        <div style="background: #F0FDF4; border: 1.5px solid #BBF7D0; border-radius: 12px; padding: 0.9rem; margin-bottom: 1.15rem; text-align: left;">
+                            <div style="font-size: 0.82rem; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 0.35rem;">
+                                <span>✉️ Verification Code Sent</span>
+                            </div>
+                            <div style="font-size: 0.78rem; color: #15803D; margin-top: 0.25rem; line-height: 1.4;">
+                                Enter the 6-digit code sent to <strong id="otp-target-email" style="text-decoration: underline;">your email</strong>.
+                            </div>
+                        </div>
+
+                        <div id="otp-dev-hint" style="display: none; background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px; padding: 0.6rem; margin-bottom: 1rem; font-size: 0.75rem; color: #92400E; text-align: left;">
+                            💡 <strong>Dev Mode (No SMTP):</strong> Code <code id="otp-dev-code" style="font-weight: 800; background: #FFFBEB; padding: 2px 6px; border-radius: 4px;"></code> auto-detected.
+                        </div>
+
+                        <div class="form-group" style="text-align: center; margin-bottom: 1.25rem;">
+                            <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.5rem; display: block;">Enter 6-Digit Code</label>
+                            <input type="text" id="otp-code-input" maxlength="6" inputmode="numeric" placeholder="••••••" required
+                                   style="width: 100%; text-align: center; font-family: 'Courier New', monospace; font-size: 1.8rem; font-weight: 800; letter-spacing: 12px; padding: 0.65rem 0.5rem; border-radius: 12px; border: 2px solid #D97757; background: #FAF8F5; color: #2C2A29; outline: none; box-shadow: 0 2px 8px rgba(217, 119, 87, 0.15);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
+                                <span id="otp-resend-status" style="font-size: 0.76rem; color: #736E68;">
+                                    Resend in <span id="otp-timer-count" style="font-weight: 700; color: #D97757;">60s</span>
+                                </span>
+                                <a href="javascript:void(0)" id="otp-resend-link" onclick="resendOtpCode()" style="font-size: 0.76rem; font-weight: 700; color: #D97757; text-decoration: none; display: none;">🔄 Resend Code</a>
+                                <a href="javascript:void(0)" onclick="cancelOtpVerification()" style="font-size: 0.76rem; font-weight: 600; color: #8C827A; text-decoration: underline;">Wrong Email?</a>
+                            </div>
+                        </div>
+
+                        <button type="submit" id="btn-verify-otp" class="btn btn-primary w-full" style="padding: 0.85rem 1.5rem; font-size: 0.95rem; font-weight: 800; border-radius: 12px; box-shadow: 0 4px 14px rgba(217, 119, 87, 0.3);">
+                            <span>Verify & Enter Workspace →</span>
+                        </button>
+                    </form>
+
+                    <div style="margin-top: 1.45rem; text-align: center; font-size: 0.76rem; font-weight: 700; color: #736E68; display: flex; align-items: center; justify-content: center; gap: 0.4rem; border-top: 1px solid #F5F1EA; padding-top: 1.15rem;">
+                        <span style="color: #2E7D32;">🟢</span>
+                        <span>Isolated Workspace • Meta Graph API 250 DMs/hr Cap Safe</span>
                     </div>
                 </div>
-
-                <button type="submit" class="btn btn-primary w-full" style="padding: 0.85rem 1.5rem; font-size: 0.95rem; font-weight: 800; border-radius: 12px; box-shadow: 0 4px 14px rgba(217, 119, 87, 0.3);">
-                    <span>Sign In to Workspace →</span>
-                </button>
-            </form>
-
-            <!-- REGISTER FORM -->
-            <form id="register-form" style="display: none;">
-                <div class="form-group" style="text-align: left; margin-bottom: 0.85rem;">
-                    <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.35rem; display: block;">Full Name</label>
-                    <input type="text" id="reg-name" class="input" placeholder="e.g. Alex Rivera" required style="width: 100%; padding: 0.75rem 1rem; font-size: 0.92rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none;">
-                </div>
-
-                <div class="form-group" style="text-align: left; margin-bottom: 0.85rem;">
-                    <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.35rem; display: block;">Email Address</label>
-                    <input type="email" id="reg-email" class="input" placeholder="e.g. alex@creatorstudio.com" required style="width: 100%; padding: 0.75rem 1rem; font-size: 0.92rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none;">
-                </div>
-
-                <div class="form-group" style="position: relative; text-align: left; margin-bottom: 1.25rem;">
-                    <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.35rem; display: block;">Password (min 6 chars)</label>
-                    <input type="password" id="reg-password" class="input" placeholder="Create a secure password" minlength="6" required style="width: 100%; padding: 0.75rem 2.6rem 0.75rem 1rem; font-size: 0.92rem; font-weight: 600; border-radius: 12px; border: 1.5px solid #E6E1D8; background: #FAF8F5; outline: none;">
-                    <button type="button" id="btn-toggle-reg-pwd" onclick="toggleLoginPassword('reg-password', 'btn-toggle-reg-pwd')" style="position: absolute; right: 12px; top: 34px; background: none; border: none; font-size: 1.05rem; cursor: pointer; color: #736E68;" title="Toggle Password Visibility">👁️</button>
-                </div>
-
-                <button type="submit" class="btn btn-primary w-full" style="padding: 0.85rem 1.5rem; font-size: 0.95rem; font-weight: 800; border-radius: 12px; box-shadow: 0 4px 14px rgba(217, 119, 87, 0.3);">
-                    <span>Create Creator Account →</span>
-                </button>
-            </form>
-
-            <!-- OTP VERIFICATION FORM -->
-            <form id="otp-form" style="display: none;">
-                <div style="background: #F0FDF4; border: 1.5px solid #BBF7D0; border-radius: 12px; padding: 0.9rem; margin-bottom: 1.15rem; text-align: left;">
-                    <div style="font-size: 0.82rem; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 0.35rem;">
-                        <span>✉️ Verification Code Sent</span>
-                    </div>
-                    <div style="font-size: 0.78rem; color: #15803D; margin-top: 0.25rem; line-height: 1.4;">
-                        Enter the 6-digit code sent to <strong id="otp-target-email" style="text-decoration: underline;">your email</strong>.
-                    </div>
-                </div>
-
-                <div id="otp-dev-hint" style="display: none; background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px; padding: 0.6rem; margin-bottom: 1rem; font-size: 0.75rem; color: #92400E; text-align: left;">
-                    💡 <strong>Dev Mode (No SMTP):</strong> Code <code id="otp-dev-code" style="font-weight: 800; background: #FFFBEB; padding: 2px 6px; border-radius: 4px;"></code> auto-detected.
-                </div>
-
-                <div class="form-group" style="text-align: center; margin-bottom: 1.25rem;">
-                    <label style="font-size: 0.82rem; font-weight: 700; color: #2C2A29; margin-bottom: 0.5rem; display: block;">Enter 6-Digit Code</label>
-                    <input type="text" id="otp-code-input" maxlength="6" inputmode="numeric" placeholder="••••••" required
-                           style="width: 100%; text-align: center; font-family: 'Courier New', monospace; font-size: 1.8rem; font-weight: 800; letter-spacing: 12px; padding: 0.65rem 0.5rem; border-radius: 12px; border: 2px solid #D97757; background: #FAF8F5; color: #2C2A29; outline: none; box-shadow: 0 2px 8px rgba(217, 119, 87, 0.15);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
-                        <span id="otp-resend-status" style="font-size: 0.76rem; color: #736E68;">
-                            Resend in <span id="otp-timer-count" style="font-weight: 700; color: #D97757;">60s</span>
-                        </span>
-                        <a href="javascript:void(0)" id="otp-resend-link" onclick="resendOtpCode()" style="font-size: 0.76rem; font-weight: 700; color: #D97757; text-decoration: none; display: none;">🔄 Resend Code</a>
-                        <a href="javascript:void(0)" onclick="cancelOtpVerification()" style="font-size: 0.76rem; font-weight: 600; color: #8C827A; text-decoration: underline;">Wrong Email?</a>
-                    </div>
-                </div>
-
-                <button type="submit" id="btn-verify-otp" class="btn btn-primary w-full" style="padding: 0.85rem 1.5rem; font-size: 0.95rem; font-weight: 800; border-radius: 12px; box-shadow: 0 4px 14px rgba(217, 119, 87, 0.3);">
-                    <span>Verify & Enter Workspace →</span>
-                </button>
-            </form>
-
-            <div style="margin-top: 1.45rem; text-align: center; font-size: 0.76rem; font-weight: 700; color: #736E68; display: flex; align-items: center; justify-content: center; gap: 0.4rem; border-top: 1px solid #F5F1EA; padding-top: 1.15rem;">
-                <span style="color: #2E7D32;">🟢</span>
-                <span>Isolated Workspace • Meta Graph API 250 DMs/hr Cap Safe</span>
             </div>
         </div>
     </div>
@@ -180,7 +293,9 @@
             document.getElementById('auth-heading-login').style.display = isLogin ? 'block' : 'none';
             document.getElementById('auth-heading-register').style.display = isLogin ? 'none' : 'block';
             document.getElementById('auth-heading-otp').style.display = 'none';
-            document.querySelector('#login-screen .login-header-text > div:nth-child(2)').style.display = 'flex'; // show tabs
+            
+            const tabsContainer = document.getElementById('auth-tabs-container');
+            if (tabsContainer) tabsContainer.style.display = 'flex'; // show tabs
 
             const btnLogin = document.getElementById('tab-btn-login');
             const btnReg = document.getElementById('tab-btn-register');
@@ -209,7 +324,9 @@
             document.getElementById('auth-heading-login').style.display = 'none';
             document.getElementById('auth-heading-register').style.display = 'none';
             document.getElementById('auth-heading-otp').style.display = 'block';
-            document.querySelector('#login-screen .login-header-text > div:nth-child(2)').style.display = 'none'; // hide tabs during OTP
+            
+            const tabsContainer = document.getElementById('auth-tabs-container');
+            if (tabsContainer) tabsContainer.style.display = 'none'; // hide tabs during OTP
 
             document.getElementById('otp-target-email').textContent = email;
             const codeInput = document.getElementById('otp-code-input');
