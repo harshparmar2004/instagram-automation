@@ -20,11 +20,12 @@ try {
     }
     prepare(sql) {
       const stmt = this.db.prepare(sql);
+      const cleanParams = (params) => params.map(p => p === undefined ? null : p);
       return {
-        all: (...params) => stmt.all(...params),
-        get: (...params) => stmt.get(...params),
+        all: (...params) => stmt.all(...cleanParams(params)),
+        get: (...params) => stmt.get(...cleanParams(params)),
         run: (...params) => {
-          const res = stmt.run(...params);
+          const res = stmt.run(...cleanParams(params));
           return {
             lastInsertRowid: Number(res.lastInsertRowid),
             changes: Number(res.changes)
@@ -1337,8 +1338,24 @@ function getInstagramAccountByIgId(igUserId) {
 
   if (acct && acct.access_token) {
     acct.access_token = decryptToken(acct.access_token);
+    return acct;
   }
-  return acct;
+
+  // Fallback: Return primary active studio account if specific IG ID didn't match (e.g. entry.id is a Facebook Page ID)
+  const fallbackAcct = getDb().prepare(`
+    SELECT a.*, u.id as owner_id, u.name as owner_name, u.email as owner_email, u.status as owner_status
+    FROM instagram_accounts a
+    JOIN users u ON a.user_id = u.id
+    WHERE a.is_active = 1 AND u.status = 'active'
+    ORDER BY a.id ASC LIMIT 1
+  `).get();
+
+  if (fallbackAcct && fallbackAcct.access_token) {
+    fallbackAcct.access_token = decryptToken(fallbackAcct.access_token);
+    return fallbackAcct;
+  }
+
+  return null;
 }
 
 function getAllUsers(search = '') {

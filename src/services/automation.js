@@ -50,12 +50,22 @@ async function ensureMediaExists(mediaIgId, token = null, userId = null) {
 }
 
 function checkDedupComment(commentId) {
-    const row = getDb().prepare("SELECT id FROM events WHERE comment_id = ?").get(commentId);
+    if (!commentId) return false;
+    const row = getDb().prepare("SELECT id FROM events WHERE comment_id = ? AND dm_status = 'delivered'").get(commentId);
     return !!row;
 }
 
 function checkDedupUserForMedia(commenterIgId, mediaIgId) {
-    const row = getDb().prepare("SELECT id FROM events WHERE commenter_ig_id = ? AND media_ig_id = ?").get(commenterIgId, mediaIgId);
+    if (!commenterIgId || !mediaIgId) return false;
+    // Only deduplicate if a DM was actually successfully delivered within the last 24 hours
+    const row = getDb().prepare(`
+        SELECT id FROM events 
+        WHERE commenter_ig_id = ? 
+          AND media_ig_id = ? 
+          AND dm_status = 'delivered'
+          AND created_at > datetime('now', '-24 hours')
+        LIMIT 1
+    `).get(commenterIgId, mediaIgId);
     return !!row;
 }
 

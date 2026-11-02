@@ -454,6 +454,23 @@ async function hydrateLocalFromTurso(localDb) {
             }
         }
 
+        // 5. Restore Config
+        const configRes = await execute('SELECT * FROM config');
+        if (configRes.rows.length > 0) {
+            const upsertConfig = localDb.prepare(`
+                INSERT INTO config (key, value, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+            `);
+            for (const c of configRes.rows) {
+                try {
+                    if (c.value && !c.value.includes('••••') && !c.value.includes('***')) {
+                        upsertConfig.run(c.key, c.value, c.updated_at || new Date().toISOString());
+                    }
+                } catch(e) {}
+            }
+        }
+
         console.log(`✅ [Turso] Local state successfully hydrated from Turso Cloud!`);
     } catch (err) {
         console.warn('[Turso] State hydration notice:', err.message);
