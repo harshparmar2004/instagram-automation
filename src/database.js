@@ -134,6 +134,8 @@ function getDb() {
       dm_status TEXT DEFAULT 'pending',
       dm_message_id TEXT,
       tracking_id TEXT,
+      synced_to_sheet INTEGER DEFAULT 0,
+      user_id INTEGER,
       created_at TEXT
     );
 
@@ -210,6 +212,8 @@ function getDb() {
   try { db.exec(`ALTER TABLE media ADD COLUMN like_count INTEGER DEFAULT 0;`); } catch (e) {}
   try { db.exec(`ALTER TABLE media ADD COLUMN status TEXT DEFAULT 'active';`); } catch (e) {}
   try { db.exec(`ALTER TABLE events ADD COLUMN synced_to_sheet INTEGER DEFAULT 0;`); } catch (e) {}
+  try { db.exec(`ALTER TABLE events ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
+  try { db.exec(`ALTER TABLE clicks ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
   try { db.exec(`ALTER TABLE rules ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
   try { db.exec(`ALTER TABLE media ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
   try { db.exec(`ALTER TABLE conversations ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
