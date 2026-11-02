@@ -472,14 +472,44 @@ router.post('/rules/:id/backfill', auth, async (req, res) => {
                 let messageToSend = (rule.response_text || '').trim();
                 const directLink = (rule.link_url || '').trim();
                 let trackingId = null;
+                let messagePayload = null;
 
                 if (rule.action_type === 'link_dm') {
                     if (directLink) {
-                        if (messageToSend.includes(directLink)) {
-                            // Link already embedded in text
-                        } else {
-                            messageToSend = messageToSend ? `${messageToSend}\n${directLink}` : directLink;
+                        const crypto = require('crypto');
+                        trackingId = crypto.randomBytes(4).toString('hex');
+                        const config = require('../config');
+                        const baseUrl = typeof config.resolveBaseUrl === 'function' ? config.resolveBaseUrl() : config.BASE_URL;
+                        const trackedLink = `${baseUrl}/r/${trackingId}`;
+
+                        let btnCfg = null;
+                        if (rule.buttons_config_json) {
+                            try { btnCfg = JSON.parse(rule.buttons_config_json); } catch(e) {}
                         }
+                        let btnTitle = btnCfg?.step3_button || btnCfg?.step1_button || rule.button_title || 'Access Resource';
+                        btnTitle = String(btnTitle).slice(0, 20);
+
+                        let cleanText = messageToSend ? messageToSend.replace(directLink, '').trim() : '';
+                        if (!cleanText) cleanText = 'Here is your resource link!';
+
+                        messagePayload = {
+                            attachment: {
+                                type: 'template',
+                                payload: {
+                                    template_type: 'button',
+                                    text: cleanText,
+                                    buttons: [
+                                        {
+                                            type: 'web_url',
+                                            url: trackedLink,
+                                            title: btnTitle
+                                        }
+                                    ]
+                                }
+                            }
+                        };
+
+                        messageToSend = messageToSend ? `${messageToSend}\n${trackedLink}` : trackedLink;
                     } else if (!messageToSend) {
                         messageToSend = 'Here is your resource link!';
                     }

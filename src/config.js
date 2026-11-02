@@ -16,11 +16,21 @@ function resolveBaseUrl() {
         }
         return process.env.BASE_URL.replace(/\/+$/, '');
     }
-    // 4. If running in Render environment
-    if (process.env.RENDER) {
+    // 4. If running in Render environment or production
+    if (process.env.RENDER || process.env.NODE_ENV === 'production') {
         return 'https://instaauto-wzvc.onrender.com';
     }
-    return 'http://localhost:3000';
+    // 5. Config table in DB
+    try {
+        const { getConfig } = require('./database');
+        const dbPublicUrl = getConfig('public_url') || getConfig('base_url');
+        if (dbPublicUrl && !dbPublicUrl.includes('localhost') && !dbPublicUrl.includes('instaauto.onrender.com')) {
+            return dbPublicUrl.replace(/\/+$/, '');
+        }
+    } catch(e) {}
+
+    // Default to the live Render production URL so links in Instagram DMs always work on real devices
+    return 'https://instaauto-wzvc.onrender.com';
 }
 
 module.exports = {

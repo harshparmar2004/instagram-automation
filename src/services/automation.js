@@ -273,6 +273,37 @@ async function processCommentEvent(payload) {
                     messageToSend = baseResponse;
                 } else if (rule.action_type === 'link_dm') {
                     if (trackedLink) {
+                        let btnTitle = 'Access Resource';
+                        if (btnCfg?.step3_button) btnTitle = btnCfg.step3_button;
+                        else if (btnCfg?.step1_button) btnTitle = btnCfg.step1_button;
+                        else if (rule.button_title) btnTitle = rule.button_title;
+                        btnTitle = String(btnTitle).slice(0, 20);
+
+                        // Clean text above the button box
+                        let cleanText = baseResponse ? baseResponse.replace(/\{link\}|\{url\}/gi, '').trim() : '';
+                        if (finalLink && cleanText.includes(finalLink)) {
+                            cleanText = cleanText.replace(finalLink, '').trim();
+                        }
+                        if (!cleanText) cleanText = 'Here is your resource link!';
+
+                        // 🔘 OFFICIAL INSTAGRAM BUTTON TEMPLATE: Renders link in an interactive tap button box
+                        messagePayload = {
+                            attachment: {
+                                type: 'template',
+                                payload: {
+                                    template_type: 'button',
+                                    text: cleanText,
+                                    buttons: [
+                                        {
+                                            type: 'web_url',
+                                            url: trackedLink,
+                                            title: btnTitle
+                                        }
+                                    ]
+                                }
+                            }
+                        };
+
                         if (baseResponse.includes('{link}')) {
                             messageToSend = baseResponse.replace(/\{link\}/gi, trackedLink);
                         } else if (baseResponse.includes('{url}')) {

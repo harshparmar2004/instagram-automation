@@ -154,37 +154,24 @@ function getMonthHistoryData(period, userId = null) {
     const historyMap = new Map();
     historyRows.forEach(h => historyMap.set(h.media_id, h));
 
-    // 3. Aggregate live event counts for this target period
-    const eventsStmt = db.prepare(`
-        SELECT media_ig_id,
-               COUNT(*) as total_comments,
-               SUM(CASE WHEN dm_status IN ('sent', 'delivered') THEN 1 ELSE 0 END) as dms_sent
+    // 3. Fetch all live events and clicks for this target period
+    const monthEvents = db.prepare(`
+        SELECT e.id, e.media_ig_id, e.rule_id, e.dm_status, r.media_id as rule_media_id
         FROM events e
-        WHERE substr(created_at, 1, 7) = ? ${userEventFilter}
-        GROUP BY media_ig_id
-    `);
-    const eventStats = eventsStmt.all(targetPeriod, ...(userId ? [userId] : []));
-    const eventMap = new Map();
-    eventStats.forEach(ev => {
-        if (ev.media_ig_id) eventMap.set(String(ev.media_ig_id), ev);
-    });
+        LEFT JOIN rules r ON e.rule_id = r.id
+        WHERE substr(e.created_at, 1, 7) = ? ${userEventFilter}
+    `).all(targetPeriod, ...(userId ? [userId] : []));
 
-    // 4. Aggregate live click counts for this target period
-    const clicksStmt = db.prepare(`
-        SELECT e.media_ig_id, COUNT(*) as click_count
+    const monthClicks = db.prepare(`
+        SELECT c.id, e.media_ig_id, e.rule_id, r.media_id as rule_media_id
         FROM clicks c
         JOIN events e ON c.event_id = e.id
+        LEFT JOIN rules r ON e.rule_id = r.id
         WHERE (substr(c.clicked_at, 1, 7) = ? OR substr(e.created_at, 1, 7) = ?)
         ${userEventFilter}
-        GROUP BY e.media_ig_id
-    `);
-    const clickStats = clicksStmt.all(targetPeriod, targetPeriod, ...(userId ? [userId] : []));
-    const clickMap = new Map();
-    clickStats.forEach(cl => {
-        if (cl.media_ig_id) clickMap.set(String(cl.media_ig_id), cl.click_count);
-    });
+    `).all(targetPeriod, targetPeriod, ...(userId ? [userId] : []));
 
-    // 5. Build reels breakdown for the target month
+    // 4. Build reels breakdown for the target month
     const reelsBreakdown = [];
     const upsertStmt = db.prepare(`
         INSERT INTO reel_stats_history (media_id, month_year, views_count, comments_count, dms_sent_count, clicks_count, updated_at, user_id)
@@ -199,11 +186,33 @@ function getMonthHistoryData(period, userId = null) {
 
     for (const m of allMedia) {
         const saved = historyMap.get(m.id);
-        const ev = eventMap.get(String(m.ig_media_id)) || {};
-        const clCount = clickMap.get(String(m.ig_media_id)) || 0;
+        const mIgId = String(m.ig_media_id || '');
+        const mLocalId = String(m.id || '');
+
+        const matchedEvents = monthEvents.filter(ev => {
+            const evMedia = String(ev.media_ig_id || '');
+            const ruleMedia = String(ev.rule_media_id || '');
+            return (mIgId && evMedia === mIgId) || 
+                   (mLocalId && evMedia === mLocalId) || 
+                   (mLocalId && ruleMedia === mLocalId) ||
+                   (mIgId && ruleMedia === mIgId);
+        });
+
+        const evTotalComments = matchedEvents.length;
+        const evDmsSent = matchedEvents.filter(ev => ev.dm_status === 'sent' || ev.dm_status === 'delivered').length;
+
+        const matchedClicks = monthClicks.filter(cl => {
+            const clMedia = String(cl.media_ig_id || '');
+            const ruleMedia = String(cl.rule_media_id || '');
+            return (mIgId && clMedia === mIgId) || 
+                   (mLocalId && clMedia === mLocalId) || 
+                   (mLocalId && ruleMedia === mLocalId) ||
+                   (mIgId && ruleMedia === mIgId);
+        });
+        const clCount = matchedClicks.length;
 
         const mediaMonth = (m.timestamp || '').slice(0, 7);
-        const existsInMonth = (mediaMonth === targetPeriod || (saved && (saved.views_count > 0 || saved.dms_sent_count > 0)) || (ev.total_comments > 0 || ev.dms_sent > 0 || clCount > 0));
+        const existsInMonth = (mediaMonth === targetPeriod || (saved && (saved.views_count > 0 || saved.dms_sent_count > 0)) || (evTotalComments > 0 || evDmsSent > 0 || clCount > 0));
 
         let views = 0;
         let comments = 0;
@@ -212,9 +221,9 @@ function getMonthHistoryData(period, userId = null) {
 
         if (isCurrent) {
             views = m.views_count || (saved ? saved.views_count : 0) || 0;
-            comments = Math.max(m.comments_count || 0, ev.total_comments || 0, (saved ? saved.comments_count : 0));
-            dms = Math.max(ev.dms_sent || 0, (saved ? saved.dms_sent_count : 0));
-            clicks = Math.max(clCount || 0, (saved ? saved.clicks_count : 0));
+            comments = Math.max(m.comments_count || 0, evTotalComments, (saved ? saved.comments_count : 0));
+            dms = Math.max(evDmsSent, (saved ? saved.dms_sent_count : 0));
+            clicks = Math.max(clCount, (saved ? saved.clicks_count : 0));
 
             // Continuously seal/update live month snapshot in reel_stats_history
             try {
@@ -228,11 +237,10 @@ function getMonthHistoryData(period, userId = null) {
                 dms = saved.dms_sent_count || 0;
                 clicks = saved.clicks_count || 0;
             } else if (existsInMonth) {
-                // Media was published or had events in that past month, create baseline snapshot
                 views = m.views_count || 0;
-                comments = ev.total_comments || m.comments_count || 0;
-                dms = ev.dms_sent || 0;
-                clicks = clCount || 0;
+                comments = evTotalComments || m.comments_count || 0;
+                dms = evDmsSent;
+                clicks = clCount;
 
                 try {
                     upsertStmt.run(m.id, targetPeriod, views, comments, dms, clicks, new Date().toISOString(), userId || m.user_id || 1);
@@ -241,7 +249,6 @@ function getMonthHistoryData(period, userId = null) {
         }
 
         // Only include in breakdown if reel was relevant to that month
-        // (For current month, include all active and deleted media; for past month, include if existed in that month)
         if (isCurrent || existsInMonth) {
             const ctr = dms > 0 ? Math.min(100, Math.round((clicks / dms) * 100)) : 0;
             reelsBreakdown.push({
@@ -263,11 +270,31 @@ function getMonthHistoryData(period, userId = null) {
         }
     }
 
-    // Top Summary Totals
-    const totalViews = reelsBreakdown.reduce((acc, r) => acc + (r.views_count || 0), 0);
-    const totalComments = reelsBreakdown.reduce((acc, r) => acc + (r.comments_count || 0), 0);
-    const totalDms = reelsBreakdown.reduce((acc, r) => acc + (r.dms_sent || 0), 0);
-    const totalClicks = reelsBreakdown.reduce((acc, r) => acc + (r.clicks || 0), 0);
+    // Top Summary Totals with real numbers guarantee
+    const totalEventDmsRow = db.prepare(`
+        SELECT SUM(CASE WHEN dm_status IN ('sent', 'delivered') THEN 1 ELSE 0 END) as total_dms,
+               COUNT(*) as total_comments
+        FROM events e
+        WHERE substr(created_at, 1, 7) = ? ${userEventFilter}
+    `).get(targetPeriod, ...(userId ? [userId] : []));
+
+    const totalEventClicksRow = db.prepare(`
+        SELECT COUNT(*) as total_clicks
+        FROM clicks c
+        JOIN events e ON c.event_id = e.id
+        WHERE (substr(c.clicked_at, 1, 7) = ? OR substr(e.created_at, 1, 7) = ?)
+        ${userEventFilter}
+    `).get(targetPeriod, targetPeriod, ...(userId ? [userId] : []));
+
+    const sumReelViews = reelsBreakdown.reduce((acc, r) => acc + (r.views_count || 0), 0);
+    const sumReelComments = reelsBreakdown.reduce((acc, r) => acc + (r.comments_count || 0), 0);
+    const sumReelDms = reelsBreakdown.reduce((acc, r) => acc + (r.dms_sent || 0), 0);
+    const sumReelClicks = reelsBreakdown.reduce((acc, r) => acc + (r.clicks || 0), 0);
+
+    const totalViews = sumReelViews;
+    const totalComments = Math.max(sumReelComments, totalEventDmsRow?.total_comments || 0);
+    const totalDms = Math.max(sumReelDms, totalEventDmsRow?.total_dms || 0);
+    const totalClicks = Math.max(sumReelClicks, totalEventClicksRow?.total_clicks || 0);
     const overallCtr = totalDms > 0 ? Math.min(100, Math.round((totalClicks / totalDms) * 100)) : 0;
 
     // Format human-readable period title (e.g. "September 2026")

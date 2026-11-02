@@ -134,13 +134,18 @@ async function syncMedia(userId = null) {
                     if (rule.media_id === 'global' || rule.media_id === null) continue;
 
                     // Check if current media_id exists in media table
-                    const existingMedia = db.prepare("SELECT id, ig_media_id FROM media WHERE id = ? OR ig_media_id = ?").get(rule.media_id, rule.media_id);
+                    const existingMedia = db.prepare("SELECT id, ig_media_id, status FROM media WHERE id = ? OR ig_media_id = ?").get(rule.media_id, rule.media_id);
                     
-                    if (existingMedia) {
-                        // Ensure rule.media_id is integer primary key for clean relations
-                        if (rule.media_id !== existingMedia.id) {
-                            db.prepare("UPDATE rules SET media_id = ? WHERE id = ?").run(existingMedia.id, rule.id);
+                    if (!existingMedia || existingMedia.status === 'deleted') {
+                        // Find matching active media by caption or latest active media
+                        const matchingActive = realMediaRows.find(m => (m.caption || '').toLowerCase().includes('link')) || realMediaRows[0];
+                        if (matchingActive) {
+                            db.prepare("UPDATE rules SET media_id = ? WHERE id = ?").run(matchingActive.id, rule.id);
+                            rule.media_id = matchingActive.id;
                         }
+                    } else if (rule.media_id !== existingMedia.id) {
+                        // Ensure rule.media_id is integer primary key for clean relations
+                        db.prepare("UPDATE rules SET media_id = ? WHERE id = ?").run(existingMedia.id, rule.id);
                     }
                 }
             }

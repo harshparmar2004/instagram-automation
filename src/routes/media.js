@@ -63,13 +63,17 @@ router.get('/media/automated', auth, (req, res) => {
         
         let rulesQuery = `
             SELECT r.*, 
-                   (SELECT COUNT(*) FROM events e WHERE e.rule_id = r.id) as total_triggers,
-                   (SELECT COUNT(*) FROM clicks c JOIN events e ON c.event_id = e.id WHERE e.rule_id = r.id) as total_clicks
+                   (SELECT COUNT(*) FROM events e WHERE (e.rule_id = r.id OR (r.media_id IS NOT NULL AND (e.media_ig_id IN (SELECT ig_media_id FROM media WHERE id = r.media_id) OR e.media_ig_id = CAST(r.media_id AS TEXT)))) AND e.dm_status IN ('sent', 'delivered')) as total_triggers,
+                   (SELECT COUNT(*) FROM clicks c JOIN events e ON c.event_id = e.id WHERE (e.rule_id = r.id OR (r.media_id IS NOT NULL AND (e.media_ig_id IN (SELECT ig_media_id FROM media WHERE id = r.media_id) OR e.media_ig_id = CAST(r.media_id AS TEXT))))) as total_clicks
             FROM rules r
+            WHERE 1=1
         `;
         const rulesParams = [];
+        if (!includeDeleted) {
+            rulesQuery += ` AND (r.is_deleted = 0 OR r.is_deleted IS NULL)`;
+        }
         if (!isSuperAdmin && userId) {
-            rulesQuery += ` WHERE r.user_id = ?`;
+            rulesQuery += ` AND r.user_id = ?`;
             rulesParams.push(userId);
         }
         rulesQuery += ` ORDER BY r.created_at DESC`;
