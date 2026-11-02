@@ -255,9 +255,6 @@ function getDb() {
   }
 
   // 2. Startup sync: Restore media, automations & events from JSON backup
-  try {
-    db.prepare("UPDATE media SET status = 'active' WHERE status = 'deleted'").run();
-  } catch (e) {}
 
   try {
     restoreMedia(db);

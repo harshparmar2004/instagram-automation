@@ -500,7 +500,59 @@ async function subscribeWebhook(appId, appSecret, callbackUrl, verifyToken) {
         } catch(e) {}
     }
 
+    // 3. For Instagram Login token (IGAA...): Install app directly on Instagram Account
+    if (token && token.startsWith('IG')) {
+        try {
+            await axios.post(`${IG_API_BASE}/me/subscribed_apps`, null, {
+                params: {
+                    subscribed_fields: 'comments,messages',
+                    access_token: token
+                }
+            });
+            console.log('[Instagram] ✅ Subscribed Instagram account directly to comments & messages webhooks!');
+        } catch(ige) {
+            console.warn('[Instagram] Instagram account webhook subscription notice:', ige.response?.data?.error?.message || ige.message);
+        }
+    }
+
     return appSub || { success: true };
+}
+
+async function ensureAccountWebhooksSubscribed(token = null) {
+    const activeToken = token || getConfig('access_token');
+    if (!activeToken) return;
+
+    if (activeToken.startsWith('IG')) {
+        try {
+            const res = await axios.post(`${IG_API_BASE}/me/subscribed_apps`, null, {
+                params: {
+                    subscribed_fields: 'comments,messages',
+                    access_token: activeToken
+                }
+            });
+            console.log('[Instagram] ✅ Verified & subscribed Instagram account to comments & messages webhooks:', res.data);
+            return res.data;
+        } catch (ige) {
+            console.warn('[Instagram] Webhook auto-subscribe notice:', ige.response?.data?.error?.message || ige.message);
+        }
+    } else if (activeToken.startsWith('EAA')) {
+        try {
+            const pagesRes = await axios.get(`${FB_API_BASE}/me/accounts`, {
+                params: { access_token: activeToken }
+            });
+            for (const page of pagesRes.data?.data || []) {
+                try {
+                    await axios.post(`${FB_API_BASE}/${page.id}/subscribed_apps`, null, {
+                        params: {
+                            subscribed_fields: 'feed,comments,messages',
+                            access_token: page.access_token || activeToken
+                        }
+                    });
+                    console.log(`[Instagram] ✅ Subscribed page ${page.name} (${page.id}) to webhooks!`);
+                } catch(pe) {}
+            }
+        } catch(e) {}
+    }
 }
 
 async function getMediaComments(token, mediaId, limit = 100) {
@@ -634,6 +686,7 @@ module.exports = {
     replyToComment,
     sendDirectMessage,
     subscribeWebhook,
+    ensureAccountWebhooksSubscribed,
     checkIsUserFollowing
 };
 

@@ -97,6 +97,24 @@ async function syncMedia(userId = null) {
             }
         })(allItems);
 
+        // Mark any media that was deleted from Instagram as 'deleted'
+        const liveIgIds = allItems.map(item => String(item.id));
+        if (liveIgIds.length > 0) {
+            const placeholders = liveIgIds.map(() => '?').join(',');
+            let deleteQuery = `UPDATE media SET status = 'deleted' WHERE ig_media_id NOT IN (${placeholders})`;
+            const deleteParams = [...liveIgIds];
+            if (userId) {
+                deleteQuery += ` AND (user_id = ? OR user_id IS NULL)`;
+                deleteParams.push(userId);
+            }
+            db.prepare(deleteQuery).run(...deleteParams);
+
+            try {
+                const { asyncSync } = require('./turso');
+                asyncSync(deleteQuery, deleteParams);
+            } catch(e) {}
+        }
+
         // Persist all synced media to data/media.json for restart persistence
         try {
             backupMedia(db);
@@ -108,8 +126,8 @@ async function syncMedia(userId = null) {
 
         // === 1. SMART AUTO-RELINK: Resolve reel IDs cleanly without forcing unrelated rules ===
         try {
-            const realMediaRows = db.prepare("SELECT * FROM media WHERE ig_media_id NOT LIKE '179001122%' ORDER BY timestamp DESC").all();
-            const allRules = db.prepare("SELECT * FROM rules").all();
+            const realMediaRows = db.prepare("SELECT * FROM media WHERE status != 'deleted' AND ig_media_id NOT LIKE '179001122%' ORDER BY timestamp DESC").all();
+            const allRules = db.prepare("SELECT * FROM rules WHERE is_deleted = 0").all();
 
             if (realMediaRows.length > 0 && allRules.length > 0) {
                 for (const rule of allRules) {
@@ -130,12 +148,13 @@ async function syncMedia(userId = null) {
             console.warn('[MediaSync] Notice during rule auto-linking:', linkErr.message);
         }
 
-        // === 2. REAL HISTORY SYNC: Fetch real comments from Instagram and create real user activity ===
+        // === 2. REAL HISTORY SYNC: Fetch real comments from Instagram and process automation ===
         let totalCommentsFetched = 0;
         try {
-            const mediaToFetch = allItems.length > 0 ? allItems : db.prepare("SELECT * FROM media").all();
+            const mediaToFetch = allItems.length > 0 ? allItems : db.prepare("SELECT * FROM media WHERE status != 'deleted'").all();
             const myUsername = (acct?.ig_username || getConfig('ig_username') || '').toLowerCase().replace('@', '').trim();
             const myIgUserId = String(acct?.ig_user_id || getConfig('ig_user_id') || '').trim();
+            const { processCommentEvent } = require('./automation');
             
             for (const m of mediaToFetch) {
                 const igMediaId = m.id || m.ig_media_id;
@@ -145,21 +164,15 @@ async function syncMedia(userId = null) {
                 const comments = await getMediaComments(token, igMediaId, 100);
                 if (comments && comments.length > 0) {
                     totalCommentsFetched += comments.length;
-                    console.log(`[MediaSync] Ingesting ${comments.length} real Instagram comments for media ${igMediaId}...`);
-
-                    // Find rules for this media or global/keyword-matched rules
-                    const mediaRow = db.prepare("SELECT id, caption, views_count FROM media WHERE ig_media_id = ?").get(igMediaId);
-                    const mediaLocalId = mediaRow ? mediaRow.id : null;
-                    const allRules = db.prepare("SELECT * FROM rules WHERE is_active = 1").all();
 
                     for (const comment of comments) {
                         if (!comment.id) continue;
 
-                        const alreadyExists = db.prepare("SELECT id FROM events WHERE comment_id = ?").get(comment.id);
-                        if (alreadyExists) continue;
+                        const alreadyHandled = db.prepare("SELECT id FROM events WHERE comment_id = ? AND dm_status = 'delivered'").get(comment.id);
+                        if (alreadyHandled) continue;
 
                         const commentText = (comment.text || '').trim();
-                        const fromUsername = (comment.from?.username || 'instagram_user').toLowerCase().replace('@', '').trim();
+                        const fromUsername = (comment.from?.username || comment.username || 'instagram_user').toLowerCase().replace('@', '').trim();
                         const fromId = String(comment.from?.id || 'ig_user').trim();
                         const commentTime = comment.timestamp || new Date().toISOString();
 
@@ -168,50 +181,30 @@ async function syncMedia(userId = null) {
                             continue;
                         }
 
-                        // Match rule strictly by trigger keywords
-                        let matchedRule = null;
-                        const textLower = commentText.toLowerCase();
+                        // Feed unhandled comments through the automation engine
+                        const simulatedPayload = {
+                            object: 'instagram',
+                            entry: [{
+                                id: myIgUserId || '28689630687300805',
+                                time: Math.floor(new Date(commentTime).getTime() / 1000),
+                                changes: [{
+                                    field: 'comments',
+                                    value: {
+                                        from: { id: fromId, username: fromUsername },
+                                        media: { id: igMediaId },
+                                        id: comment.id,
+                                        text: commentText,
+                                        created_time: commentTime
+                                    }
+                                }]
+                            }]
+                        };
 
-                        // 1. Check rules assigned to this media
-                        for (const r of allRules) {
-                            if (r.media_id === mediaLocalId || String(r.media_id) === String(igMediaId)) {
-                                const kws = (r.trigger_keyword || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
-                                if (kws.includes('*') || kws.some(kw => textLower.includes(kw))) {
-                                    matchedRule = r;
-                                    break;
-                                }
-                            }
-                        }
-
-                        // 2. Check global rules or keyword match across active rules
-                        if (!matchedRule) {
-                            for (const r of allRules) {
-                                const kws = (r.trigger_keyword || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
-                                if (kws.includes('*') || kws.some(kw => textLower.includes(kw))) {
-                                    matchedRule = r;
-                                    break;
-                                }
-                            }
-                        }
-
-                        // Only ingest if a rule actually matched
-                        if (!matchedRule) continue;
-
-                        const ruleIdToAttach = matchedRule.id;
-                        const trackingId = crypto.randomUUID();
-
-                        const eventRes = db.prepare(`
-                            INSERT INTO events (rule_id, comment_id, comment_text, commenter_ig_id, commenter_username, media_ig_id, tracking_id, dm_status, created_at, user_id)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?)
-                        `).run(ruleIdToAttach, comment.id, commentText, fromId, fromUsername, igMediaId, trackingId, commentTime, userId);
-
-                        // Also record conversation
                         try {
-                            db.prepare(`
-                                INSERT INTO conversations (commenter_ig_id, rule_id, event_id, state, created_at, completed_at)
-                                VALUES (?, ?, ?, 'completed', ?, ?)
-                            `).run(fromId, ruleIdToAttach, eventRes.lastInsertRowid, commentTime, commentTime);
-                        } catch(e) {}
+                            await processCommentEvent(simulatedPayload);
+                        } catch (pe) {
+                            console.warn('[MediaSync] Comment automation notice:', pe.message);
+                        }
                     }
 
                     // Update monthly stats history for this reel

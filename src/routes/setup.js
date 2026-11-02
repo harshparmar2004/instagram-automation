@@ -1,7 +1,7 @@
 const express = require('express');
 const { getDb, getConfig, setConfig, backupRules, backupEvents, getUserInstagramAccount, saveUserInstagramAccount, disconnectUserInstagramAccount } = require('../database');
 const auth = require('../middleware/auth');
-const { subscribeWebhook, getUserProfile } = require('../services/instagram');
+const { subscribeWebhook, getUserProfile, ensureAccountWebhooksSubscribed } = require('../services/instagram');
 const { seedDemoData } = require('../seedData');
 const { syncMedia } = require('../services/mediaSync');
 const config = require('../config');
@@ -134,6 +134,10 @@ router.post('/setup/save-credentials', auth, (req, res) => {
         const currentToken = refreshedAcct?.access_token || getConfig('access_token');
         const hasToken = !!(currentToken && currentToken.trim() && !currentToken.includes('•'));
 
+        if (hasToken) {
+            ensureAccountWebhooksSubscribed(currentToken).catch(e => console.warn('[Setup] Auto-subscribe webhooks error:', e.message));
+        }
+
         try {
             const db = getDb();
             backupRules(db);
@@ -241,6 +245,10 @@ async function handleConnectAndScan(req, res) {
             if (targetUsername) setConfig('ig_username', targetUsername);
             if (resolvedIgUserId) setConfig('ig_user_id', resolvedIgUserId);
             if (profilePic) setConfig('ig_profile_pic', profilePic);
+        }
+
+        if (tokenToUse) {
+            ensureAccountWebhooksSubscribed(tokenToUse).catch(e => console.warn('[Setup] Auto-subscribe webhooks error:', e.message));
         }
 
         // Clean up only known mock commenter usernames (non-destructive to real media or rules)

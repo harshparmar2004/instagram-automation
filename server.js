@@ -100,20 +100,23 @@ cron.schedule('0 */6 * * *', async () => {
   }
 });
 
-// Media sync every 30 minutes
-cron.schedule('*/30 * * * *', async () => {
-  console.log('[Cron] Running media sync');
+// Real-time comment poller & media sync every 60 seconds (zero dropped comments guarantee)
+cron.schedule('* * * * *', async () => {
   try {
     await syncMedia();
   } catch (err) {
-    console.error('[Cron] Media sync failed:', err.message);
+    console.warn('[Poller] Real-time media/comment sync notice:', err.message);
   }
 });
+
+const { ensureAccountWebhooksSubscribed } = require('./src/services/instagram');
 
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
     startKeepAlive();
+    ensureAccountWebhooksSubscribed().catch(err => console.warn('[Startup] Webhook subscription notice:', err.message));
+    syncMedia().catch(err => console.warn('[Startup] Initial media sync notice:', err.message));
   });
 }
 

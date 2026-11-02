@@ -30,7 +30,7 @@ router.get('/media', auth, (req, res) => {
         }
 
         if (!includeDeleted) {
-            whereClauses.push("(m.status IS NULL OR m.status != 'deleted' OR m.id IN (SELECT DISTINCT media_id FROM rules WHERE media_id IS NOT NULL))");
+            whereClauses.push("(m.status IS NULL OR m.status != 'deleted')");
         }
 
         if (type === 'reels') {
@@ -84,7 +84,7 @@ router.get('/media/automated', auth, (req, res) => {
             mediaParams.push(userId);
         }
         if (!includeDeleted) {
-            mediaWhereClauses.push(`(status IS NULL OR status != 'deleted' OR id IN (SELECT DISTINCT media_id FROM rules WHERE media_id IS NOT NULL))`);
+            mediaWhereClauses.push("(status IS NULL OR status != 'deleted')");
         }
         if (mediaWhereClauses.length > 0) {
             mediaQuery += ` WHERE ` + mediaWhereClauses.join(' AND ');
