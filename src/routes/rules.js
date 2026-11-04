@@ -139,7 +139,7 @@ router.post('/rules', auth, (req, res) => {
         let resolvedSourceType = source_type || 'reel';
         let resolvedMediaId = null;
 
-        if (media_id === 'story' || source_type === 'story') {
+        if (media_id === 'story') {
             resolvedSourceType = 'story';
             resolvedMediaId = null;
         } else if (media_id === 'story_mention' || source_type === 'story_mention') {

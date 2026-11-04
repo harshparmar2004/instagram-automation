@@ -1343,6 +1343,10 @@ function getInstagramAccountByIgId(igUserId) {
 
   if (acct && acct.access_token) {
     acct.access_token = decryptToken(acct.access_token);
+    const cfgToken = getConfig('access_token');
+    if ((!acct.access_token || acct.access_token.includes('••••') || acct.access_token.length < 30) && cfgToken && cfgToken.length > 30) {
+      acct.access_token = cfgToken;
+    }
     return acct;
   }
 
@@ -1357,6 +1361,10 @@ function getInstagramAccountByIgId(igUserId) {
 
   if (fallbackAcct && fallbackAcct.access_token) {
     fallbackAcct.access_token = decryptToken(fallbackAcct.access_token);
+    const cfgToken = getConfig('access_token');
+    if ((!fallbackAcct.access_token || fallbackAcct.access_token.includes('••••') || fallbackAcct.access_token.length < 30) && cfgToken && cfgToken.length > 30) {
+      fallbackAcct.access_token = cfgToken;
+    }
     return fallbackAcct;
   }
 

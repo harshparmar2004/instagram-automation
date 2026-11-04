@@ -1,5 +1,5 @@
 const express = require('express');
-const { getDb, getConfig, setConfig, backupRules, backupEvents, getUserInstagramAccount, saveUserInstagramAccount, disconnectUserInstagramAccount } = require('../database');
+const { getDb, getConfig, setConfig, backupRules, backupEvents, backupSettings, backupInstagramAccounts, getUserInstagramAccount, saveUserInstagramAccount, disconnectUserInstagramAccount } = require('../database');
 const auth = require('../middleware/auth');
 const { subscribeWebhook, getUserProfile, ensureAccountWebhooksSubscribed } = require('../services/instagram');
 const { seedDemoData } = require('../seedData');
@@ -140,6 +140,8 @@ router.post('/setup/save-credentials', auth, (req, res) => {
 
         try {
             const db = getDb();
+            backupSettings(db);
+            backupInstagramAccounts(db);
             backupRules(db);
         } catch(e) {}
 

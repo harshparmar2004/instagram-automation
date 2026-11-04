@@ -169,7 +169,11 @@ async function processCommentEvent(payload) {
         const igAccountId = entry.id;
         const linkedAccount = getInstagramAccountByIgId(igAccountId);
         const targetUserId = linkedAccount ? linkedAccount.user_id : null;
-        const activeToken = linkedAccount ? linkedAccount.access_token : getConfig('access_token');
+        const configToken = getConfig('access_token');
+        let activeToken = linkedAccount?.access_token || configToken;
+        if (!activeToken || activeToken.includes('••••') || activeToken.length < 30) {
+            activeToken = configToken;
+        }
 
         for (const change of entry.changes || []) {
             if (change.field === 'comments') {
@@ -405,18 +409,18 @@ function cleanUrl(url) {
     return trimmed;
 }
 
-function dispatchStoryRule({ db, rule, senderId, username, activeToken, targetUserId, interactionText, interactionType }) {
-    // 1. Deduplication: only 1 DM per sender per rule within last 1 hour
+function dispatchStoryRule({ db, rule, senderId, username, activeToken, targetUserId, interactionText, interactionType, storyMediaId }) {
+    // 1. Deduplication: only 1 DM per sender per rule within last 2 minutes to prevent webhook duplicates
     const recent = db.prepare(`
         SELECT id FROM events 
         WHERE commenter_ig_id = ? 
           AND rule_id = ? 
           AND dm_status = 'delivered'
-          AND created_at > datetime('now', '-1 hours')
+          AND created_at > datetime('now', '-2 minutes')
         LIMIT 1
     `).get(senderId, rule.id);
     if (recent) {
-        console.log(`[Automation] Story interaction deduplicated for sender ${senderId} on rule #${rule.id}`);
+        console.log(`[Automation] Story interaction deduplicated for sender ${senderId} on rule #${rule.id} (within 2 minutes)`);
         return null;
     }
 
@@ -510,8 +514,9 @@ function dispatchStoryRule({ db, rule, senderId, username, activeToken, targetUs
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
+    const finalMediaIgId = storyMediaId || 'story';
     const eventResult = insertEvent.run(
-        rule.id, fakeCommentId, interactionText || `[${interactionType}]`, senderId, username || 'user', 'story', trackingId, targetUserId, new Date().toISOString()
+        rule.id, fakeCommentId, interactionText || `[${interactionType}]`, senderId, username || 'user', finalMediaIgId, trackingId, targetUserId, new Date().toISOString()
     );
     const eventId = eventResult.lastInsertRowid;
 
@@ -533,7 +538,7 @@ function dispatchStoryRule({ db, rule, senderId, username, activeToken, targetUs
         keyword: rule.trigger_keyword,
         action_type: rule.action_type,
         status: 'delivered',
-        mediaIgId: 'story',
+        mediaIgId: finalMediaIgId,
         linkClicked: false
     }).catch(() => {});
 
@@ -559,7 +564,11 @@ async function processMessageEvent(payload) {
         const igAccountId = entry.id;
         const linkedAccount = getInstagramAccountByIgId(igAccountId);
         const targetUserId = linkedAccount ? linkedAccount.user_id : null;
-        const activeToken = linkedAccount ? linkedAccount.access_token : getConfig('access_token');
+        const configToken = getConfig('access_token');
+        let activeToken = linkedAccount?.access_token || configToken;
+        if (!activeToken || activeToken.includes('••••') || activeToken.length < 30) {
+            activeToken = configToken;
+        }
 
         for (const msgEvent of entry.messaging || []) {
             const senderId = msgEvent.sender.id;
@@ -588,6 +597,7 @@ async function processMessageEvent(payload) {
                 // Not in active conversation: Check Story Mentions, Story Replies, or Keyword triggers!
                 const isStoryMention = msgEvent.message?.attachments?.some(a => a.type === 'story_mention' || a.type === 'ig_story');
                 const isStoryReply = !!msgEvent.message?.reply_to?.story || msgEvent.message?.attachments?.some(a => a.type === 'story_share' || a.type === 'story_reply');
+                const storyId = msgEvent.message?.reply_to?.story?.id || null;
 
                 if (isStoryMention) {
                     console.log(`[Automation] ⚡ Story mention detected from sender ${senderId}`);
@@ -619,34 +629,108 @@ async function processMessageEvent(payload) {
                             activeToken,
                             targetUserId,
                             interactionText: rawText || 'Story Mention',
-                            interactionType: 'Story Mention'
+                            interactionType: 'Story Mention',
+                            storyMediaId: storyId || 'story'
                         });
                         continue;
                     }
                 }
 
                 if (isStoryReply || rawText) {
-                    // Check story reply rules
-                    let storyReplyQuery = `
-                        SELECT * FROM rules 
-                        WHERE (source_type = 'story' OR media_id = 'story') 
-                          AND (source_type IS NULL OR source_type != 'story_mention')
-                          AND (media_id IS NULL OR media_id != 'story_mention')
-                          AND is_active = 1 AND (is_deleted = 0 OR is_deleted IS NULL)
-                    `;
-                    const params = [];
-                    if (targetUserId) {
-                        storyReplyQuery += " AND (user_id = ? OR user_id IS NULL)";
-                        params.push(targetUserId);
-                    }
-                    storyReplyQuery += " ORDER BY id DESC";
-                    const storyRules = db.prepare(storyReplyQuery).all(...params);
-
                     let matchedRule = null;
-                    for (const r of storyRules) {
-                        if (matchKeyword(r.trigger_keyword, rawText)) {
-                            matchedRule = r;
-                            break;
+
+                    // Tier 1: Check if rule targets this specific story
+                    if (storyId) {
+                        let specificQuery = `
+                            SELECT r.* FROM rules r
+                            LEFT JOIN media m ON r.media_id = m.id
+                            WHERE (r.media_id = ? OR m.ig_media_id = ?)
+                              AND r.is_active = 1 AND (r.is_deleted = 0 OR r.is_deleted IS NULL)
+                        `;
+                        const specificParams = [storyId, storyId];
+                        if (targetUserId) {
+                            specificQuery += " AND (r.user_id = ? OR r.user_id IS NULL)";
+                            specificParams.push(targetUserId);
+                        }
+                        specificQuery += " ORDER BY r.id DESC";
+                        const specificRules = db.prepare(specificQuery).all(...specificParams);
+                        for (const r of specificRules) {
+                            if (matchKeyword(r.trigger_keyword, rawText)) {
+                                matchedRule = r;
+                                console.log(`[Automation] 🎯 Story rule #${r.id} matched specific story ID ${storyId} for text "${rawText}"`);
+                                break;
+                            }
+                        }
+                    }
+
+                    // Tier 2: Check general Story rules (source_type = 'story' or media_id = 'story')
+                    if (!matchedRule) {
+                        let storyReplyQuery = `
+                            SELECT * FROM rules 
+                            WHERE (source_type = 'story' OR media_id = 'story') 
+                              AND (source_type IS NULL OR source_type != 'story_mention')
+                              AND (media_id IS NULL OR media_id != 'story_mention')
+                              AND is_active = 1 AND (is_deleted = 0 OR is_deleted IS NULL)
+                        `;
+                        const params = [];
+                        if (targetUserId) {
+                            storyReplyQuery += " AND (user_id = ? OR user_id IS NULL)";
+                            params.push(targetUserId);
+                        }
+                        storyReplyQuery += " ORDER BY id DESC";
+                        const storyRules = db.prepare(storyReplyQuery).all(...params);
+
+                        for (const r of storyRules) {
+                            if (matchKeyword(r.trigger_keyword, rawText)) {
+                                matchedRule = r;
+                                console.log(`[Automation] 🎯 Story-wide rule #${r.id} matched keyword "${r.trigger_keyword}" for text "${rawText}"`);
+                                break;
+                            }
+                        }
+                    }
+
+                    // Tier 3: Global rules (media_id is null / 'global')
+                    if (!matchedRule) {
+                        let globalQuery = `
+                            SELECT * FROM rules 
+                            WHERE (media_id IS NULL OR media_id = 'global')
+                              AND is_active = 1 AND (is_deleted = 0 OR is_deleted IS NULL)
+                        `;
+                        const params = [];
+                        if (targetUserId) {
+                            globalQuery += " AND (user_id = ? OR user_id IS NULL)";
+                            params.push(targetUserId);
+                        }
+                        globalQuery += " ORDER BY id DESC";
+                        const globalRules = db.prepare(globalQuery).all(...params);
+                        for (const r of globalRules) {
+                            if (matchKeyword(r.trigger_keyword, rawText)) {
+                                matchedRule = r;
+                                console.log(`[Automation] 🎯 Global rule #${r.id} matched keyword "${r.trigger_keyword}" for text "${rawText}"`);
+                                break;
+                            }
+                        }
+                    }
+
+                    // Tier 4: Account-wide Creator Fallback: If keyword matches ANY active rule for this creator
+                    if (!matchedRule && rawText) {
+                        let fallbackQuery = `
+                            SELECT * FROM rules 
+                            WHERE is_active = 1 AND (is_deleted = 0 OR is_deleted IS NULL)
+                        `;
+                        const params = [];
+                        if (targetUserId) {
+                            fallbackQuery += " AND (user_id = ? OR user_id IS NULL)";
+                            params.push(targetUserId);
+                        }
+                        fallbackQuery += " ORDER BY id DESC";
+                        const allRules = db.prepare(fallbackQuery).all(...params);
+                        for (const r of allRules) {
+                            if (matchKeyword(r.trigger_keyword, rawText)) {
+                                matchedRule = r;
+                                console.log(`[Automation] ⚡ Keyword matched rule #${r.id} ("${r.trigger_keyword}") via creator account fallback`);
+                                break;
+                            }
                         }
                     }
 
@@ -658,8 +742,9 @@ async function processMessageEvent(payload) {
                             username: 'story_user',
                             activeToken,
                             targetUserId,
-                            interactionText: rawText || 'Story Reply',
-                            interactionType: isStoryReply ? 'Story Reply' : 'Story DM'
+                            interactionText: rawText || (isStoryReply ? 'Story Reply' : 'DM'),
+                            interactionType: isStoryReply ? 'Story Reply' : 'Direct DM',
+                            storyMediaId: storyId || 'story'
                         });
                         continue;
                     }

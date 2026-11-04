@@ -458,16 +458,21 @@ async function sendDirectMessage(token, recipientId, messagePayload) {
 
     const messageObj = typeof messagePayload === 'string' ? { text: messagePayload } : messagePayload;
 
+    const postConfig = {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        params: {
+            access_token: token
+        }
+    };
+
     try {
         const res = await axios.post(endpoint, {
             recipient: { id: recipientId },
             message: messageObj
-        }, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        }, postConfig);
         return res.data;
     } catch (err) {
         // Fallback to plain text if structured template failed
@@ -478,12 +483,7 @@ async function sendDirectMessage(token, recipientId, messagePayload) {
                 const resFallback = await axios.post(endpoint, {
                     recipient: { id: recipientId },
                     message: { text: fallbackText }
-                }, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
+                }, postConfig);
                 return resFallback.data;
             } catch(e) {}
         }
