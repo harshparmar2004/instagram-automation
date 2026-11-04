@@ -326,6 +326,11 @@ window['new-automation'] = {
     },
 
     renderStep1(container) {
+        const user = window.App?.state?.user || {};
+        const igAccount = user.instagram || {};
+        const igUsername = igAccount.username || user.ig_username || 'harshparmar007__';
+        const igProfilePic = igAccount.profilePic || user.profile_pic || user.avatar_url || '';
+
         let filtered = (this.mediaList || []).filter(m => {
             const cap = (m.caption || '').toLowerCase();
             return !this.searchQuery || cap.includes(this.searchQuery.toLowerCase());
@@ -341,12 +346,150 @@ window['new-automation'] = {
             (m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED')) && m.status !== 'deleted'
         ).length;
         const totalCount = (this.mediaList || []).filter(m => 
-            m.media_product_type !== 'STORY' && m.status !== 'deleted'
+            m.status !== 'deleted'
         ).length;
         const activeStories = (this.mediaList || []).filter(m => 
             (m.media_product_type === 'STORY' || m.media_type === 'STORY') && m.status !== 'deleted'
         );
         const storiesCount = activeStories.length;
+
+        // AUTHENTIC INSTAGRAM STORY CARD RENDERER
+        const renderStoryCard = (st, isSelected) => {
+            const thumbUrl = st.thumbnail_url || st.media_url || '';
+            const captionCut = st.caption ? (st.caption.slice(0, 42) + '...') : `Active Story #${String(st.id || st.ig_media_id).slice(-4)}`;
+
+            return `
+                <div class="reel-card-item ${isSelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('${st.id}', this)" style="
+                    border-radius: 14px;
+                    border: ${isSelected ? '2.5px solid var(--accent-primary)' : '1px solid var(--border-color)'};
+                    outline: ${isSelected ? '3px solid var(--accent-primary)' : 'none'};
+                    outline-offset: ${isSelected ? '2px' : '0'};
+                    background: ${isSelected ? '#FDF8F6' : '#FFFFFF'};
+                    box-shadow: ${isSelected ? '0 0 0 3px rgba(217, 119, 87, 0.25), 0 8px 24px rgba(217, 119, 87, 0.15)' : '0 2px 8px rgba(0,0,0,0.03)'};
+                    cursor: pointer;
+                    overflow: hidden;
+                    position: relative;
+                    display: flex;
+                    flex-direction: column;
+                    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                ">
+                    ${isSelected ? `<div style="position:absolute; top:8px; right:8px; width:24px; height:24px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.78rem; z-index:20; border: 2px solid #FFFFFF; box-shadow: 0 2px 8px rgba(0,0,0,0.35);">✓</div>` : ''}
+
+                    <!-- AUTHENTIC 9:16 INSTAGRAM STORY MOBILE FRAME -->
+                    <div style="
+                        position: relative;
+                        width: 100%;
+                        padding-top: 162%;
+                        background-color: #121212;
+                        background-size: cover;
+                        background-position: center;
+                        background-image: url('${thumbUrl}');
+                        overflow: hidden;
+                    ">
+                        <!-- TOP SHADOW GRADIENT FOR TEXT LEGIBILITY -->
+                        <div style="position: absolute; top: 0; left: 0; right: 0; height: 72px; background: linear-gradient(to bottom, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.35) 65%, transparent 100%); pointer-events: none; z-index: 1;"></div>
+
+                        <!-- 1. INSTAGRAM STORY PROGRESS SEGMENTS -->
+                        <div style="position: absolute; top: 6px; left: 7px; right: 7px; display: flex; gap: 3px; z-index: 2;">
+                            <div style="flex: 1; height: 2px; background: #FFFFFF; border-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.5);"></div>
+                            <div style="flex: 1; height: 2px; background: rgba(255,255,255,0.4); border-radius: 2px;"></div>
+                            <div style="flex: 1; height: 2px; background: rgba(255,255,255,0.4); border-radius: 2px;"></div>
+                        </div>
+
+                        <!-- 2. CREATOR HEADER (AVATAR IN STORY GRADIENT RING + USERNAME + META VERIFIED + TIME) -->
+                        <div style="position: absolute; top: 13px; left: 7px; right: 7px; display: flex; align-items: center; justify-content: space-between; z-index: 2;">
+                            <div style="display: flex; align-items: center; gap: 5px; min-width: 0;">
+                                <!-- GRADIENT STORY RING -->
+                                <div style="width: 20px; height: 20px; border-radius: 50%; padding: 1.5px; background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 1px 4px rgba(0,0,0,0.4);">
+                                    ${igProfilePic ? `
+                                        <img src="${igProfilePic}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div style="display:none; width: 100%; height: 100%; border-radius: 50%; background: #1a1a1a; color: #FFF; font-size: 0.55rem; font-weight: 800; align-items: center; justify-content: center;">${(igUsername[0] || 'C').toUpperCase()}</div>
+                                    ` : `
+                                        <div style="width: 100%; height: 100%; border-radius: 50%; background: #1a1a1a; color: #FFF; font-size: 0.55rem; font-weight: 800; display: flex; align-items: center; justify-content: center;">${(igUsername[0] || 'C').toUpperCase()}</div>
+                                    `}
+                                </div>
+
+                                <!-- USERNAME & VERIFIED BADGE -->
+                                <div style="display: flex; align-items: center; gap: 2px; min-width: 0; overflow: hidden;">
+                                    <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 0.65rem; font-weight: 700; color: #FFFFFF; text-shadow: 0 1px 3px rgba(0,0,0,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 78px;">
+                                        ${igUsername}
+                                    </span>
+                                    <!-- META VERIFIED BLUE TICK -->
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0;" title="Meta Verified Account">
+                                        <circle cx="12" cy="12" r="10" fill="#0095F6"/>
+                                        <path d="M9.5 12.3l1.8 1.8 4.2-4.2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                    <span style="font-size: 0.58rem; color: rgba(255,255,255,0.75); margin-left: 1px;">• 2h</span>
+                                </div>
+                            </div>
+
+                            <!-- INSTAGRAM STORY GLYPH -->
+                            <div style="display: flex; align-items: center; gap: 3px; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); padding: 1.5px 5px; border-radius: 10px; border: 0.5px solid rgba(255,255,255,0.25);">
+                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                                </svg>
+                                <span style="font-size: 0.55rem; font-weight: 700; color: #FFFFFF;">Story</span>
+                            </div>
+                        </div>
+
+                        <!-- 3. LIVE STORY FLOATING BADGE -->
+                        <div style="position: absolute; top: 38px; left: 7px; z-index: 2;">
+                            <div style="font-size: 0.55rem; font-weight: 800; color: #FFFFFF; background: linear-gradient(45deg, #f09433, #dc2743); padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px; box-shadow: 0 2px 6px rgba(0,0,0,0.35); text-transform: uppercase; letter-spacing: 0.04em;">
+                                ⚡ Live Story
+                            </div>
+                        </div>
+
+                        <!-- 4. BOTTOM SHADOW FOR STORY CONTROLS -->
+                        <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 85px; background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, transparent 100%); pointer-events: none; z-index: 1;"></div>
+
+                        <!-- 5. AUTHENTIC INSTAGRAM STORY BOTTOM REPLY BAR -->
+                        <div style="position: absolute; bottom: 7px; left: 7px; right: 7px; z-index: 2; display: flex; flex-direction: column; gap: 4px;">
+                            <div style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.32); border-radius: 18px; padding: 4px 8px; display: flex; align-items: center; justify-content: space-between;">
+                                <span style="font-size: 0.58rem; color: rgba(255,255,255,0.92); font-weight: 500;">Send message...</span>
+                                <div style="display: flex; align-items: center; gap: 4px;">
+                                    <span style="font-size: 0.62rem;">🤍</span>
+                                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.55rem; color: rgba(255,255,255,0.85); font-weight: 700; padding: 0 2px;">
+                                <span>🟢 24h Live Window</span>
+                                <span>Meta API ✓</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- METADATA FOOTER (BELOW 9:16 FRAME) -->
+                    <div style="padding: 0.6rem 0.7rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between; background: #FFFFFF;">
+                        <div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.2rem;">
+                                <span style="font-size: 0.6rem; font-weight: 800; color: var(--accent-primary); background: #FAF2EC; padding: 1px 5px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">
+                                    ⚡ Story Automation
+                                </span>
+                                <span style="font-size: 0.6rem; color: #15803D; font-weight: 700;">🟢 Active</span>
+                            </div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.75rem; color: var(--text-primary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                ${captionCut}
+                            </div>
+                        </div>
+                        <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 0.35rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
+                            <span>${new Date(st.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                            <span style="color: var(--accent-primary); font-weight: 700;">Select Story →</span>
+                        </div>
+                    </div>
+
+                    ${isSelected ? `
+                        <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.68rem; font-weight: 800; text-align: center; padding: 4px 6px; letter-spacing: 0.04em;">
+                            ✓ SELECTED FOR STORY AUTOMATION
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        };
 
         let gridHtml = '';
 
@@ -358,7 +501,7 @@ window['new-automation'] = {
                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 0.85rem; width: 100%;">
                     <!-- COMPACT STORY REPLIES CARD -->
                     <div class="reel-card-item ${isStoryReplySelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('story', this)" style="
-                        border-radius: 12px;
+                        border-radius: 14px;
                         border: ${isStoryReplySelected ? '2.5px solid var(--accent-primary)' : '1px solid var(--border-color)'};
                         outline: ${isStoryReplySelected ? '3px solid var(--accent-primary)' : 'none'};
                         outline-offset: ${isStoryReplySelected ? '2px' : '0'};
@@ -371,16 +514,16 @@ window['new-automation'] = {
                         flex-direction: column;
                         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                     ">
-                        ${isStoryReplySelected ? `<div style="position:absolute; top:6px; right:6px; width:22px; height:22px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.75rem; z-index:10; border: 2px solid #FFFFFF;">✓</div>` : ''}
+                        ${isStoryReplySelected ? `<div style="position:absolute; top:8px; right:8px; width:24px; height:24px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.78rem; z-index:10; border: 2px solid #FFFFFF; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">✓</div>` : ''}
 
-                        <div style="height: 105px; background: linear-gradient(135deg, #FFF1EB 0%, #FEE5DC 60%, #FDC5B4 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.5rem; text-align: center; position: relative;">
-                            <div style="position: absolute; top: 6px; left: 6px; font-size: 0.62rem; font-weight: 800; color: #8F4932; background: rgba(255,255,255,0.85); padding: 2px 5px; border-radius: 5px;">⚡ ANY STORY</div>
-                            <div style="font-size: 1.5rem; margin-top: 0.2rem;">⚡</div>
-                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.82rem; color: var(--accent-primary); margin-top: 0.15rem;">All Stories</div>
+                        <div style="height: 115px; background: linear-gradient(135deg, #FFF1EB 0%, #FEE5DC 60%, #FDC5B4 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.5rem; text-align: center; position: relative;">
+                            <div style="position: absolute; top: 6px; left: 6px; font-size: 0.62rem; font-weight: 800; color: #8F4932; background: rgba(255,255,255,0.88); padding: 2px 6px; border-radius: 5px;">⚡ ANY STORY</div>
+                            <div style="font-size: 1.6rem; margin-top: 0.15rem;">⚡</div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.85rem; color: var(--accent-primary); margin-top: 0.15rem;">All Stories</div>
                             <div style="font-size: 0.68rem; color: #8F4932; font-weight: 600;">Incoming Replies</div>
                         </div>
 
-                        <div style="padding: 0.6rem 0.7rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="padding: 0.65rem 0.75rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
                             <div>
                                 <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.78rem; color: var(--text-primary); margin-bottom: 0.2rem;">Story Reply Automation</div>
                                 <div style="font-size: 0.7rem; color: var(--text-secondary); line-height: 1.35;">Auto-reply when a user sends a keyword to any story you post.</div>
@@ -400,7 +543,7 @@ window['new-automation'] = {
 
                     <!-- COMPACT STORY MENTIONS CARD -->
                     <div class="reel-card-item ${isStoryMentionSelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('story_mention', this)" style="
-                        border-radius: 12px;
+                        border-radius: 14px;
                         border: ${isStoryMentionSelected ? '2.5px solid var(--accent-primary)' : '1px solid var(--border-color)'};
                         outline: ${isStoryMentionSelected ? '3px solid var(--accent-primary)' : 'none'};
                         outline-offset: ${isStoryMentionSelected ? '2px' : '0'};
@@ -413,16 +556,16 @@ window['new-automation'] = {
                         flex-direction: column;
                         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                     ">
-                        ${isStoryMentionSelected ? `<div style="position:absolute; top:6px; right:6px; width:22px; height:22px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.75rem; z-index:10; border: 2px solid #FFFFFF;">✓</div>` : ''}
+                        ${isStoryMentionSelected ? `<div style="position:absolute; top:8px; right:8px; width:24px; height:24px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.78rem; z-index:10; border: 2px solid #FFFFFF; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">✓</div>` : ''}
 
-                        <div style="height: 105px; background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 60%, #C7D2FE 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.5rem; text-align: center; position: relative;">
-                            <div style="position: absolute; top: 6px; left: 6px; font-size: 0.62rem; font-weight: 800; color: #4338CA; background: rgba(255,255,255,0.85); padding: 2px 5px; border-radius: 5px;">🏷️ MENTION</div>
-                            <div style="font-size: 1.5rem; margin-top: 0.2rem;">🏷️</div>
-                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.82rem; color: #4338CA; margin-top: 0.15rem;">Story Mentions</div>
+                        <div style="height: 115px; background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 60%, #C7D2FE 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.5rem; text-align: center; position: relative;">
+                            <div style="position: absolute; top: 6px; left: 6px; font-size: 0.62rem; font-weight: 800; color: #4338CA; background: rgba(255,255,255,0.88); padding: 2px 6px; border-radius: 5px;">🏷️ MENTION</div>
+                            <div style="font-size: 1.6rem; margin-top: 0.15rem;">🏷️</div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.85rem; color: #4338CA; margin-top: 0.15rem;">Story Mentions</div>
                             <div style="font-size: 0.68rem; color: #3730A3; font-weight: 600;">When Tagged</div>
                         </div>
 
-                        <div style="padding: 0.6rem 0.7rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="padding: 0.65rem 0.75rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
                             <div>
                                 <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.78rem; color: var(--text-primary); margin-bottom: 0.2rem;">Story Mention Automation</div>
                                 <div style="font-size: 0.7rem; color: var(--text-secondary); line-height: 1.35;">Auto-DM when someone tags @yourhandle in their story.</div>
@@ -440,64 +583,10 @@ window['new-automation'] = {
                         ` : ''}
                     </div>
 
-                    <!-- ACTIVE STORIES POSTED BY USER -->
+                    <!-- ACTIVE STORIES POSTED BY USER (AUTHENTIC INSTAGRAM STORY FRAMES) -->
                     ${activeStories.map(st => {
                         const isSelected = String(this.selectedMediaId) === String(st.id) || String(this.selectedMediaId) === String(st.ig_media_id);
-                        const thumbUrl = st.thumbnail_url || st.media_url || '';
-                        const captionCut = st.caption ? (st.caption.slice(0, 38) + '...') : `Active Story #${String(st.id || st.ig_media_id).slice(-4)}`;
-
-                        return `
-                            <div class="reel-card-item ${isSelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('${st.id}', this)" style="
-                                border-radius: 12px;
-                                border: ${isSelected ? '2.5px solid var(--accent-primary)' : '1px solid var(--border-color)'};
-                                outline: ${isSelected ? '3px solid var(--accent-primary)' : 'none'};
-                                outline-offset: ${isSelected ? '2px' : '0'};
-                                background: ${isSelected ? '#FDF8F6' : '#FFFFFF'};
-                                box-shadow: ${isSelected ? '0 0 0 3px rgba(217, 119, 87, 0.25)' : '0 1px 3px rgba(0,0,0,0.02)'};
-                                cursor: pointer;
-                                overflow: hidden;
-                                position: relative;
-                                display: flex;
-                                flex-direction: column;
-                                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-                            ">
-                                ${isSelected ? `<div style="position:absolute; top:6px; right:6px; width:22px; height:22px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.75rem; z-index:10; border: 2px solid #FFFFFF;">✓</div>` : ''}
-
-                                <!-- 9:16 VERTICAL COVER FOR STORY -->
-                                <div style="
-                                    position: relative;
-                                    width: 100%;
-                                    padding-top: 120%;
-                                    background-color: #171514;
-                                    background-size: cover;
-                                    background-position: center;
-                                    background-image: url('${thumbUrl}');
-                                ">
-                                    <div style="position: absolute; top: 6px; left: 6px; font-size: 0.62rem; font-weight: 800; color: #FFFFFF; background: linear-gradient(45deg, #f09433, #dc2743); padding: 0.2rem 0.5rem; border-radius: 6px; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">
-                                        ⚡ ACTIVE STORY
-                                    </div>
-
-                                    <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 1rem 0.5rem 0.35rem 0.5rem; background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%); color: #FFF; font-size: 0.65rem; font-weight: 700;">
-                                        🕒 Live on Instagram
-                                    </div>
-                                </div>
-
-                                <div style="padding: 0.6rem 0.7rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
-                                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.78rem; color: var(--text-primary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                                        ${captionCut}
-                                    </div>
-                                    <div style="font-size: 0.68rem; color: var(--text-secondary); margin-top: 0.3rem; font-weight: 600;">
-                                        ${new Date(st.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} • Story DM
-                                    </div>
-                                </div>
-
-                                ${isSelected ? `
-                                    <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.68rem; font-weight: 800; text-align: center; padding: 4px 6px; letter-spacing: 0.04em;">
-                                        ✓ SELECTED
-                                    </div>
-                                ` : ''}
-                            </div>
-                        `;
+                        return renderStoryCard(st, isSelected);
                     }).join('')}
 
                     ${activeStories.length === 0 ? `
@@ -560,6 +649,14 @@ window['new-automation'] = {
 
             filtered.forEach(m => {
                 const isSelected = String(this.selectedMediaId) === String(m.id);
+                const isStory = m.media_product_type === 'STORY' || m.media_type === 'STORY';
+
+                // IF ITEM IS STORY IN ALL CONTENTS, RENDER AUTHENTIC STORY CARD
+                if (isStory) {
+                    gridHtml += renderStoryCard(m, isSelected);
+                    return;
+                }
+
                 const isReel = m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED');
                 const thumbUrl = m.thumbnail_url || m.media_url || '';
                 const captionCut = m.caption ? (m.caption.slice(0, 45) + '...') : 'Instagram Content';
@@ -582,18 +679,25 @@ window['new-automation'] = {
                     ">
                         ${isSelected ? `<div style="position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.85rem; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.25); border: 2px solid #FFFFFF;">✓</div>` : ''}
 
-                        <!-- 9:16 VERTICAL COVER FOR REELS -->
+                        <!-- VERTICAL COVER FOR REELS / FEED -->
                         <div style="
                             position: relative;
                             width: 100%;
-                            padding-top: ${isReel ? '125%' : '85%'};
+                            padding-top: ${isReel ? '135%' : '100%'};
                             background-color: #171514;
                             background-size: cover;
                             background-position: center;
                             background-image: url('${thumbUrl}');
                         ">
-                            <div style="position: absolute; top: 6px; left: 6px; font-size: 0.65rem; font-weight: 800; color: #FFFFFF; background: rgba(0,0,0,0.7); backdrop-filter: blur(6px); padding: 0.2rem 0.5rem; border-radius: 6px; display: flex; align-items: center; gap: 4px;">
-                                ${isReel ? '▶ REEL' : '📸 POST'}
+                            <!-- TOP CREATOR HEADER OVERLAY -->
+                            <div style="position: absolute; top: 0; left: 0; right: 0; padding: 6px 8px; background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%); display: flex; align-items: center; justify-content: space-between; z-index: 2;">
+                                <div style="display: flex; align-items: center; gap: 4px;">
+                                    <span style="font-size: 0.65rem; font-weight: 700; color: #FFFFFF; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">@${igUsername}</span>
+                                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#0095F6"/><path d="M9.5 12.3l1.8 1.8 4.2-4.2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </div>
+                                <div style="font-size: 0.62rem; font-weight: 800; color: #FFFFFF; background: ${isReel ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.65)'}; backdrop-filter: blur(6px); padding: 2px 6px; border-radius: 4px; display: flex; align-items: center; gap: 3px;">
+                                    ${isReel ? '▶ REEL' : '📸 POST'}
+                                </div>
                             </div>
 
                             <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 1.25rem 0.5rem 0.4rem 0.5rem; background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%); color: #FFF; font-size: 0.68rem; font-weight: 700;">
@@ -626,7 +730,15 @@ window['new-automation'] = {
             <div style="width: 100%;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.85rem; flex-wrap:wrap; gap:0.65rem;">
                     <div>
-                        <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">Step 1: Pick a Target Reel, Post or Story</h2>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">Step 1: Pick a Target Reel, Post or Story</h2>
+                            <div style="display: inline-flex; align-items: center; gap: 5px; background: #F0FDF4; border: 1px solid #BBF7D0; padding: 2.5px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; color: #15803D;">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#0095F6"/><path d="M9.5 12.3l1.8 1.8 4.2-4.2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                <span>@${igUsername}</span>
+                                <span style="color: #86EFAC;">•</span>
+                                <span>Meta Verified Token Active</span>
+                            </div>
+                        </div>
                         <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.1rem;">Select which Instagram Reel, Post, or Story interaction this automation will monitor.</p>
                     </div>
 
@@ -655,7 +767,7 @@ window['new-automation'] = {
                     </button>
                 </div>
 
-                <div style="max-height: 380px; overflow-y: auto; border-radius: 12px; border: 1px solid var(--border-color); padding: 0.85rem; background: #FAF8F5;">
+                <div style="max-height: 480px; overflow-y: auto; border-radius: 12px; border: 1px solid var(--border-color); padding: 0.85rem; background: #FAF8F5;">
                     ${gridHtml}
                 </div>
             </div>

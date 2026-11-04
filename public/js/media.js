@@ -157,7 +157,8 @@ window.media = {
         let html = `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(${isReelView ? '210px' : '240px'}, 1fr)); gap: 1.25rem; width: 100%;">`;
         
         filtered.forEach(item => {
-            const isReel = item.media_product_type === 'REELS' || item.media_type === 'REEL' || (item.media_type === 'VIDEO' && item.media_product_type !== 'FEED');
+            const isStory = item.media_product_type === 'STORY' || item.media_type === 'STORY';
+            const isReel = !isStory && (item.media_product_type === 'REELS' || item.media_type === 'REEL' || (item.media_type === 'VIDEO' && item.media_product_type !== 'FEED'));
             const rulesCount = item.rulesCount || 0;
             const thumbUrl = item.thumbnail_url || item.media_url || '';
             const commentsCount = item.comments_count || 0;
@@ -175,11 +176,11 @@ window.media = {
                     transition: transform 0.15s ease, box-shadow 0.15s ease;
                 " onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 24px rgba(0,0,0,0.08)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 10px rgba(0,0,0,0.03)';">
                     
-                    <!-- 9:16 VERTICAL COVER FOR REELS -->
+                    <!-- 9:16 VERTICAL COVER FOR STORIES & REELS -->
                     <div style="
                         position: relative;
                         width: 100%;
-                        padding-top: ${isReel ? '150%' : '100%'};
+                        padding-top: ${isStory ? '160%' : isReel ? '150%' : '100%'};
                         background-color: #171514;
                         background-image: url('${thumbUrl}');
                         background-size: cover;
@@ -187,9 +188,11 @@ window.media = {
                     ">
                         <!-- TOP BADGES -->
                         <div style="position: absolute; top: 10px; left: 10px; display: flex; gap: 6px;">
-                            ${isReel 
-                                ? `<span style="background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); color: #FFF; font-size: 0.7rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; display: flex; align-items: center; gap: 4px;">▶ REEL</span>`
-                                : `<span style="background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); color: #FFF; font-size: 0.7rem; font-weight: 800; padding: 3px 8px; border-radius: 6px;">📸 POST</span>`
+                            ${isStory
+                                ? `<span style="background: linear-gradient(45deg, #f09433, #dc2743); color: #FFF; font-size: 0.7rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">⚡ INSTAGRAM STORY</span>`
+                                : isReel 
+                                    ? `<span style="background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); color: #FFF; font-size: 0.7rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; display: flex; align-items: center; gap: 4px;">▶ REEL</span>`
+                                    : `<span style="background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); color: #FFF; font-size: 0.7rem; font-weight: 800; padding: 3px 8px; border-radius: 6px;">📸 POST</span>`
                             }
                         </div>
 

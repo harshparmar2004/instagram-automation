@@ -266,6 +266,8 @@ window.workflows = {
         }
 
         this.storedData = {};
+        const user = window.App?.state?.user || {};
+        const igUsername = user.instagram?.username || user.ig_username || 'harshparmar007__';
         let html = '<div style="display:flex; flex-direction:column; gap: 1.75rem; width: 100%;">';
 
         items.forEach(item => {
@@ -381,11 +383,22 @@ window.workflows = {
                                     ` : ruleIsStory ? `
                                         <div style="display:flex; flex-direction:column; gap:0.65rem;">
                                             ${thumbUrl ? `
-                                                <div style="width:100%; height:110px; border-radius:10px; background-size:cover; background-position:center; background-image:url('${thumbUrl}'); border:1px solid var(--border-color); position:relative;">
-                                                    <span style="position:absolute; top:6px; left:6px; font-size:0.62rem; font-weight:800; background:linear-gradient(45deg, #f09433, #dc2743); color:#FFF; padding:2px 6px; border-radius:4px; box-shadow:0 1px 4px rgba(0,0,0,0.3);">⚡ ACTIVE STORY</span>
+                                                <div style="width:100%; height:130px; border-radius:12px; background-size:cover; background-position:center; background-image:url('${thumbUrl}'); border:1px solid var(--border-color); position:relative; overflow:hidden;">
+                                                    <div style="position:absolute; top:0; left:0; right:0; height:45px; background:linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%); z-index:1;"></div>
+                                                    <div style="position:absolute; top:6px; left:6px; right:6px; display:flex; align-items:center; justify-content:space-between; z-index:2;">
+                                                        <span style="font-size:0.62rem; font-weight:800; background:linear-gradient(45deg, #f09433, #dc2743); color:#FFF; padding:2px 6px; border-radius:4px; box-shadow:0 1px 4px rgba(0,0,0,0.3); display:flex; align-items:center; gap:3px;">⚡ INSTAGRAM STORY</span>
+                                                        <div style="display:flex; align-items:center; gap:3px; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); padding:2px 6px; border-radius:10px; font-size:0.58rem; color:#FFF; font-weight:700;">
+                                                            <span>@${igUsername}</span>
+                                                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#0095F6"/><path d="M9.5 12.3l1.8 1.8 4.2-4.2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                                        </div>
+                                                    </div>
+                                                    <div style="position:absolute; bottom:6px; left:8px; right:8px; background:rgba(255,255,255,0.22); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.35); border-radius:14px; padding:3px 8px; font-size:0.58rem; color:#FFF; display:flex; justify-content:space-between; align-items:center; z-index:2;">
+                                                        <span style="font-weight:500;">Send message...</span>
+                                                        <span>🤍 ✈️</span>
+                                                    </div>
                                                 </div>
                                             ` : `
-                                                <div style="width:100%; height:90px; border-radius:10px; background: linear-gradient(135deg, #FFF1EB 0%, #FDD1C3 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; border:1px solid #FDC8B6;">
+                                                <div style="width:100%; height:95px; border-radius:12px; background: linear-gradient(135deg, #FFF1EB 0%, #FDD1C3 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; border:1px solid #FDC8B6;">
                                                     <div style="font-size: 1.8rem;">⚡</div>
                                                     <div style="font-size: 0.75rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase;">Instagram Story</div>
                                                 </div>
