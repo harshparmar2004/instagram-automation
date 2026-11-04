@@ -271,15 +271,40 @@ window['new-automation'] = {
     setStep1Filter(filter) {
         this.step1Filter = filter;
         if (filter === 'story') {
-            if (this.selectedMediaId !== 'story' && this.selectedMediaId !== 'story_mention') {
+            const hasStorySelected = this.selectedMediaId === 'story' || 
+                                     this.selectedMediaId === 'story_mention' || 
+                                     (this.mediaList || []).some(m => String(m.id) === String(this.selectedMediaId) && (m.media_product_type === 'STORY' || m.media_type === 'STORY'));
+            if (!hasStorySelected) {
                 this.selectedMediaId = 'story';
             }
         }
         this.renderStep1(document.getElementById('new-automation-content'));
     },
 
+    async refreshStories() {
+        const btn = document.getElementById('btn-refresh-step1-content') || document.getElementById('btn-refresh-stories-banner');
+        if (btn) {
+            btn.innerHTML = '<span class="spinner"></span> Syncing Stories...';
+            btn.disabled = true;
+        }
+        try {
+            const res = await App.apiCall('POST', '/api/stories/sync');
+            this.mediaList = await App.apiCall('GET', '/api/media') || [];
+            const count = res.count !== undefined ? res.count : 0;
+            App.showToast(`✅ Synced! Found ${count} active stories on Instagram`, 'success');
+            this.renderStep1(document.getElementById('new-automation-content'));
+        } catch (err) {
+            App.showToast(err.message, 'error');
+        } finally {
+            if (btn) {
+                btn.innerHTML = '<span>🔄 Refresh Stories</span>';
+                btn.disabled = false;
+            }
+        }
+    },
+
     async refreshMedia() {
-        const btn = document.getElementById('btn-refresh-step1-reels');
+        const btn = document.getElementById('btn-refresh-step1-content') || document.getElementById('btn-refresh-step1-reels');
         if (btn) {
             btn.innerHTML = '<span class="spinner"></span> Syncing from Instagram...';
             btn.disabled = true;
@@ -308,14 +333,20 @@ window['new-automation'] = {
 
         if (this.step1Filter === 'reels') {
             filtered = filtered.filter(m => 
-                m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED')
+                (m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED')) && m.status !== 'deleted'
             );
         }
 
         const reelsCount = (this.mediaList || []).filter(m => 
-            m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED')
+            (m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED')) && m.status !== 'deleted'
         ).length;
-        const totalCount = (this.mediaList || []).length;
+        const totalCount = (this.mediaList || []).filter(m => 
+            m.media_product_type !== 'STORY' && m.status !== 'deleted'
+        ).length;
+        const activeStories = (this.mediaList || []).filter(m => 
+            (m.media_product_type === 'STORY' || m.media_type === 'STORY') && m.status !== 'deleted'
+        );
+        const storiesCount = activeStories.length;
 
         let gridHtml = '';
 
@@ -324,15 +355,15 @@ window['new-automation'] = {
             const isStoryMentionSelected = String(this.selectedMediaId) === 'story_mention';
 
             gridHtml = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; width: 100%;">
-                    <!-- STORY REPLIES CARD -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 0.85rem; width: 100%;">
+                    <!-- COMPACT STORY REPLIES CARD -->
                     <div class="reel-card-item ${isStoryReplySelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('story', this)" style="
-                        border-radius: 14px;
-                        border: ${isStoryReplySelected ? '2.5px solid var(--accent-primary)' : '1.5px solid var(--border-color)'};
+                        border-radius: 12px;
+                        border: ${isStoryReplySelected ? '2.5px solid var(--accent-primary)' : '1px solid var(--border-color)'};
                         outline: ${isStoryReplySelected ? '3px solid var(--accent-primary)' : 'none'};
-                        outline-offset: ${isStoryReplySelected ? '3px' : '0'};
+                        outline-offset: ${isStoryReplySelected ? '2px' : '0'};
                         background: ${isStoryReplySelected ? '#FDF8F6' : '#FFFFFF'};
-                        box-shadow: ${isStoryReplySelected ? '0 0 0 4px rgba(217, 119, 87, 0.28), 0 8px 24px rgba(217, 119, 87, 0.2)' : '0 1px 4px rgba(0,0,0,0.02)'};
+                        box-shadow: ${isStoryReplySelected ? '0 0 0 3px rgba(217, 119, 87, 0.25)' : '0 1px 3px rgba(0,0,0,0.02)'};
                         cursor: pointer;
                         overflow: hidden;
                         position: relative;
@@ -340,40 +371,41 @@ window['new-automation'] = {
                         flex-direction: column;
                         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                     ">
-                        ${isStoryReplySelected ? `<div style="position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.85rem; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.25); border: 2px solid #FFFFFF;">✓</div>` : ''}
+                        ${isStoryReplySelected ? `<div style="position:absolute; top:6px; right:6px; width:22px; height:22px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.75rem; z-index:10; border: 2px solid #FFFFFF;">✓</div>` : ''}
 
-                        <div style="height: 130px; background: linear-gradient(135deg, #FFF1EB 0%, #FDD1C3 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.85rem; text-align: center;">
-                            <div style="font-size: 2.2rem; margin-bottom: 0.2rem;">⚡</div>
-                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.95rem; color: var(--accent-primary);">All Stories (Story Replies)</div>
-                            <div style="font-size: 0.72rem; color: #8F4932; font-weight: 600; margin-top: 0.15rem;">Automates incoming Story replies</div>
+                        <div style="height: 105px; background: linear-gradient(135deg, #FFF1EB 0%, #FEE5DC 60%, #FDC5B4 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.5rem; text-align: center; position: relative;">
+                            <div style="position: absolute; top: 6px; left: 6px; font-size: 0.62rem; font-weight: 800; color: #8F4932; background: rgba(255,255,255,0.85); padding: 2px 5px; border-radius: 5px;">⚡ ANY STORY</div>
+                            <div style="font-size: 1.5rem; margin-top: 0.2rem;">⚡</div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.82rem; color: var(--accent-primary); margin-top: 0.15rem;">All Stories</div>
+                            <div style="font-size: 0.68rem; color: #8F4932; font-weight: 600;">Incoming Replies</div>
                         </div>
 
-                        <div style="padding: 1rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="padding: 0.6rem 0.7rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
                             <div>
-                                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.35rem;">Story Reply Automation</div>
-                                <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.45;">Triggers whenever a follower sends a message or keyword reply to any active Instagram Story on your account.</div>
+                                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.78rem; color: var(--text-primary); margin-bottom: 0.2rem;">Story Reply Automation</div>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary); line-height: 1.35;">Auto-reply when a user sends a keyword to any story you post.</div>
                             </div>
-                            <div style="margin-top: 0.75rem; display: flex; gap: 6px; flex-wrap: wrap;">
-                                <span style="font-size: 0.68rem; font-weight: 700; background: #FAF2EC; color: var(--accent-primary); padding: 3px 8px; border-radius: 6px;">📩 Auto-DM Links</span>
-                                <span style="font-size: 0.68rem; font-weight: 700; background: #FAF2EC; color: var(--accent-primary); padding: 3px 8px; border-radius: 6px;">🔐 Follower Gate</span>
+                            <div style="margin-top: 0.5rem; display: flex; gap: 4px; flex-wrap: wrap;">
+                                <span style="font-size: 0.62rem; font-weight: 700; background: #FAF2EC; color: var(--accent-primary); padding: 2px 6px; border-radius: 5px;">📩 Auto-DM</span>
+                                <span style="font-size: 0.62rem; font-weight: 700; background: #FAF2EC; color: var(--accent-primary); padding: 2px 6px; border-radius: 5px;">🔐 Gate</span>
                             </div>
                         </div>
 
                         ${isStoryReplySelected ? `
-                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.72rem; font-weight: 800; text-align: center; padding: 6px 8px; letter-spacing: 0.04em;">
-                                ✓ SELECTED FOR AUTOMATION
+                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.68rem; font-weight: 800; text-align: center; padding: 4px 6px; letter-spacing: 0.04em;">
+                                ✓ SELECTED
                             </div>
                         ` : ''}
                     </div>
 
-                    <!-- STORY MENTIONS CARD -->
+                    <!-- COMPACT STORY MENTIONS CARD -->
                     <div class="reel-card-item ${isStoryMentionSelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('story_mention', this)" style="
-                        border-radius: 14px;
-                        border: ${isStoryMentionSelected ? '2.5px solid var(--accent-primary)' : '1.5px solid var(--border-color)'};
+                        border-radius: 12px;
+                        border: ${isStoryMentionSelected ? '2.5px solid var(--accent-primary)' : '1px solid var(--border-color)'};
                         outline: ${isStoryMentionSelected ? '3px solid var(--accent-primary)' : 'none'};
-                        outline-offset: ${isStoryMentionSelected ? '3px' : '0'};
+                        outline-offset: ${isStoryMentionSelected ? '2px' : '0'};
                         background: ${isStoryMentionSelected ? '#FDF8F6' : '#FFFFFF'};
-                        box-shadow: ${isStoryMentionSelected ? '0 0 0 4px rgba(217, 119, 87, 0.28), 0 8px 24px rgba(217, 119, 87, 0.2)' : '0 1px 4px rgba(0,0,0,0.02)'};
+                        box-shadow: ${isStoryMentionSelected ? '0 0 0 3px rgba(217, 119, 87, 0.25)' : '0 1px 3px rgba(0,0,0,0.02)'};
                         cursor: pointer;
                         overflow: hidden;
                         position: relative;
@@ -381,31 +413,107 @@ window['new-automation'] = {
                         flex-direction: column;
                         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                     ">
-                        ${isStoryMentionSelected ? `<div style="position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.85rem; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.25); border: 2px solid #FFFFFF;">✓</div>` : ''}
+                        ${isStoryMentionSelected ? `<div style="position:absolute; top:6px; right:6px; width:22px; height:22px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.75rem; z-index:10; border: 2px solid #FFFFFF;">✓</div>` : ''}
 
-                        <div style="height: 130px; background: linear-gradient(135deg, #EEF2FF 0%, #C7D2FE 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.85rem; text-align: center;">
-                            <div style="font-size: 2.2rem; margin-bottom: 0.2rem;">🏷️</div>
-                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.95rem; color: #4338CA;">Story Mentions & Tags</div>
-                            <div style="font-size: 0.72rem; color: #3730A3; font-weight: 600; margin-top: 0.15rem;">Automates user stories mentioning you</div>
+                        <div style="height: 105px; background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 60%, #C7D2FE 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.5rem; text-align: center; position: relative;">
+                            <div style="position: absolute; top: 6px; left: 6px; font-size: 0.62rem; font-weight: 800; color: #4338CA; background: rgba(255,255,255,0.85); padding: 2px 5px; border-radius: 5px;">🏷️ MENTION</div>
+                            <div style="font-size: 1.5rem; margin-top: 0.2rem;">🏷️</div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.82rem; color: #4338CA; margin-top: 0.15rem;">Story Mentions</div>
+                            <div style="font-size: 0.68rem; color: #3730A3; font-weight: 600;">When Tagged</div>
                         </div>
 
-                        <div style="padding: 1rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="padding: 0.6rem 0.7rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
                             <div>
-                                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.35rem;">Story Mention Automation</div>
-                                <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.45;">Triggers immediately when a user tags or mentions your account in their story (great for giveaway entries, shoutout rewards, or instant DM deliveries).</div>
+                                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.78rem; color: var(--text-primary); margin-bottom: 0.2rem;">Story Mention Automation</div>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary); line-height: 1.35;">Auto-DM when someone tags @yourhandle in their story.</div>
                             </div>
-                            <div style="margin-top: 0.75rem; display: flex; gap: 6px; flex-wrap: wrap;">
-                                <span style="font-size: 0.68rem; font-weight: 700; background: #EEF2FF; color: #4338CA; padding: 3px 8px; border-radius: 6px;">🎁 Reward Delivery</span>
-                                <span style="font-size: 0.68rem; font-weight: 700; background: #EEF2FF; color: #4338CA; padding: 3px 8px; border-radius: 6px;">🔥 Viral Loop</span>
+                            <div style="margin-top: 0.5rem; display: flex; gap: 4px; flex-wrap: wrap;">
+                                <span style="font-size: 0.62rem; font-weight: 700; background: #EEF2FF; color: #4338CA; padding: 2px 6px; border-radius: 5px;">🎁 Reward</span>
+                                <span style="font-size: 0.62rem; font-weight: 700; background: #EEF2FF; color: #4338CA; padding: 2px 6px; border-radius: 5px;">🔥 Viral</span>
                             </div>
                         </div>
 
                         ${isStoryMentionSelected ? `
-                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.72rem; font-weight: 800; text-align: center; padding: 6px 8px; letter-spacing: 0.04em;">
-                                ✓ SELECTED FOR AUTOMATION
+                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.68rem; font-weight: 800; text-align: center; padding: 4px 6px; letter-spacing: 0.04em;">
+                                ✓ SELECTED
                             </div>
                         ` : ''}
                     </div>
+
+                    <!-- ACTIVE STORIES POSTED BY USER -->
+                    ${activeStories.map(st => {
+                        const isSelected = String(this.selectedMediaId) === String(st.id) || String(this.selectedMediaId) === String(st.ig_media_id);
+                        const thumbUrl = st.thumbnail_url || st.media_url || '';
+                        const captionCut = st.caption ? (st.caption.slice(0, 38) + '...') : `Active Story #${String(st.id || st.ig_media_id).slice(-4)}`;
+
+                        return `
+                            <div class="reel-card-item ${isSelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('${st.id}', this)" style="
+                                border-radius: 12px;
+                                border: ${isSelected ? '2.5px solid var(--accent-primary)' : '1px solid var(--border-color)'};
+                                outline: ${isSelected ? '3px solid var(--accent-primary)' : 'none'};
+                                outline-offset: ${isSelected ? '2px' : '0'};
+                                background: ${isSelected ? '#FDF8F6' : '#FFFFFF'};
+                                box-shadow: ${isSelected ? '0 0 0 3px rgba(217, 119, 87, 0.25)' : '0 1px 3px rgba(0,0,0,0.02)'};
+                                cursor: pointer;
+                                overflow: hidden;
+                                position: relative;
+                                display: flex;
+                                flex-direction: column;
+                                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                            ">
+                                ${isSelected ? `<div style="position:absolute; top:6px; right:6px; width:22px; height:22px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.75rem; z-index:10; border: 2px solid #FFFFFF;">✓</div>` : ''}
+
+                                <!-- 9:16 VERTICAL COVER FOR STORY -->
+                                <div style="
+                                    position: relative;
+                                    width: 100%;
+                                    padding-top: 120%;
+                                    background-color: #171514;
+                                    background-size: cover;
+                                    background-position: center;
+                                    background-image: url('${thumbUrl}');
+                                ">
+                                    <div style="position: absolute; top: 6px; left: 6px; font-size: 0.62rem; font-weight: 800; color: #FFFFFF; background: linear-gradient(45deg, #f09433, #dc2743); padding: 0.2rem 0.5rem; border-radius: 6px; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">
+                                        ⚡ ACTIVE STORY
+                                    </div>
+
+                                    <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 1rem 0.5rem 0.35rem 0.5rem; background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%); color: #FFF; font-size: 0.65rem; font-weight: 700;">
+                                        🕒 Live on Instagram
+                                    </div>
+                                </div>
+
+                                <div style="padding: 0.6rem 0.7rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.78rem; color: var(--text-primary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                        ${captionCut}
+                                    </div>
+                                    <div style="font-size: 0.68rem; color: var(--text-secondary); margin-top: 0.3rem; font-weight: 600;">
+                                        ${new Date(st.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} • Story DM
+                                    </div>
+                                </div>
+
+                                ${isSelected ? `
+                                    <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.68rem; font-weight: 800; text-align: center; padding: 4px 6px; letter-spacing: 0.04em;">
+                                        ✓ SELECTED
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    }).join('')}
+
+                    ${activeStories.length === 0 ? `
+                        <div style="grid-column: 1 / -1; margin-top: 0.25rem; background: #FFFFFF; border: 1.5px dashed var(--border-color); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <div style="width: 36px; height: 36px; border-radius: 50%; background: #FAF2EC; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;">📱</div>
+                                <div>
+                                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.82rem; color: var(--text-primary);">No individual active stories live on Instagram right now</div>
+                                    <div style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.35; margin-top: 0.15rem;">Instagram stories expire after 24 hours. Select <strong>All Stories</strong> above to auto-DM anyone who replies to any future story, or post a new story on Instagram and click refresh!</div>
+                                </div>
+                            </div>
+                            <button type="button" id="btn-refresh-stories-banner" class="btn btn-secondary btn-sm" onclick="window['new-automation'].refreshStories()" style="font-weight: 700; font-size: 0.78rem; padding: 0.4rem 0.85rem; white-space: nowrap; background: #FFFFFF; border: 1px solid var(--border-color);">
+                                🔄 Refresh Stories
+                            </button>
+                        </div>
+                    ` : ''}
                 </div>
             `;
         } else {
@@ -524,8 +632,8 @@ window['new-automation'] = {
 
                     <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                         <!-- INSTANT REFRESH BUTTON -->
-                        <button type="button" id="btn-refresh-step1-reels" class="btn btn-secondary btn-sm" onclick="window['new-automation'].refreshMedia()" style="font-weight: 700; font-size: 0.78rem; background: #FFFFFF; border: 1px solid var(--border-color); padding: 0.45rem 0.85rem;" title="Fetch newly posted Reels from Instagram immediately">
-                            <span>🔄 Refresh Latest Reels</span>
+                        <button type="button" id="btn-refresh-step1-content" class="btn btn-secondary btn-sm" onclick="${this.step1Filter === 'story' ? 'window[\'new-automation\'].refreshStories()' : 'window[\'new-automation\'].refreshMedia()'}" style="font-weight: 700; font-size: 0.78rem; background: #FFFFFF; border: 1px solid var(--border-color); padding: 0.45rem 0.85rem;" title="${this.step1Filter === 'story' ? 'Check Instagram for active stories' : 'Fetch newly posted Reels from Instagram immediately'}">
+                            <span>🔄 ${this.step1Filter === 'story' ? 'Refresh Stories' : 'Refresh Latest Reels'}</span>
                         </button>
 
                         <div style="min-width: 180px;">
@@ -543,7 +651,7 @@ window['new-automation'] = {
                         📁 All Contents (${totalCount})
                     </button>
                     <button type="button" onclick="window['new-automation'].setStep1Filter('story')" style="padding: 0.4rem 0.95rem; font-size: 0.82rem; font-weight: ${this.step1Filter === 'story' ? '800' : '600'}; border-radius: 8px; background: ${this.step1Filter === 'story' ? 'var(--accent-primary)' : '#FFFFFF'}; color: ${this.step1Filter === 'story' ? '#FFFFFF' : 'var(--text-secondary)'}; border: ${this.step1Filter === 'story' ? 'none' : '1px solid var(--border-color)'}; cursor: pointer; transition: all 0.15s ease;">
-                        ⚡ Stories (Replies & Mentions)
+                        ⚡ Stories Only (${storiesCount})
                     </button>
                 </div>
 
@@ -827,7 +935,22 @@ window['new-automation'] = {
 
     renderStep4(container) {
         const delayVal = this.savedDelay || 5;
-        const replyVal = this.savedPublicReply || 'Sent! Check your DMs 📩';
+        const chosen = (this.mediaList || []).find(m => String(m.id) === String(this.selectedMediaId) || String(m.ig_media_id) === String(this.selectedMediaId));
+        let targetLabel = 'Account-Wide Global Rule (All Reels & Posts)';
+        let targetIcon = '🌐';
+        let targetThumb = '';
+        if (this.selectedMediaId === 'story') {
+            targetLabel = 'All Active Stories (Story Replies)';
+            targetIcon = '⚡';
+        } else if (this.selectedMediaId === 'story_mention') {
+            targetLabel = 'Story Mentions & Tags';
+            targetIcon = '🏷️';
+        } else if (chosen) {
+            targetThumb = chosen.thumbnail_url || chosen.media_url || '';
+            const isStory = chosen.media_product_type === 'STORY' || chosen.media_type === 'STORY';
+            targetIcon = isStory ? '⚡' : '🎬';
+            targetLabel = `${isStory ? 'Active Story' : 'Target Reel'}: "${chosen.caption ? chosen.caption.slice(0, 45) + '...' : 'Untitled Content'}"`;
+        }
 
         container.innerHTML = `
             <div style="width: 100%;">
@@ -851,6 +974,27 @@ window['new-automation'] = {
                         <label style="font-size: 0.88rem; font-weight: 800; color: var(--text-primary);">Public Comment Reply (Optional)</label>
                         <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.1rem;">Posts public comment reply under post</div>
                         <input type="text" id="auto_public_reply" value="${replyVal}" onchange="window['new-automation'].savedPublicReply=this.value" placeholder="e.g. Sent! Check your DMs 📩" style="width: 100%; padding: 0.65rem 0.95rem; font-size: 0.88rem; font-weight: 500; border-radius: 8px; border: 1px solid #D1C9BE; background: #FFF; marginTop: 0.5rem; outline: none;">
+                    </div>
+                </div>
+
+                <!-- AUTOMATION DEPLOYMENT SUMMARY PREVIEW -->
+                <div style="margin-top: 1.25rem; background: #FFFFFF; border: 1.5px solid var(--border-color); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 0.85rem;">
+                        ${targetThumb ? `
+                            <div style="width: 44px; height: 55px; border-radius: 8px; background-size: cover; background-position: center; background-image: url('${targetThumb}'); border: 1px solid var(--border-color); flex-shrink: 0;"></div>
+                        ` : `
+                            <div style="width: 44px; height: 44px; border-radius: 10px; background: #FAF2EC; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0;">${targetIcon}</div>
+                        `}
+                        <div>
+                            <div style="font-size: 0.72rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 0.05em;">READY TO DEPLOY</div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.92rem; color: var(--text-primary);">${targetLabel}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.1rem;">
+                                Trigger: <strong>${this.keywordMode === 'any' ? 'Universal (*)' : (this.keywordList.join(', ') || this.savedKeywords || 'ANY')}</strong> • Action: <strong>${this.savedActionType || 'link_dm'}</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.75rem; font-weight: 700; color: #15803D; background: #F0FDF4; border: 1px solid #BBF7D0; padding: 0.35rem 0.75rem; border-radius: 6px;">
+                        ✓ Ready to Deploy
                     </div>
                 </div>
             </div>
@@ -932,6 +1076,11 @@ window['new-automation'] = {
             sourceType = 'story';
         } else if (this.selectedMediaId === 'story_mention') {
             sourceType = 'story_mention';
+        } else {
+            const chosen = (this.mediaList || []).find(m => String(m.id) === String(this.selectedMediaId) || String(m.ig_media_id) === String(this.selectedMediaId));
+            if (chosen && (chosen.media_product_type === 'STORY' || chosen.media_type === 'STORY')) {
+                sourceType = 'story';
+            }
         }
 
         const payload = {

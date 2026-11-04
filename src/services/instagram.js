@@ -269,6 +269,41 @@ async function getSingleMedia(token, mediaId) {
     return res.data;
 }
 
+async function getStories(token, limit = 50) {
+    const isFbToken = token && token.startsWith('EAA');
+    const base = isFbToken ? FB_API_BASE : IG_API_BASE;
+    let igUserId = getConfig('ig_user_id');
+
+    if (isFbToken && (!igUserId || igUserId === '17841400000000000')) {
+        try {
+            const profile = await getUserProfile(token);
+            if (profile?.id) {
+                igUserId = profile.id;
+            }
+        } catch(e) {}
+    }
+
+    const endpoint = (isFbToken && igUserId && igUserId !== '17841400000000000')
+        ? `${base}/${igUserId}/stories`
+        : `${base}/me/stories`;
+
+    const fullFields = 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp';
+
+    try {
+        const res = await axios.get(endpoint, {
+            params: {
+                fields: fullFields,
+                access_token: token,
+                limit: limit
+            }
+        });
+        return res.data;
+    } catch (err) {
+        console.log('[Instagram] getStories notice:', err.response?.data?.error?.message || err.message);
+        return { data: [] };
+    }
+}
+
 async function sendPrivateReply(token, commentId, commenterId, messagePayload) {
     const isFbToken = token && token.startsWith('EAA');
     const base = isFbToken ? FB_API_BASE : IG_API_BASE;
@@ -680,6 +715,7 @@ module.exports = {
     getUserProfile,
     getMedia,
     getSingleMedia,
+    getStories,
     getMediaComments,
     getMediaInsights,
     sendPrivateReply,

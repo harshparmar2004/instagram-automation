@@ -32,5 +32,22 @@
     "like_count": 0,
     "user_id": 1,
     "status": "active"
+  },
+  {
+    "id": 99,
+    "ig_media_id": "18099238475019284",
+    "media_type": "IMAGE",
+    "caption": "🔥 Exclusive VIP Resource Drops & Giveaway — Reply 'ACCESS' for link!",
+    "thumbnail_url": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80",
+    "media_url": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80",
+    "permalink": "https://www.instagram.com/stories/harshparmar007__/",
+    "timestamp": "2026-11-04T08:30:00+0000",
+    "synced_at": "2026-11-04T10:00:00.000Z",
+    "views_count": 482,
+    "comments_count": 18,
+    "media_product_type": "STORY",
+    "like_count": 34,
+    "user_id": 1,
+    "status": "active"
   }
 ]

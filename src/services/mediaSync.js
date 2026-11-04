@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { getMedia, getMediaComments, getMediaInsights } = require('./instagram');
+const { getMedia, getMediaComments, getMediaInsights, getStories } = require('./instagram');
 const { getDb, getConfig, getUserInstagramAccount, backupRules, restoreRules, backupEvents, restoreEvents, backupMedia } = require('../database');
 
 async function syncMedia(userId = null) {
@@ -41,6 +41,16 @@ async function syncMedia(userId = null) {
             }
         }
 
+        // Fetch active stories from Instagram
+        let activeStories = [];
+        try {
+            const storiesRes = await getStories(token);
+            activeStories = (storiesRes && storiesRes.data) || [];
+            console.log(`[MediaSync] Fetched ${activeStories.length} active stories from Instagram.`);
+        } catch (storyErr) {
+            console.log('[MediaSync] Stories fetch notice:', storyErr.message);
+        }
+
         // Fetch live Instagram Insights (views & reach) for each media item
         for (const item of allItems) {
             try {
@@ -74,8 +84,8 @@ async function syncMedia(userId = null) {
                 user_id = COALESCE(media.user_id, excluded.user_id)
         `);
 
-        db.transaction((items) => {
-            for (const item of items) {
+        db.transaction((feedItems, stories) => {
+            for (const item of feedItems) {
                 const productType = item.media_product_type 
                     || (item.media_type === 'VIDEO' ? 'REELS' : 'FEED');
 
@@ -95,13 +105,31 @@ async function syncMedia(userId = null) {
                     userId
                 );
             }
-        })(allItems);
 
-        // Mark any media that was deleted from Instagram as 'deleted'
+            for (const story of stories) {
+                upsert.run(
+                    story.id,
+                    story.media_type || 'IMAGE',
+                    'STORY',
+                    story.caption || 'Active Instagram Story',
+                    story.thumbnail_url || story.media_url || '',
+                    story.media_url || story.thumbnail_url || '',
+                    story.permalink || '',
+                    story.timestamp || new Date().toISOString(),
+                    0,
+                    0,
+                    0,
+                    new Date().toISOString(),
+                    userId
+                );
+            }
+        })(allItems, activeStories);
+
+        // Mark any feed media that was deleted from Instagram as 'deleted' (excluding stories)
         const liveIgIds = allItems.map(item => String(item.id));
         if (liveIgIds.length > 0) {
             const placeholders = liveIgIds.map(() => '?').join(',');
-            let deleteQuery = `UPDATE media SET status = 'deleted' WHERE ig_media_id NOT IN (${placeholders})`;
+            let deleteQuery = `UPDATE media SET status = 'deleted' WHERE media_product_type != 'STORY' AND ig_media_id NOT IN (${placeholders})`;
             const deleteParams = [...liveIgIds];
             if (userId) {
                 deleteQuery += ` AND (user_id = ? OR user_id IS NULL)`;
@@ -114,6 +142,11 @@ async function syncMedia(userId = null) {
                 asyncSync(deleteQuery, deleteParams);
             } catch(e) {}
         }
+
+        // Expire any stories older than 24h
+        try {
+            db.prepare("UPDATE media SET status = 'deleted' WHERE media_product_type = 'STORY' AND timestamp < datetime('now', '-24 hours')").run();
+        } catch(e) {}
 
         // Persist all synced media to data/media.json for restart persistence
         try {

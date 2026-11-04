@@ -120,7 +120,7 @@ window.workflows = {
         let filtered = [];
 
         this.rawItems.forEach(item => {
-            const isStory = item.id === 'story' || item.media_type === 'STORY';
+            const isStory = item.id === 'story' || item.media_type === 'STORY' || item.media_product_type === 'STORY';
             const isGlobal = item.id === 'global' || item.media_type === 'GLOBAL';
             const isReel = !isStory && !isGlobal;
 
@@ -270,7 +270,7 @@ window.workflows = {
 
         items.forEach(item => {
             const isGlobal = item.id === 'global';
-            const isStory = item.id === 'story' || item.media_type === 'STORY';
+            const isStory = item.id === 'story' || item.media_type === 'STORY' || item.media_product_type === 'STORY';
             const thumbUrl = item.thumbnail_url || item.media_url || '';
             this.storedData[item.id] = item;
 
@@ -380,16 +380,22 @@ window.workflows = {
                                         </div>
                                     ` : ruleIsStory ? `
                                         <div style="display:flex; flex-direction:column; gap:0.65rem;">
-                                            <div style="width:100%; height:90px; border-radius:10px; background: linear-gradient(135deg, #FFF1EB 0%, #FDD1C3 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; border:1px solid #FDC8B6;">
-                                                <div style="font-size: 1.8rem;">⚡</div>
-                                                <div style="font-size: 0.75rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase;">Instagram Story</div>
-                                            </div>
+                                            ${thumbUrl ? `
+                                                <div style="width:100%; height:110px; border-radius:10px; background-size:cover; background-position:center; background-image:url('${thumbUrl}'); border:1px solid var(--border-color); position:relative;">
+                                                    <span style="position:absolute; top:6px; left:6px; font-size:0.62rem; font-weight:800; background:linear-gradient(45deg, #f09433, #dc2743); color:#FFF; padding:2px 6px; border-radius:4px; box-shadow:0 1px 4px rgba(0,0,0,0.3);">⚡ ACTIVE STORY</span>
+                                                </div>
+                                            ` : `
+                                                <div style="width:100%; height:90px; border-radius:10px; background: linear-gradient(135deg, #FFF1EB 0%, #FDD1C3 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; border:1px solid #FDC8B6;">
+                                                    <div style="font-size: 1.8rem;">⚡</div>
+                                                    <div style="font-size: 0.75rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase;">Instagram Story</div>
+                                                </div>
+                                            `}
                                             <div>
                                                 <div style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.15rem;">
                                                     ${rule.source_type === 'story_mention' ? '🏷️ Story Mentions' : '⚡ Story Replies'}
                                                 </div>
                                                 <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.92rem; line-height: 1.4; color: var(--text-primary);">
-                                                    ${rule.source_type === 'story_mention' ? 'Follower mentions your account in their story' : 'Follower replies to your active Instagram Story'}
+                                                    ${item.caption || (rule.source_type === 'story_mention' ? 'Follower mentions your account in their story' : 'Follower replies to your active Instagram Story')}
                                                 </div>
                                             </div>
                                         </div>

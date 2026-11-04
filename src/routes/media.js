@@ -36,7 +36,9 @@ router.get('/media', auth, (req, res) => {
         if (type === 'reels') {
             whereClauses.push("(m.media_product_type = 'REELS' OR m.media_type = 'REEL' OR (m.media_type = 'VIDEO' AND m.media_product_type != 'FEED'))");
         } else if (type === 'feed') {
-            whereClauses.push("(m.media_product_type != 'REELS' AND m.media_type != 'REEL')");
+            whereClauses.push("(m.media_product_type != 'REELS' AND m.media_type != 'REEL' AND m.media_product_type != 'STORY')");
+        } else if (type === 'stories') {
+            whereClauses.push("(m.media_product_type = 'STORY' OR m.media_type = 'STORY')");
         }
 
         if (whereClauses.length > 0) {
@@ -196,6 +198,17 @@ router.post('/media/sync', auth, async (req, res) => {
     try {
         const result = await syncMedia(req.user?.id);
         res.json({ success: true, count: result?.synced || 0, pages: result?.pages || 1 });
+    } catch (err) {
+        res.status(500).json({ error: err.response?.data?.error?.message || err.message });
+    }
+});
+
+router.post('/stories/sync', auth, async (req, res) => {
+    try {
+        await syncMedia(req.user?.id);
+        const db = getDb();
+        const activeStories = db.prepare("SELECT * FROM media WHERE (media_product_type = 'STORY' OR media_type = 'STORY') AND (status IS NULL OR status != 'deleted')").all();
+        res.json({ success: true, count: activeStories.length, stories: activeStories });
     } catch (err) {
         res.status(500).json({ error: err.response?.data?.error?.message || err.message });
     }
