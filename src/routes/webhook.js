@@ -55,7 +55,70 @@ router.post('/simulate', auth, async (req, res) => {
             bodyData = req.body || {};
         }
 
-        const { media_id, comment_text, username } = bodyData;
+        const { media_id, comment_text, username, type } = bodyData;
+
+        if (type === 'story' || media_id === 'story' || type === 'story_reply') {
+            const senderId = 'tester_' + Math.floor(Math.random() * 100000);
+            const payload = {
+                object: 'instagram',
+                entry: [{
+                    id: getConfig('ig_user_id') || '17841400000000000',
+                    time: Math.floor(Date.now() / 1000),
+                    messaging: [{
+                        sender: { id: senderId },
+                        recipient: { id: getConfig('ig_user_id') || '17841400000000000' },
+                        timestamp: Date.now(),
+                        message: {
+                            mid: 'mid_story_' + Date.now(),
+                            text: comment_text || 'LINK',
+                            reply_to: {
+                                story: {
+                                    id: 'story_12345',
+                                    url: 'https://instagram.com/stories/harshparmar007__/12345'
+                                }
+                            }
+                        }
+                    }]
+                }]
+            };
+            await processMessageEvent(payload);
+            return res.json({
+                success: true,
+                message: `Test story reply "${comment_text || 'LINK'}" processed through automation engine!`
+            });
+        }
+
+        if (type === 'story_mention' || media_id === 'story_mention') {
+            const senderId = 'tester_' + Math.floor(Math.random() * 100000);
+            const payload = {
+                object: 'instagram',
+                entry: [{
+                    id: getConfig('ig_user_id') || '17841400000000000',
+                    time: Math.floor(Date.now() / 1000),
+                    messaging: [{
+                        sender: { id: senderId },
+                        recipient: { id: getConfig('ig_user_id') || '17841400000000000' },
+                        timestamp: Date.now(),
+                        message: {
+                            mid: 'mid_mention_' + Date.now(),
+                            text: comment_text || '',
+                            attachments: [{
+                                type: 'story_mention',
+                                payload: {
+                                    url: 'https://instagram.com/stories/test_fan/67890'
+                                }
+                            }]
+                        }
+                    }]
+                }]
+            };
+            await processMessageEvent(payload);
+            return res.json({
+                success: true,
+                message: `Test story mention processed through automation engine!`
+            });
+        }
+
         const fakeCommentId = 'sim_' + Date.now();
         const payload = {
             object: 'instagram',

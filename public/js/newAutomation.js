@@ -270,6 +270,11 @@ window['new-automation'] = {
 
     setStep1Filter(filter) {
         this.step1Filter = filter;
+        if (filter === 'story') {
+            if (this.selectedMediaId !== 'story' && this.selectedMediaId !== 'story_mention') {
+                this.selectedMediaId = 'story';
+            }
+        }
         this.renderStep1(document.getElementById('new-automation-content'));
     },
 
@@ -312,116 +317,209 @@ window['new-automation'] = {
         ).length;
         const totalCount = (this.mediaList || []).length;
 
-        const isGlobalSelected = String(this.selectedMediaId) === 'global';
+        let gridHtml = '';
 
-        let gridHtml = `
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.85rem; width: 100%;">
-                
-                <!-- GLOBAL OPTION -->
-                <div class="reel-card-item ${isGlobalSelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('global', this)" style="
-                    border-radius: 14px;
-                    border: ${isGlobalSelected ? '2.5px solid var(--accent-primary)' : '1.5px solid var(--border-color)'};
-                    outline: ${isGlobalSelected ? '3px solid var(--accent-primary)' : 'none'};
-                    outline-offset: ${isGlobalSelected ? '3px' : '0'};
-                    background: ${isGlobalSelected ? '#FDF8F6' : '#FFFFFF'};
-                    box-shadow: ${isGlobalSelected ? '0 0 0 4px rgba(217, 119, 87, 0.28), 0 8px 24px rgba(217, 119, 87, 0.2)' : '0 1px 4px rgba(0,0,0,0.02)'};
-                    cursor: pointer;
-                    overflow: hidden;
-                    position: relative;
-                    display: flex;
-                    flex-direction: column;
-                    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-                ">
-                    ${isGlobalSelected ? `<div style="position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.85rem; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.25); border: 2px solid #FFFFFF;">✓</div>` : ''}
-                    
-                    <div style="height: 120px; background: linear-gradient(135deg, #FAF8F5 0%, #E6E1D8 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.65rem; text-align: center;">
-                        <div style="font-size: 1.5rem; margin-bottom: 0.15rem;">🌐</div>
-                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.88rem; color: var(--accent-primary);">Account-Wide Rule</div>
-                        <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.1rem;">Applies to all current & newly posted Reels</div>
-                    </div>
+        if (this.step1Filter === 'story') {
+            const isStoryReplySelected = String(this.selectedMediaId) === 'story';
+            const isStoryMentionSelected = String(this.selectedMediaId) === 'story_mention';
 
-                    <div style="padding: 0.75rem; flex: 1;">
-                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.82rem; color: var(--text-primary);">Global Account Rule</div>
-                        <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.15rem; line-height: 1.35;">Triggers on comments across your entire Instagram profile</div>
-                    </div>
-
-                    ${isGlobalSelected ? `
-                        <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.7rem; font-weight: 800; text-align: center; padding: 4px 8px; letter-spacing: 0.04em;">
-                            ✓ SELECTED
-                        </div>
-                    ` : ''}
-                </div>
-        `;
-
-        filtered.forEach(m => {
-            const isSelected = String(this.selectedMediaId) === String(m.id);
-            const isReel = m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED');
-            const thumbUrl = m.thumbnail_url || m.media_url || '';
-            const captionCut = m.caption ? (m.caption.slice(0, 45) + '...') : 'Instagram Content';
-            const comments = m.comments_count || 0;
-
-            gridHtml += `
-                <div class="reel-card-item ${isSelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('${m.id}', this)" style="
-                    border-radius: 14px;
-                    border: ${isSelected ? '2.5px solid var(--accent-primary)' : '1.5px solid var(--border-color)'};
-                    outline: ${isSelected ? '3px solid var(--accent-primary)' : 'none'};
-                    outline-offset: ${isSelected ? '3px' : '0'};
-                    background: ${isSelected ? '#FDF8F6' : '#FFFFFF'};
-                    box-shadow: ${isSelected ? '0 0 0 4px rgba(217, 119, 87, 0.28), 0 8px 24px rgba(217, 119, 87, 0.2)' : '0 1px 4px rgba(0,0,0,0.02)'};
-                    cursor: pointer;
-                    overflow: hidden;
-                    position: relative;
-                    display: flex;
-                    flex-direction: column;
-                    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-                ">
-                    ${isSelected ? `<div style="position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.85rem; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.25); border: 2px solid #FFFFFF;">✓</div>` : ''}
-
-                    <!-- 9:16 VERTICAL COVER FOR REELS -->
-                    <div style="
+            gridHtml = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; width: 100%;">
+                    <!-- STORY REPLIES CARD -->
+                    <div class="reel-card-item ${isStoryReplySelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('story', this)" style="
+                        border-radius: 14px;
+                        border: ${isStoryReplySelected ? '2.5px solid var(--accent-primary)' : '1.5px solid var(--border-color)'};
+                        outline: ${isStoryReplySelected ? '3px solid var(--accent-primary)' : 'none'};
+                        outline-offset: ${isStoryReplySelected ? '3px' : '0'};
+                        background: ${isStoryReplySelected ? '#FDF8F6' : '#FFFFFF'};
+                        box-shadow: ${isStoryReplySelected ? '0 0 0 4px rgba(217, 119, 87, 0.28), 0 8px 24px rgba(217, 119, 87, 0.2)' : '0 1px 4px rgba(0,0,0,0.02)'};
+                        cursor: pointer;
+                        overflow: hidden;
                         position: relative;
-                        width: 100%;
-                        padding-top: ${isReel ? '125%' : '85%'};
-                        background-color: #171514;
-                        background-size: cover;
-                        background-position: center;
-                        background-image: url('${thumbUrl}');
+                        display: flex;
+                        flex-direction: column;
+                        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                     ">
-                        <div style="position: absolute; top: 6px; left: 6px; font-size: 0.65rem; font-weight: 800; color: #FFFFFF; background: rgba(0,0,0,0.7); backdrop-filter: blur(6px); padding: 0.2rem 0.5rem; border-radius: 6px; display: flex; align-items: center; gap: 4px;">
-                            ${isReel ? '▶ REEL' : '📸 POST'}
+                        ${isStoryReplySelected ? `<div style="position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.85rem; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.25); border: 2px solid #FFFFFF;">✓</div>` : ''}
+
+                        <div style="height: 130px; background: linear-gradient(135deg, #FFF1EB 0%, #FDD1C3 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.85rem; text-align: center;">
+                            <div style="font-size: 2.2rem; margin-bottom: 0.2rem;">⚡</div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.95rem; color: var(--accent-primary);">All Stories (Story Replies)</div>
+                            <div style="font-size: 0.72rem; color: #8F4932; font-weight: 600; margin-top: 0.15rem;">Automates incoming Story replies</div>
                         </div>
 
-                        <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 1.25rem 0.5rem 0.4rem 0.5rem; background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%); color: #FFF; font-size: 0.68rem; font-weight: 700;">
-                            💬 ${comments} comments
+                        <div style="padding: 1rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div>
+                                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.35rem;">Story Reply Automation</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.45;">Triggers whenever a follower sends a message or keyword reply to any active Instagram Story on your account.</div>
+                            </div>
+                            <div style="margin-top: 0.75rem; display: flex; gap: 6px; flex-wrap: wrap;">
+                                <span style="font-size: 0.68rem; font-weight: 700; background: #FAF2EC; color: var(--accent-primary); padding: 3px 8px; border-radius: 6px;">📩 Auto-DM Links</span>
+                                <span style="font-size: 0.68rem; font-weight: 700; background: #FAF2EC; color: var(--accent-primary); padding: 3px 8px; border-radius: 6px;">🔐 Follower Gate</span>
+                            </div>
                         </div>
+
+                        ${isStoryReplySelected ? `
+                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.72rem; font-weight: 800; text-align: center; padding: 6px 8px; letter-spacing: 0.04em;">
+                                ✓ SELECTED FOR AUTOMATION
+                            </div>
+                        ` : ''}
                     </div>
 
-                    <div style="padding: 0.65rem 0.75rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
-                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--text-primary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                            ${captionCut}
-                        </div>
-                        <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.35rem; font-weight: 600;">
-                            ${new Date(m.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                        </div>
-                    </div>
+                    <!-- STORY MENTIONS CARD -->
+                    <div class="reel-card-item ${isStoryMentionSelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('story_mention', this)" style="
+                        border-radius: 14px;
+                        border: ${isStoryMentionSelected ? '2.5px solid var(--accent-primary)' : '1.5px solid var(--border-color)'};
+                        outline: ${isStoryMentionSelected ? '3px solid var(--accent-primary)' : 'none'};
+                        outline-offset: ${isStoryMentionSelected ? '3px' : '0'};
+                        background: ${isStoryMentionSelected ? '#FDF8F6' : '#FFFFFF'};
+                        box-shadow: ${isStoryMentionSelected ? '0 0 0 4px rgba(217, 119, 87, 0.28), 0 8px 24px rgba(217, 119, 87, 0.2)' : '0 1px 4px rgba(0,0,0,0.02)'};
+                        cursor: pointer;
+                        overflow: hidden;
+                        position: relative;
+                        display: flex;
+                        flex-direction: column;
+                        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                    ">
+                        ${isStoryMentionSelected ? `<div style="position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.85rem; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.25); border: 2px solid #FFFFFF;">✓</div>` : ''}
 
-                    ${isSelected ? `
-                        <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.7rem; font-weight: 800; text-align: center; padding: 4px 8px; letter-spacing: 0.04em;">
-                            ✓ SELECTED
+                        <div style="height: 130px; background: linear-gradient(135deg, #EEF2FF 0%, #C7D2FE 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.85rem; text-align: center;">
+                            <div style="font-size: 2.2rem; margin-bottom: 0.2rem;">🏷️</div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.95rem; color: #4338CA;">Story Mentions & Tags</div>
+                            <div style="font-size: 0.72rem; color: #3730A3; font-weight: 600; margin-top: 0.15rem;">Automates user stories mentioning you</div>
                         </div>
-                    ` : ''}
+
+                        <div style="padding: 1rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div>
+                                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.35rem;">Story Mention Automation</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.45;">Triggers immediately when a user tags or mentions your account in their story (great for giveaway entries, shoutout rewards, or instant DM deliveries).</div>
+                            </div>
+                            <div style="margin-top: 0.75rem; display: flex; gap: 6px; flex-wrap: wrap;">
+                                <span style="font-size: 0.68rem; font-weight: 700; background: #EEF2FF; color: #4338CA; padding: 3px 8px; border-radius: 6px;">🎁 Reward Delivery</span>
+                                <span style="font-size: 0.68rem; font-weight: 700; background: #EEF2FF; color: #4338CA; padding: 3px 8px; border-radius: 6px;">🔥 Viral Loop</span>
+                            </div>
+                        </div>
+
+                        ${isStoryMentionSelected ? `
+                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.72rem; font-weight: 800; text-align: center; padding: 6px 8px; letter-spacing: 0.04em;">
+                                ✓ SELECTED FOR AUTOMATION
+                            </div>
+                        ` : ''}
+                    </div>
                 </div>
             `;
-        });
+        } else {
+            const isGlobalSelected = String(this.selectedMediaId) === 'global';
 
-        gridHtml += '</div>';
+            gridHtml = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.85rem; width: 100%;">
+                    
+                    <!-- GLOBAL OPTION -->
+                    <div class="reel-card-item ${isGlobalSelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('global', this)" style="
+                        border-radius: 14px;
+                        border: ${isGlobalSelected ? '2.5px solid var(--accent-primary)' : '1.5px solid var(--border-color)'};
+                        outline: ${isGlobalSelected ? '3px solid var(--accent-primary)' : 'none'};
+                        outline-offset: ${isGlobalSelected ? '3px' : '0'};
+                        background: ${isGlobalSelected ? '#FDF8F6' : '#FFFFFF'};
+                        box-shadow: ${isGlobalSelected ? '0 0 0 4px rgba(217, 119, 87, 0.28), 0 8px 24px rgba(217, 119, 87, 0.2)' : '0 1px 4px rgba(0,0,0,0.02)'};
+                        cursor: pointer;
+                        overflow: hidden;
+                        position: relative;
+                        display: flex;
+                        flex-direction: column;
+                        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                    ">
+                        ${isGlobalSelected ? `<div style="position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.85rem; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.25); border: 2px solid #FFFFFF;">✓</div>` : ''}
+                        
+                        <div style="height: 120px; background: linear-gradient(135deg, #FAF8F5 0%, #E6E1D8 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.65rem; text-align: center;">
+                            <div style="font-size: 1.5rem; margin-bottom: 0.15rem;">🌐</div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.88rem; color: var(--accent-primary);">Account-Wide Rule</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.1rem;">Applies to all current & newly posted Reels</div>
+                        </div>
+
+                        <div style="padding: 0.75rem; flex: 1;">
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.82rem; color: var(--text-primary);">Global Account Rule</div>
+                            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.15rem; line-height: 1.35;">Triggers on comments across your entire Instagram profile</div>
+                        </div>
+
+                        ${isGlobalSelected ? `
+                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.7rem; font-weight: 800; text-align: center; padding: 4px 8px; letter-spacing: 0.04em;">
+                                ✓ SELECTED
+                            </div>
+                        ` : ''}
+                    </div>
+            `;
+
+            filtered.forEach(m => {
+                const isSelected = String(this.selectedMediaId) === String(m.id);
+                const isReel = m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED');
+                const thumbUrl = m.thumbnail_url || m.media_url || '';
+                const captionCut = m.caption ? (m.caption.slice(0, 45) + '...') : 'Instagram Content';
+                const comments = m.comments_count || 0;
+
+                gridHtml += `
+                    <div class="reel-card-item ${isSelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('${m.id}', this)" style="
+                        border-radius: 14px;
+                        border: ${isSelected ? '2.5px solid var(--accent-primary)' : '1.5px solid var(--border-color)'};
+                        outline: ${isSelected ? '3px solid var(--accent-primary)' : 'none'};
+                        outline-offset: ${isSelected ? '3px' : '0'};
+                        background: ${isSelected ? '#FDF8F6' : '#FFFFFF'};
+                        box-shadow: ${isSelected ? '0 0 0 4px rgba(217, 119, 87, 0.28), 0 8px 24px rgba(217, 119, 87, 0.2)' : '0 1px 4px rgba(0,0,0,0.02)'};
+                        cursor: pointer;
+                        overflow: hidden;
+                        position: relative;
+                        display: flex;
+                        flex-direction: column;
+                        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                    ">
+                        ${isSelected ? `<div style="position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.85rem; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.25); border: 2px solid #FFFFFF;">✓</div>` : ''}
+
+                        <!-- 9:16 VERTICAL COVER FOR REELS -->
+                        <div style="
+                            position: relative;
+                            width: 100%;
+                            padding-top: ${isReel ? '125%' : '85%'};
+                            background-color: #171514;
+                            background-size: cover;
+                            background-position: center;
+                            background-image: url('${thumbUrl}');
+                        ">
+                            <div style="position: absolute; top: 6px; left: 6px; font-size: 0.65rem; font-weight: 800; color: #FFFFFF; background: rgba(0,0,0,0.7); backdrop-filter: blur(6px); padding: 0.2rem 0.5rem; border-radius: 6px; display: flex; align-items: center; gap: 4px;">
+                                ${isReel ? '▶ REEL' : '📸 POST'}
+                            </div>
+
+                            <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 1.25rem 0.5rem 0.4rem 0.5rem; background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%); color: #FFF; font-size: 0.68rem; font-weight: 700;">
+                                💬 ${comments} comments
+                            </div>
+                        </div>
+
+                        <div style="padding: 0.65rem 0.75rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--text-primary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                ${captionCut}
+                            </div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.35rem; font-weight: 600;">
+                                ${new Date(m.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                            </div>
+                        </div>
+
+                        ${isSelected ? `
+                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.7rem; font-weight: 800; text-align: center; padding: 4px 8px; letter-spacing: 0.04em;">
+                                ✓ SELECTED
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+
+            gridHtml += '</div>';
+        }
 
         container.innerHTML = `
             <div style="width: 100%;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.85rem; flex-wrap:wrap; gap:0.65rem;">
                     <div>
-                        <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">Step 1: Pick a Target Reel or Post</h2>
-                        <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.1rem;">Select which specific Instagram content item this comment-to-DM automation rule will monitor.</p>
+                        <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">Step 1: Pick a Target Reel, Post or Story</h2>
+                        <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.1rem;">Select which Instagram Reel, Post, or Story interaction this automation will monitor.</p>
                     </div>
 
                     <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
@@ -431,18 +529,21 @@ window['new-automation'] = {
                         </button>
 
                         <div style="min-width: 180px;">
-                            <input type="text" value="${this.searchQuery}" onkeyup="window['new-automation'].filterReels(this.value)" placeholder="Search reels..." style="padding: 0.42rem 0.75rem; font-size: 0.8rem; font-weight: 500; border-radius: 8px; border: 1px solid var(--border-color); background: #FAF8F5; outline: none; width: 100%;">
+                            <input type="text" value="${this.searchQuery}" onkeyup="window['new-automation'].filterReels(this.value)" placeholder="Search content..." style="padding: 0.42rem 0.75rem; font-size: 0.8rem; font-weight: 500; border-radius: 8px; border: 1px solid var(--border-color); background: #FAF8F5; outline: none; width: 100%;">
                         </div>
                     </div>
                 </div>
 
                 <!-- SUB TABS FOR STEP 1 -->
-                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
-                    <button type="button" onclick="window['new-automation'].setStep1Filter('reels')" style="padding: 0.35rem 0.85rem; font-size: 0.78rem; font-weight: ${this.step1Filter === 'reels' ? '800' : '600'}; border-radius: 8px; background: ${this.step1Filter === 'reels' ? 'var(--accent-primary)' : '#FFFFFF'}; color: ${this.step1Filter === 'reels' ? '#FFFFFF' : 'var(--text-secondary)'}; border: ${this.step1Filter === 'reels' ? 'none' : '1px solid var(--border-color)'}; cursor: pointer;">
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap;">
+                    <button type="button" onclick="window['new-automation'].setStep1Filter('reels')" style="padding: 0.4rem 0.95rem; font-size: 0.82rem; font-weight: ${this.step1Filter === 'reels' ? '800' : '600'}; border-radius: 8px; background: ${this.step1Filter === 'reels' ? 'var(--accent-primary)' : '#FFFFFF'}; color: ${this.step1Filter === 'reels' ? '#FFFFFF' : 'var(--text-secondary)'}; border: ${this.step1Filter === 'reels' ? 'none' : '1px solid var(--border-color)'}; cursor: pointer; transition: all 0.15s ease;">
                         🎬 Reels Only (${reelsCount})
                     </button>
-                    <button type="button" onclick="window['new-automation'].setStep1Filter('all')" style="padding: 0.35rem 0.85rem; font-size: 0.78rem; font-weight: ${this.step1Filter === 'all' ? '800' : '600'}; border-radius: 8px; background: ${this.step1Filter === 'all' ? 'var(--accent-primary)' : '#FFFFFF'}; color: ${this.step1Filter === 'all' ? '#FFFFFF' : 'var(--text-secondary)'}; border: ${this.step1Filter === 'all' ? 'none' : '1px solid var(--border-color)'}; cursor: pointer;">
-                        📁 All Content (${totalCount})
+                    <button type="button" onclick="window['new-automation'].setStep1Filter('all')" style="padding: 0.4rem 0.95rem; font-size: 0.82rem; font-weight: ${this.step1Filter === 'all' ? '800' : '600'}; border-radius: 8px; background: ${this.step1Filter === 'all' ? 'var(--accent-primary)' : '#FFFFFF'}; color: ${this.step1Filter === 'all' ? '#FFFFFF' : 'var(--text-secondary)'}; border: ${this.step1Filter === 'all' ? 'none' : '1px solid var(--border-color)'}; cursor: pointer; transition: all 0.15s ease;">
+                        📁 All Contents (${totalCount})
+                    </button>
+                    <button type="button" onclick="window['new-automation'].setStep1Filter('story')" style="padding: 0.4rem 0.95rem; font-size: 0.82rem; font-weight: ${this.step1Filter === 'story' ? '800' : '600'}; border-radius: 8px; background: ${this.step1Filter === 'story' ? 'var(--accent-primary)' : '#FFFFFF'}; color: ${this.step1Filter === 'story' ? '#FFFFFF' : 'var(--text-secondary)'}; border: ${this.step1Filter === 'story' ? 'none' : '1px solid var(--border-color)'}; cursor: pointer; transition: all 0.15s ease;">
+                        ⚡ Stories (Replies & Mentions)
                     </button>
                 </div>
 
@@ -826,8 +927,16 @@ window['new-automation'] = {
             ? (buttonsConfig.step3_text || this.savedResponseText || 'Dost appko document bejhdiya hai bahut mehnat sa bnaya hai please follow')
             : (this.savedResponseText || document.getElementById('auto_response_text')?.value || 'Here is your resource link!');
 
+        let sourceType = 'reel';
+        if (this.selectedMediaId === 'story') {
+            sourceType = 'story';
+        } else if (this.selectedMediaId === 'story_mention') {
+            sourceType = 'story_mention';
+        }
+
         const payload = {
             media_id: this.selectedMediaId,
+            source_type: sourceType,
             trigger_word: triggerWord,
             action_type: actionType,
             response_text: responseText,

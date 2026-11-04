@@ -209,6 +209,7 @@ async function initSchema() {
             buttons_config_json TEXT,
             is_active INTEGER DEFAULT 1,
             is_deleted INTEGER DEFAULT 0,
+            source_type TEXT DEFAULT 'reel',
             created_at TEXT,
             updated_at TEXT,
             user_id INTEGER
@@ -303,6 +304,10 @@ async function initSchema() {
         }
     }
 
+    try {
+        await execute("ALTER TABLE rules ADD COLUMN source_type TEXT DEFAULT 'reel';");
+    } catch (e) {}
+
     console.log('✅ [Turso] All database tables successfully initialized on Turso Cloud!');
 }
 
@@ -365,13 +370,13 @@ async function syncLocalToTurso(localDb) {
         }
 
         // 5. Rules
-        const rules = localDb.prepare('SELECT id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json, is_active, is_deleted, created_at, updated_at, user_id FROM rules').all();
+        const rules = localDb.prepare('SELECT id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json, is_active, is_deleted, created_at, updated_at, user_id, source_type FROM rules').all();
         if (rules.length > 0) {
             const stmts = rules.map(r => ({
-                sql: `INSERT INTO rules (id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json, is_active, is_deleted, created_at, updated_at, user_id)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                      ON CONFLICT(id) DO UPDATE SET trigger_keyword = excluded.trigger_keyword, response_text = excluded.response_text, link_url = excluded.link_url, public_reply = excluded.public_reply, is_active = excluded.is_active, is_deleted = excluded.is_deleted, updated_at = excluded.updated_at`,
-                params: [r.id, r.media_id, r.trigger_keyword, r.action_type, r.response_text, r.link_url, r.follow_prompt, r.public_reply, r.delay_seconds, r.variations_json, r.buttons_config_json, r.is_active, r.is_deleted, r.created_at, r.updated_at, r.user_id]
+                sql: `INSERT INTO rules (id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json, is_active, is_deleted, created_at, updated_at, user_id, source_type)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                      ON CONFLICT(id) DO UPDATE SET trigger_keyword = excluded.trigger_keyword, response_text = excluded.response_text, link_url = excluded.link_url, public_reply = excluded.public_reply, is_active = excluded.is_active, is_deleted = excluded.is_deleted, updated_at = excluded.updated_at, source_type = excluded.source_type`,
+                params: [r.id, r.media_id, r.trigger_keyword, r.action_type, r.response_text, r.link_url, r.follow_prompt, r.public_reply, r.delay_seconds, r.variations_json, r.buttons_config_json, r.is_active, r.is_deleted, r.created_at, r.updated_at, r.user_id, r.source_type || 'reel']
             }));
             await batch(stmts);
         }
@@ -443,13 +448,13 @@ async function hydrateLocalFromTurso(localDb) {
         const rulesRes = await execute('SELECT * FROM rules');
         if (rulesRes.rows.length > 0) {
             const upsertRule = localDb.prepare(`
-                INSERT INTO rules (id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json, is_active, is_deleted, created_at, updated_at, user_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET trigger_keyword = excluded.trigger_keyword, response_text = excluded.response_text, link_url = excluded.link_url, public_reply = excluded.public_reply, is_active = excluded.is_active, is_deleted = excluded.is_deleted, updated_at = excluded.updated_at
+                INSERT INTO rules (id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json, is_active, is_deleted, created_at, updated_at, user_id, source_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET trigger_keyword = excluded.trigger_keyword, response_text = excluded.response_text, link_url = excluded.link_url, public_reply = excluded.public_reply, is_active = excluded.is_active, is_deleted = excluded.is_deleted, updated_at = excluded.updated_at, source_type = excluded.source_type
             `);
             for (const r of rulesRes.rows) {
                 try {
-                    upsertRule.run(r.id, r.media_id, r.trigger_keyword, r.action_type, r.response_text, r.link_url, r.follow_prompt, r.public_reply, r.delay_seconds, r.variations_json, r.buttons_config_json, r.is_active, r.is_deleted, r.created_at, r.updated_at, r.user_id);
+                    upsertRule.run(r.id, r.media_id, r.trigger_keyword, r.action_type, r.response_text, r.link_url, r.follow_prompt, r.public_reply, r.delay_seconds, r.variations_json, r.buttons_config_json, r.is_active, r.is_deleted, r.created_at, r.updated_at, r.user_id, r.source_type || 'reel');
                 } catch(e) {}
             }
         }

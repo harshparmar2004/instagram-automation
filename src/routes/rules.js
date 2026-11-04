@@ -20,7 +20,7 @@ router.get('/rules', auth, (req, res) => {
             }
         } catch(e) {}
 
-        const { media_id, status } = req.query;
+        const { media_id, status, source_type } = req.query;
         const userId = req.user?.id;
         const userObj = userId ? db.prepare('SELECT email, role FROM users WHERE id = ?').get(userId) : null;
         const isSuperAdmin = (req.user?.role === 'super_admin' || userObj?.role === 'super_admin' || (userObj?.email && userObj.email.includes('harshparmar'))) && !req.isImpersonating;
@@ -54,8 +54,15 @@ router.get('/rules', auth, (req, res) => {
             params.push(userId);
         }
 
+        if (source_type) {
+            whereClauses.push('r.source_type = ?');
+            params.push(source_type);
+        }
+
         if (media_id === 'global') {
-            whereClauses.push('r.media_id IS NULL');
+            whereClauses.push('(r.media_id IS NULL AND (r.source_type IS NULL OR r.source_type = "reel"))');
+        } else if (media_id === 'story') {
+            whereClauses.push('(r.source_type IN ("story", "story_mention") OR r.media_id = "story")');
         } else if (media_id && media_id !== 'all') {
             whereClauses.push('(r.media_id = ? OR m.ig_media_id = ?)');
             params.push(media_id, media_id);
@@ -122,15 +129,23 @@ function cleanUrl(url) {
 router.post('/rules', auth, (req, res) => {
     try {
         const db = getDb();
-        const { media_id, trigger_keyword, trigger_word, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json } = req.body;
+        const { media_id, trigger_keyword, trigger_word, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json, source_type } = req.body;
         const keyword = trigger_keyword || trigger_word;
 
         if (!keyword || !action_type) {
             return res.status(400).json({ error: 'trigger_keyword and action_type are required' });
         }
 
+        let resolvedSourceType = source_type || 'reel';
         let resolvedMediaId = null;
-        if (media_id && media_id !== 'global') {
+
+        if (media_id === 'story' || source_type === 'story') {
+            resolvedSourceType = 'story';
+            resolvedMediaId = null;
+        } else if (media_id === 'story_mention' || source_type === 'story_mention') {
+            resolvedSourceType = 'story_mention';
+            resolvedMediaId = null;
+        } else if (media_id && media_id !== 'global') {
             const mRow = db.prepare("SELECT id FROM media WHERE id = ? OR ig_media_id = ?").get(media_id, media_id);
             if (mRow) {
                 resolvedMediaId = mRow.id;
@@ -144,8 +159,8 @@ router.post('/rules', auth, (req, res) => {
         const userId = req.user?.id || null;
 
         const result = db.prepare(`
-            INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json, created_at, updated_at, user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json, created_at, updated_at, user_id, source_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
             resolvedMediaId, 
             keyword, 
@@ -159,7 +174,8 @@ router.post('/rules', auth, (req, res) => {
             buttons_config_json || null,
             new Date().toISOString(), 
             new Date().toISOString(),
-            userId
+            userId,
+            resolvedSourceType
         );
 
         try { backupRules(db); } catch(e) { console.error('Error backing up rules:', e); }
@@ -179,15 +195,22 @@ router.put('/rules/:id', auth, (req, res) => {
             return res.status(check.notFound ? 404 : 403).json({ error: check.error });
         }
 
-        const { media_id, trigger_keyword, trigger_word, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json } = req.body;
+        const { media_id, trigger_keyword, trigger_word, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json, source_type } = req.body;
         const keyword = trigger_keyword || trigger_word;
         const sanitizedUrl = cleanUrl(link_url);
 
-        // Resolve media_id if provided (same logic as POST /rules)
+        let resolvedSourceType = source_type;
         let resolvedMediaId = undefined; // undefined = don't update media_id
         if (media_id !== undefined) {
-            if (!media_id || media_id === 'global') {
+            if (media_id === 'story') {
                 resolvedMediaId = null;
+                resolvedSourceType = 'story';
+            } else if (media_id === 'story_mention') {
+                resolvedMediaId = null;
+                resolvedSourceType = 'story_mention';
+            } else if (!media_id || media_id === 'global') {
+                resolvedMediaId = null;
+                if (!resolvedSourceType) resolvedSourceType = 'reel';
             } else {
                 const mRow = db.prepare("SELECT id FROM media WHERE id = ? OR ig_media_id = ?").get(media_id, media_id);
                 if (mRow) {
@@ -195,8 +218,12 @@ router.put('/rules/:id', auth, (req, res) => {
                 } else {
                     resolvedMediaId = typeof media_id === 'number' ? media_id : null;
                 }
+                if (!resolvedSourceType) resolvedSourceType = 'reel';
             }
         }
+
+        const currentRule = db.prepare("SELECT source_type FROM rules WHERE id = ?").get(id);
+        const finalSourceType = resolvedSourceType !== undefined ? resolvedSourceType : (currentRule?.source_type || 'reel');
 
         if (resolvedMediaId !== undefined) {
             db.prepare(`
@@ -211,6 +238,7 @@ router.put('/rules/:id', auth, (req, res) => {
                     delay_seconds = ?,
                     variations_json = ?,
                     buttons_config_json = ?,
+                    source_type = ?,
                     updated_at = ?
                 WHERE id = ?
             `).run(
@@ -224,6 +252,7 @@ router.put('/rules/:id', auth, (req, res) => {
                 parseInt(delay_seconds || 0),
                 variations_json || null,
                 buttons_config_json || null,
+                finalSourceType,
                 new Date().toISOString(), 
                 id
             );
@@ -239,6 +268,7 @@ router.put('/rules/:id', auth, (req, res) => {
                     delay_seconds = ?,
                     variations_json = ?,
                     buttons_config_json = ?,
+                    source_type = ?,
                     updated_at = ?
                 WHERE id = ?
             `).run(
@@ -251,6 +281,7 @@ router.put('/rules/:id', auth, (req, res) => {
                 parseInt(delay_seconds || 0),
                 variations_json || null,
                 buttons_config_json || null,
+                finalSourceType,
                 new Date().toISOString(), 
                 id
             );

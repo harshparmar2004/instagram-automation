@@ -103,8 +103,14 @@ router.get('/media/automated', auth, (req, res) => {
         // Group rules by media
         const mediaMap = new Map();
         const globalRules = [];
+        const storyRules = [];
 
         for (const rule of allRules) {
+            if (rule.source_type === 'story' || rule.source_type === 'story_mention' || rule.media_id === 'story' || rule.media_id === 'story_mention') {
+                storyRules.push(rule);
+                continue;
+            }
+
             if (!rule.media_id || rule.media_id === 'global') {
                 globalRules.push(rule);
                 continue;
@@ -149,6 +155,21 @@ router.get('/media/automated', auth, (req, res) => {
         }
 
         const result = Array.from(mediaMap.values());
+
+        if (storyRules.length > 0) {
+            result.unshift({
+                id: 'story',
+                caption: '⚡ Instagram Stories (Replies & Mentions)',
+                media_type: 'STORY',
+                thumbnail_url: '',
+                permalink: '',
+                timestamp: new Date().toISOString(),
+                views_count: 0,
+                comments_count: 0,
+                history: [],
+                rules: storyRules
+            });
+        }
 
         if (globalRules.length > 0) {
             result.unshift({

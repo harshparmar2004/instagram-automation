@@ -218,6 +218,7 @@ function getDb() {
   try { db.exec(`ALTER TABLE media ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
   try { db.exec(`ALTER TABLE conversations ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
   try { db.exec(`ALTER TABLE rules ADD COLUMN is_deleted INTEGER DEFAULT 0;`); } catch (e) {}
+  try { db.exec(`ALTER TABLE rules ADD COLUMN source_type TEXT DEFAULT 'reel';`); } catch (e) {}
   try { db.exec(`ALTER TABLE reel_stats_history ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch (e) {}
   try { db.exec(`ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0;`); } catch (e) {}
 
@@ -502,10 +503,10 @@ function backupRules(dbInstance) {
       const { batch } = require('./services/turso');
       if (rules.length > 0) {
         const stmts = rules.map(r => ({
-          sql: `INSERT INTO rules (id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json, is_active, is_deleted, created_at, updated_at, user_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET trigger_keyword = excluded.trigger_keyword, response_text = excluded.response_text, link_url = excluded.link_url, public_reply = excluded.public_reply, is_active = excluded.is_active, is_deleted = excluded.is_deleted, updated_at = excluded.updated_at`,
-          params: [r.id, r.media_id, r.trigger_keyword, r.action_type, r.response_text, r.link_url, r.follow_prompt, r.public_reply, r.delay_seconds, r.variations_json, r.buttons_config_json, r.is_active, r.is_deleted, r.created_at, r.updated_at, r.user_id]
+          sql: `INSERT INTO rules (id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, buttons_config_json, is_active, is_deleted, created_at, updated_at, user_id, source_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET trigger_keyword = excluded.trigger_keyword, response_text = excluded.response_text, link_url = excluded.link_url, public_reply = excluded.public_reply, is_active = excluded.is_active, is_deleted = excluded.is_deleted, updated_at = excluded.updated_at, source_type = excluded.source_type`,
+          params: [r.id, r.media_id, r.trigger_keyword, r.action_type, r.response_text, r.link_url, r.follow_prompt, r.public_reply, r.delay_seconds, r.variations_json, r.buttons_config_json, r.is_active, r.is_deleted, r.created_at, r.updated_at, r.user_id, r.source_type || 'reel']
         }));
         batch(stmts).catch(() => {});
       }
@@ -531,23 +532,24 @@ function restoreRules(dbInstance) {
     let restoredCount = 0;
     const checkStmt = database.prepare('SELECT id FROM rules WHERE id = ? OR (trigger_keyword = ? AND response_text = ?)');
     const insertStmtWithId = database.prepare(`
-      INSERT INTO rules (id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, is_deleted, created_at, updated_at, user_id, buttons_config_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO rules (id, media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, is_deleted, created_at, updated_at, user_id, buttons_config_json, source_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const r of data) {
       const existing = checkStmt.get(r.id, r.trigger_keyword, r.response_text);
       if (existing) {
-        if (r.is_deleted !== undefined) {
-          database.prepare('UPDATE rules SET is_deleted = ?, is_active = ? WHERE id = ?').run(
+        if (r.is_deleted !== undefined || r.source_type !== undefined) {
+          database.prepare('UPDATE rules SET is_deleted = ?, is_active = ?, source_type = ? WHERE id = ?').run(
             r.is_deleted ? 1 : 0,
             r.is_active !== undefined ? r.is_active : (r.is_deleted ? 0 : 1),
+            r.source_type || 'reel',
             existing.id
           );
         }
       } else {
         let resolvedMediaId = r.media_id;
-        if (r.media_id && r.media_id !== 'global') {
+        if (r.media_id && r.media_id !== 'global' && r.media_id !== 'story' && r.media_id !== 'story_mention') {
           try {
             const m = database.prepare('SELECT id FROM media WHERE id = ? OR ig_media_id = ?').get(r.media_id, r.media_id);
             if (m) {
@@ -580,14 +582,15 @@ function restoreRules(dbInstance) {
             r.created_at || new Date().toISOString(),
             r.updated_at || new Date().toISOString(),
             r.user_id || 1,
-            r.buttons_config_json || null
+            r.buttons_config_json || null,
+            r.source_type || (resolvedMediaId === 'story' ? 'story' : 'reel')
           );
           restoredCount++;
         } catch (insertErr) {
           try {
             database.prepare(`
-              INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, is_deleted, created_at, updated_at, user_id, buttons_config_json)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              INSERT INTO rules (media_id, trigger_keyword, action_type, response_text, link_url, follow_prompt, public_reply, delay_seconds, variations_json, is_active, is_deleted, created_at, updated_at, user_id, buttons_config_json, source_type)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).run(
               resolvedMediaId,
               r.trigger_keyword,
@@ -603,7 +606,8 @@ function restoreRules(dbInstance) {
               r.created_at || new Date().toISOString(),
               r.updated_at || new Date().toISOString(),
               r.user_id || 1,
-              r.buttons_config_json || null
+              r.buttons_config_json || null,
+              r.source_type || 'reel'
             );
             restoredCount++;
           } catch (e2) {}

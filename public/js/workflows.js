@@ -29,6 +29,16 @@ window.workflows = {
                             <input type="text" id="workflow-search" class="input" placeholder="Search automations by reel caption, trigger keyword, or deliverable link..." value="${this.search}" onkeyup="workflows.applyFilters()" style="padding: 0.65rem 1rem; font-size: 0.88rem; font-weight: 500;">
                         </div>
 
+                        <!-- Content Source Filter -->
+                        <div style="flex: 1; min-width: 170px;">
+                            <select id="workflow-source-filter" class="select" onchange="workflows.applyFilters()" style="padding: 0.65rem 1rem; font-size: 0.88rem; font-weight: 600;">
+                                <option value="">All Content Types</option>
+                                <option value="reels" ${this.sourceFilter==='reels'?'selected':''}>🎬 Reels & Posts</option>
+                                <option value="story" ${this.sourceFilter==='story'?'selected':''}>⚡ Story Automations</option>
+                                <option value="global" ${this.sourceFilter==='global'?'selected':''}>🌐 Global Rules</option>
+                            </select>
+                        </div>
+
                         <!-- Action Type Filter -->
                         <div style="flex: 1; min-width: 160px;">
                             <select id="workflow-action-filter" class="select" onchange="workflows.applyFilters()" style="padding: 0.65rem 1rem; font-size: 0.88rem; font-weight: 600;">
@@ -100,6 +110,7 @@ window.workflows = {
 
     applyFilters() {
         this.search = (document.getElementById('workflow-search')?.value || '').toLowerCase();
+        this.sourceFilter = document.getElementById('workflow-source-filter')?.value || '';
         this.actionFilter = document.getElementById('workflow-action-filter')?.value || '';
         this.statusFilter = document.getElementById('workflow-status-filter')?.value || '';
         this.sortBy = document.getElementById('workflow-sort-by')?.value || 'recent';
@@ -109,7 +120,14 @@ window.workflows = {
         let filtered = [];
 
         this.rawItems.forEach(item => {
-            const isGlobal = item.id === 'global';
+            const isStory = item.id === 'story' || item.media_type === 'STORY';
+            const isGlobal = item.id === 'global' || item.media_type === 'GLOBAL';
+            const isReel = !isStory && !isGlobal;
+
+            if (this.sourceFilter === 'story' && !isStory) return;
+            if (this.sourceFilter === 'reels' && !isReel) return;
+            if (this.sourceFilter === 'global' && !isGlobal) return;
+
             const caption = (item.caption || '').toLowerCase();
             const matchingRules = (item.rules || []).filter(rule => {
                 const keyword = (rule.trigger_keyword || '').toLowerCase();
@@ -252,6 +270,7 @@ window.workflows = {
 
         items.forEach(item => {
             const isGlobal = item.id === 'global';
+            const isStory = item.id === 'story' || item.media_type === 'STORY';
             const thumbUrl = item.thumbnail_url || item.media_url || '';
             this.storedData[item.id] = item;
 
@@ -260,6 +279,7 @@ window.workflows = {
             const likes = item.like_count !== undefined && item.like_count !== null ? item.like_count : 0;
 
             item.rules.forEach(rule => {
+                const ruleIsStory = isStory || rule.source_type === 'story' || rule.source_type === 'story_mention';
                 let actionText = 'Send Resource Link in DM';
                 let isButtonFunnel = false;
                 if (rule.action_type === 'direct_dm') { actionText = 'Send Direct Text DM (No Link)'; }
@@ -303,6 +323,10 @@ window.workflows = {
                                     <span>${isActive ? 'Active & Listening' : 'Paused'}</span>
                                 </span>
                                 `}
+                                ${ruleIsStory && !isDeleted ? `
+                                <span style="font-size:0.8rem; font-weight:800; color:#C2410C; display: inline-flex; align-items: center; gap: 0.35rem; background:#FFF7ED; border:1px solid #FFEDD5; padding: 3px 8px; border-radius: 6px;">
+                                    <span>⚡ Story Automation</span>
+                                </span>` : ''}
                                 ${isButtonFunnel && !isDeleted ? `
                                 <span style="font-size:0.8rem; font-weight:800; color:#1D4ED8; display: inline-flex; align-items: center; gap: 0.35rem; background:#EFF6FF; border:1px solid #BFDBFE; padding: 3px 8px; border-radius: 6px;">
                                     <span>🔘 Interactive Button Funnel</span>
@@ -321,10 +345,12 @@ window.workflows = {
                                 <button class="btn btn-sm" style="font-size:0.82rem; font-weight:800; padding:0.4rem 1rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; ${isActive ? 'background:#FFFFFF; border:1.5px solid #D1C9BE; color:#4B5563;' : 'background:#2E7D32; border:1.5px solid #2E7D32; color:#FFFFFF;'}" onclick="workflows.toggleRuleStatus(${rule.id})" title="${isActive ? 'Click to Pause this automation' : 'Click to Activate this automation'}">
                                     ${isActive ? '⏸️ Pause' : '🟢 Activate'}
                                 </button>
+                                ${!ruleIsStory ? `
                                 <button class="btn btn-secondary btn-sm" style="font-size:0.8rem; font-weight:700; padding:0.35rem 0.85rem; color: #2E7D32; background: #F4FBF7; border-color: #A3D9B1;" onclick="workflows.backfillPastComments(${rule.id})" title="Auto-DM followers who commented before this automation was created">
                                     ⚡ Catch-Up Past Comments
                                 </button>
-                                <button class="btn btn-secondary btn-sm" style="font-size:0.8rem; font-weight:700; padding:0.35rem 0.85rem; color: #0369A1; background: #F0F9FF; border-color: #BAE6FD;" onclick="workflows.testRuleTrigger(${rule.id}, '${item.ig_media_id || ''}', '${rule.trigger_keyword || ''}')">
+                                ` : ''}
+                                <button class="btn btn-secondary btn-sm" style="font-size:0.8rem; font-weight:700; padding:0.35rem 0.85rem; color: #0369A1; background: #F0F9FF; border-color: #BAE6FD;" onclick="workflows.testRuleTrigger(${rule.id}, '${item.ig_media_id || item.id || ''}', '${rule.trigger_keyword || ''}', '${rule.source_type || ''}')">
                                     🧪 Test Trigger
                                 </button>
                                 <button class="btn btn-secondary btn-sm" style="font-size:0.8rem; font-weight:600; padding:0.35rem 0.85rem;" onclick="rules.openFormModal('${rule.id}')">
@@ -351,6 +377,21 @@ window.workflows = {
                                         <div>
                                             <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.05rem; color: var(--accent-primary);">Global Account Rule</div>
                                             <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Applies automatically across all active posts & reels</div>
+                                        </div>
+                                    ` : ruleIsStory ? `
+                                        <div style="display:flex; flex-direction:column; gap:0.65rem;">
+                                            <div style="width:100%; height:90px; border-radius:10px; background: linear-gradient(135deg, #FFF1EB 0%, #FDD1C3 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; border:1px solid #FDC8B6;">
+                                                <div style="font-size: 1.8rem;">⚡</div>
+                                                <div style="font-size: 0.75rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase;">Instagram Story</div>
+                                            </div>
+                                            <div>
+                                                <div style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.15rem;">
+                                                    ${rule.source_type === 'story_mention' ? '🏷️ Story Mentions' : '⚡ Story Replies'}
+                                                </div>
+                                                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.92rem; line-height: 1.4; color: var(--text-primary);">
+                                                    ${rule.source_type === 'story_mention' ? 'Follower mentions your account in their story' : 'Follower replies to your active Instagram Story'}
+                                                </div>
+                                            </div>
                                         </div>
                                     ` : `
                                         <div style="display:flex; flex-direction:column; gap:0.65rem;">
@@ -510,15 +551,21 @@ window.workflows = {
         App.showToast(`Showing ${selectedMonth === 'current' ? 'Current Month' : selectedMonth} stats`, 'info');
     },
 
-    async testRuleTrigger(ruleId, mediaIgId, triggerKeyword) {
+    async testRuleTrigger(ruleId, mediaIgId, triggerKeyword, sourceType = '') {
         const kw = (triggerKeyword || 'GOOGLE').split(',')[0].replace(/['"]/g, '').trim();
-        App.showToast(`⚡ Simulating follower comment "${kw}"...`, 'info');
+        const isStory = sourceType === 'story' || sourceType === 'story_mention' || mediaIgId === 'story' || mediaIgId === 'story_mention';
+        const label = sourceType === 'story_mention' ? 'story mention' : (isStory ? 'story reply' : 'comment');
+        App.showToast(`⚡ Simulating follower ${label} "${kw}"...`, 'info');
         try {
-            const res = await App.apiCall('POST', '/api/webhook/simulate', {
+            const payload = {
                 media_id: mediaIgId,
                 comment_text: kw,
                 username: 'live_test_follower'
-            });
+            };
+            if (isStory) {
+                payload.type = sourceType || (mediaIgId === 'story_mention' ? 'story_mention' : 'story');
+            }
+            const res = await App.apiCall('POST', '/api/webhook/simulate', payload);
             App.showToast(res.message || 'Test trigger executed successfully!', 'success');
             setTimeout(() => {
                 this.refresh();

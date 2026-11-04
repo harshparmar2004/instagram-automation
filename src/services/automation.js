@@ -396,6 +396,162 @@ async function processCommentEvent(payload) {
     }
 }
 
+function cleanUrl(url) {
+    if (!url) return '';
+    let trimmed = String(url).trim();
+    if (!/^https?:\/\//i.test(trimmed)) {
+        trimmed = 'https://' + trimmed;
+    }
+    return trimmed;
+}
+
+function dispatchStoryRule({ db, rule, senderId, username, activeToken, targetUserId, interactionText, interactionType }) {
+    // 1. Deduplication: only 1 DM per sender per rule within last 1 hour
+    const recent = db.prepare(`
+        SELECT id FROM events 
+        WHERE commenter_ig_id = ? 
+          AND rule_id = ? 
+          AND dm_status = 'delivered'
+          AND created_at > datetime('now', '-1 hours')
+        LIMIT 1
+    `).get(senderId, rule.id);
+    if (recent) {
+        console.log(`[Automation] Story interaction deduplicated for sender ${senderId} on rule #${rule.id}`);
+        return null;
+    }
+
+    const crypto = require('crypto');
+    const trackingId = crypto.randomBytes(4).toString('hex');
+    const baseUrl = typeof config.resolveBaseUrl === 'function' ? config.resolveBaseUrl() : config.BASE_URL;
+    const baseResponse = getRandomResponseText(rule);
+    let messageToSend = baseResponse;
+    let messagePayload = null;
+
+    let btnCfg = null;
+    if (rule.buttons_config_json) {
+        try { btnCfg = JSON.parse(rule.buttons_config_json); } catch(e) {}
+    }
+
+    if (rule.action_type === 'direct_dm') {
+        messageToSend = baseResponse;
+    } else if (rule.action_type === 'link_dm') {
+        const finalLink = cleanUrl(rule.link_url);
+        const trackedLink = finalLink ? `${baseUrl}/r/${trackingId}` : '';
+
+        if (trackedLink) {
+            let btnTitle = 'Access Resource';
+            if (btnCfg?.step3_button) btnTitle = btnCfg.step3_button;
+            else if (btnCfg?.step1_button) btnTitle = btnCfg.step1_button;
+            btnTitle = String(btnTitle).slice(0, 20);
+
+            let cleanText = baseResponse ? baseResponse.replace(/\{link\}|\{url\}/gi, '').trim() : '';
+            if (finalLink && cleanText.includes(finalLink)) {
+                cleanText = cleanText.replace(finalLink, '').trim();
+            }
+            if (!cleanText) cleanText = 'Here is your requested link!';
+
+            messagePayload = {
+                attachment: {
+                    type: 'template',
+                    payload: {
+                        template_type: 'button',
+                        text: cleanText,
+                        buttons: [
+                            {
+                                type: 'web_url',
+                                url: trackedLink,
+                                title: btnTitle
+                            }
+                        ]
+                    }
+                }
+            };
+
+            if (baseResponse.includes('{link}')) {
+                messageToSend = baseResponse.replace(/\{link\}/gi, trackedLink);
+            } else if (baseResponse.includes('{url}')) {
+                messageToSend = baseResponse.replace(/\{url\}/gi, trackedLink);
+            } else if (baseResponse.includes(finalLink)) {
+                messageToSend = baseResponse.replace(finalLink, trackedLink);
+            } else {
+                messageToSend = baseResponse ? `${baseResponse}\n${trackedLink}` : trackedLink;
+            }
+        }
+    } else if (rule.action_type === 'follow_first') {
+        const isButtonMode = !btnCfg || btnCfg.gate_type !== 'text';
+        if (isButtonMode) {
+            const step1Text = btnCfg?.step1_text || "Hey there! Glad you're here ☺️\n\nTap below and I'll send you the access in just a moment ✨";
+            const step1Button = (btnCfg?.step1_button || "Send me the access").slice(0, 20);
+            messageToSend = step1Text;
+            messagePayload = {
+                attachment: {
+                    type: 'template',
+                    payload: {
+                        template_type: 'button',
+                        text: step1Text,
+                        buttons: [
+                            {
+                                type: 'postback',
+                                title: step1Button,
+                                payload: 'REQ_ACCESS'
+                            }
+                        ]
+                    }
+                }
+            };
+        } else {
+            messageToSend = rule.follow_prompt || `Hey @${username || 'friend'}! 🚀 Thanks for your story reply! Please follow us first, then reply "DONE" in this DM to unlock your link!`;
+        }
+    }
+
+    const fakeCommentId = 'story_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+    const insertEvent = db.prepare(`
+        INSERT INTO events (rule_id, comment_id, comment_text, commenter_ig_id, commenter_username, media_ig_id, tracking_id, user_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const eventResult = insertEvent.run(
+        rule.id, fakeCommentId, interactionText || `[${interactionType}]`, senderId, username || 'user', 'story', trackingId, targetUserId, new Date().toISOString()
+    );
+    const eventId = eventResult.lastInsertRowid;
+
+    if (rule.action_type === 'follow_first') {
+        const isButtonMode = !btnCfg || btnCfg.gate_type !== 'text';
+        const initialState = isButtonMode ? 'awaiting_access_tap' : 'awaiting_reply';
+        db.prepare(`
+            INSERT INTO conversations (commenter_ig_id, rule_id, event_id, user_id, state, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `).run(senderId, rule.id, eventId, targetUserId, initialState, new Date().toISOString());
+    }
+
+    // Google Sheets Sync
+    syncLeadToSheet({
+        eventId,
+        date: new Date().toLocaleString(),
+        username: username || 'user',
+        comment: interactionText || `[${interactionType}]`,
+        keyword: rule.trigger_keyword,
+        action_type: rule.action_type,
+        status: 'delivered',
+        mediaIgId: 'story',
+        linkClicked: false
+    }).catch(() => {});
+
+    const delayMs = (rule.delay_seconds || 0) * 1000;
+    enqueue({
+        type: 'direct_message',
+        recipientId: senderId,
+        messagePayload: messagePayload || messageToSend,
+        messageText: messageToSend,
+        eventId: eventId,
+        accessToken: activeToken,
+        processAt: Date.now() + delayMs
+    });
+
+    console.log(`[Automation] ⚡ Successfully triggered Story rule #${rule.id} (${interactionType}) for user ${senderId}`);
+    return eventId;
+}
+
 async function processMessageEvent(payload) {
     const db = getDb();
 
@@ -418,34 +574,7 @@ async function processMessageEvent(payload) {
                 continue;
             }
 
-            if (msgEvent.message && msgEvent.message.attachments) {
-                const storyShare = msgEvent.message.attachments.find(a => a.type === 'story_mention' || a.type === 'ig_story');
-                if (storyShare) {
-                    console.log(`[Automation] Story mention received from sender ${senderId}`);
-                    let storyQuery = "SELECT * FROM rules WHERE trigger_keyword LIKE '%story%' AND is_active = 1";
-                    const params = [];
-                    if (targetUserId) {
-                        storyQuery += " AND (user_id = ? OR user_id IS NULL)";
-                        params.push(targetUserId);
-                    }
-                    storyQuery += " LIMIT 1";
-                    const storyRule = db.prepare(storyQuery).get(...params);
-                    if (storyRule) {
-                        const messageToSend = getRandomResponseText(storyRule);
-                        enqueue({
-                            type: 'direct_message',
-                            recipientId: senderId,
-                            messageText: messageToSend,
-                            accessToken: activeToken,
-                            processAt: Date.now()
-                        });
-                    }
-                }
-            }
-
-            if (!rawText && !postbackPayload && !quickReplyPayload) continue;
-
-            // FOLLOW-FIRST GATE STATE MACHINE (3-Step Button Funnel & Text Fallback)
+            // Check if user is in an active multi-step Conversation (e.g. Follow Gate)
             let convQuery = "SELECT * FROM conversations WHERE commenter_ig_id = ? AND state IN ('awaiting_access_tap', 'awaiting_follow_confirm', 'awaiting_reply')";
             const convParams = [senderId];
             if (targetUserId) {
@@ -454,7 +583,91 @@ async function processMessageEvent(payload) {
             }
             convQuery += " ORDER BY id DESC LIMIT 1";
             const conv = db.prepare(convQuery).get(...convParams);
-            if (!conv) continue;
+
+            if (!conv) {
+                // Not in active conversation: Check Story Mentions, Story Replies, or Keyword triggers!
+                const isStoryMention = msgEvent.message?.attachments?.some(a => a.type === 'story_mention' || a.type === 'ig_story');
+                const isStoryReply = !!msgEvent.message?.reply_to?.story || msgEvent.message?.attachments?.some(a => a.type === 'story_share' || a.type === 'story_reply');
+
+                if (isStoryMention) {
+                    console.log(`[Automation] ⚡ Story mention detected from sender ${senderId}`);
+                    let storyMentionQuery = `
+                        SELECT * FROM rules 
+                        WHERE (source_type = 'story_mention' OR media_id = 'story_mention' OR (source_type = 'story' AND (trigger_keyword LIKE '%mention%' OR trigger_keyword = '*' OR trigger_keyword = 'ANY'))) 
+                          AND is_active = 1 AND (is_deleted = 0 OR is_deleted IS NULL)
+                    `;
+                    const params = [];
+                    if (targetUserId) {
+                        storyMentionQuery += " AND (user_id = ? OR user_id IS NULL)";
+                        params.push(targetUserId);
+                    }
+                    storyMentionQuery += " ORDER BY id DESC";
+                    const storyRules = db.prepare(storyMentionQuery).all(...params);
+                    let matchedRule = null;
+                    for (const r of storyRules) {
+                        if (!rawText || matchKeyword(r.trigger_keyword, rawText)) {
+                            matchedRule = r;
+                            break;
+                        }
+                    }
+                    if (matchedRule) {
+                        dispatchStoryRule({
+                            db,
+                            rule: matchedRule,
+                            senderId,
+                            username: 'story_user',
+                            activeToken,
+                            targetUserId,
+                            interactionText: rawText || 'Story Mention',
+                            interactionType: 'Story Mention'
+                        });
+                        continue;
+                    }
+                }
+
+                if (isStoryReply || rawText) {
+                    // Check story reply rules
+                    let storyReplyQuery = `
+                        SELECT * FROM rules 
+                        WHERE (source_type = 'story' OR media_id = 'story') 
+                          AND (source_type IS NULL OR source_type != 'story_mention')
+                          AND (media_id IS NULL OR media_id != 'story_mention')
+                          AND is_active = 1 AND (is_deleted = 0 OR is_deleted IS NULL)
+                    `;
+                    const params = [];
+                    if (targetUserId) {
+                        storyReplyQuery += " AND (user_id = ? OR user_id IS NULL)";
+                        params.push(targetUserId);
+                    }
+                    storyReplyQuery += " ORDER BY id DESC";
+                    const storyRules = db.prepare(storyReplyQuery).all(...params);
+
+                    let matchedRule = null;
+                    for (const r of storyRules) {
+                        if (matchKeyword(r.trigger_keyword, rawText)) {
+                            matchedRule = r;
+                            break;
+                        }
+                    }
+
+                    if (matchedRule) {
+                        dispatchStoryRule({
+                            db,
+                            rule: matchedRule,
+                            senderId,
+                            username: 'story_user',
+                            activeToken,
+                            targetUserId,
+                            interactionText: rawText || 'Story Reply',
+                            interactionType: isStoryReply ? 'Story Reply' : 'Story DM'
+                        });
+                        continue;
+                    }
+                }
+
+                if (!rawText && !postbackPayload && !quickReplyPayload) continue;
+                continue;
+            }
 
             const rule = db.prepare("SELECT * FROM rules WHERE id = ?").get(conv.rule_id);
             if (!rule) continue;
