@@ -17,6 +17,12 @@ window['new-automation'] = {
         step3_button: "Click me"
     },
 
+    isStoryTarget() {
+        if (this.selectedMediaId === 'story' || this.selectedMediaId === 'story_mention') return true;
+        const chosen = (this.mediaList || []).find(m => String(m.id) === String(this.selectedMediaId) || String(m.ig_media_id) === String(this.selectedMediaId));
+        return chosen ? (chosen.media_product_type === 'STORY' || chosen.media_type === 'STORY') : false;
+    },
+
     setKeywordMode(mode) {
         this.keywordMode = mode;
         this.renderStep2(document.getElementById('new-automation-content'));
@@ -277,6 +283,10 @@ window['new-automation'] = {
             if (!hasStorySelected) {
                 this.selectedMediaId = 'story';
             }
+        } else {
+            if (this.selectedMediaId === 'story' || this.selectedMediaId === 'story_mention') {
+                this.selectedMediaId = 'global';
+            }
         }
         this.renderStep1(document.getElementById('new-automation-content'));
     },
@@ -331,160 +341,143 @@ window['new-automation'] = {
         const igUsername = igAccount.username || user.ig_username || 'harshparmar007__';
         const igProfilePic = igAccount.profilePic || user.profile_pic || user.avatar_url || '';
 
-        let filtered = (this.mediaList || []).filter(m => {
-            const cap = (m.caption || '').toLowerCase();
-            return !this.searchQuery || cap.includes(this.searchQuery.toLowerCase());
-        });
-
-        if (this.step1Filter === 'reels') {
-            filtered = filtered.filter(m => 
-                (m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED')) && m.status !== 'deleted'
-            );
-        }
-
-        const reelsCount = (this.mediaList || []).filter(m => 
-            (m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED')) && m.status !== 'deleted'
-        ).length;
-        const totalCount = (this.mediaList || []).filter(m => 
-            m.status !== 'deleted'
-        ).length;
+        // Strict Separation: Stories are kept exclusively in Stories Only
         const activeStories = (this.mediaList || []).filter(m => 
             (m.media_product_type === 'STORY' || m.media_type === 'STORY') && m.status !== 'deleted'
         );
         const storiesCount = activeStories.length;
 
-        // AUTHENTIC INSTAGRAM STORY CARD RENDERER
+        const feedMedia = (this.mediaList || []).filter(m => 
+            m.media_product_type !== 'STORY' && m.media_type !== 'STORY' && m.status !== 'deleted'
+        );
+        const feedCount = feedMedia.length;
+
+        const reelsMedia = feedMedia.filter(m => 
+            m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED')
+        );
+        const reelsCount = reelsMedia.length;
+
+        let filtered = [];
+        if (this.step1Filter === 'reels') {
+            filtered = reelsMedia.filter(m => {
+                const cap = (m.caption || '').toLowerCase();
+                return !this.searchQuery || cap.includes(this.searchQuery.toLowerCase());
+            });
+        } else if (this.step1Filter === 'story') {
+            filtered = activeStories.filter(m => {
+                const cap = (m.caption || '').toLowerCase();
+                return !this.searchQuery || cap.includes(this.searchQuery.toLowerCase());
+            });
+        } else {
+            // 'all': All Posts & Reels (strictly excluding Stories)
+            filtered = feedMedia.filter(m => {
+                const cap = (m.caption || '').toLowerCase();
+                return !this.searchQuery || cap.includes(this.searchQuery.toLowerCase());
+            });
+        }
+
+        // COMPACT AUTHENTIC INSTAGRAM STORY CARD RENDERER
         const renderStoryCard = (st, isSelected) => {
             const thumbUrl = st.thumbnail_url || st.media_url || '';
-            const captionCut = st.caption ? (st.caption.slice(0, 42) + '...') : `Active Story #${String(st.id || st.ig_media_id).slice(-4)}`;
+            const captionCut = st.caption ? (st.caption.slice(0, 32) + '...') : `Active Story #${String(st.id || st.ig_media_id).slice(-4)}`;
 
             return `
                 <div class="reel-card-item ${isSelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('${st.id}', this)" style="
-                    border-radius: 14px;
+                    border-radius: 12px;
                     border: ${isSelected ? '2.5px solid var(--accent-primary)' : '1px solid var(--border-color)'};
-                    outline: ${isSelected ? '3px solid var(--accent-primary)' : 'none'};
-                    outline-offset: ${isSelected ? '2px' : '0'};
+                    outline: ${isSelected ? '2px solid var(--accent-primary)' : 'none'};
+                    outline-offset: ${isSelected ? '1px' : '0'};
                     background: ${isSelected ? '#FDF8F6' : '#FFFFFF'};
-                    box-shadow: ${isSelected ? '0 0 0 3px rgba(217, 119, 87, 0.25), 0 8px 24px rgba(217, 119, 87, 0.15)' : '0 2px 8px rgba(0,0,0,0.03)'};
+                    box-shadow: ${isSelected ? '0 0 0 3px rgba(217, 119, 87, 0.2), 0 4px 14px rgba(217, 119, 87, 0.12)' : '0 1px 4px rgba(0,0,0,0.03)'};
                     cursor: pointer;
                     overflow: hidden;
                     position: relative;
                     display: flex;
                     flex-direction: column;
+                    width: 100%;
+                    max-width: 155px;
                     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                 ">
-                    ${isSelected ? `<div style="position:absolute; top:8px; right:8px; width:24px; height:24px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.78rem; z-index:20; border: 2px solid #FFFFFF; box-shadow: 0 2px 8px rgba(0,0,0,0.35);">✓</div>` : ''}
+                    ${isSelected ? `<div style="position:absolute; top:6px; right:6px; width:20px; height:20px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.7rem; z-index:20; border: 1.5px solid #FFFFFF; box-shadow: 0 1px 5px rgba(0,0,0,0.3);">✓</div>` : ''}
 
-                    <!-- AUTHENTIC 9:16 INSTAGRAM STORY MOBILE FRAME -->
+                    <!-- COMPACT 9:16 INSTAGRAM STORY MOBILE FRAME -->
                     <div style="
                         position: relative;
                         width: 100%;
-                        padding-top: 162%;
+                        padding-top: 140%;
                         background-color: #121212;
                         background-size: cover;
                         background-position: center;
                         background-image: url('${thumbUrl}');
                         overflow: hidden;
                     ">
-                        <!-- TOP SHADOW GRADIENT FOR TEXT LEGIBILITY -->
-                        <div style="position: absolute; top: 0; left: 0; right: 0; height: 72px; background: linear-gradient(to bottom, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.35) 65%, transparent 100%); pointer-events: none; z-index: 1;"></div>
+                        <!-- TOP GRADIENT -->
+                        <div style="position: absolute; top: 0; left: 0; right: 0; height: 50px; background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 70%, transparent 100%); pointer-events: none; z-index: 1;"></div>
 
-                        <!-- 1. INSTAGRAM STORY PROGRESS SEGMENTS -->
-                        <div style="position: absolute; top: 6px; left: 7px; right: 7px; display: flex; gap: 3px; z-index: 2;">
-                            <div style="flex: 1; height: 2px; background: #FFFFFF; border-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.5);"></div>
-                            <div style="flex: 1; height: 2px; background: rgba(255,255,255,0.4); border-radius: 2px;"></div>
-                            <div style="flex: 1; height: 2px; background: rgba(255,255,255,0.4); border-radius: 2px;"></div>
+                        <!-- 1. PROGRESS SEGMENTS -->
+                        <div style="position: absolute; top: 4px; left: 5px; right: 5px; display: flex; gap: 2px; z-index: 2;">
+                            <div style="flex: 1; height: 1.5px; background: #FFFFFF; border-radius: 1px;"></div>
+                            <div style="flex: 1; height: 1.5px; background: rgba(255,255,255,0.4); border-radius: 1px;"></div>
                         </div>
 
-                        <!-- 2. CREATOR HEADER (AVATAR IN STORY GRADIENT RING + USERNAME + META VERIFIED + TIME) -->
-                        <div style="position: absolute; top: 13px; left: 7px; right: 7px; display: flex; align-items: center; justify-content: space-between; z-index: 2;">
-                            <div style="display: flex; align-items: center; gap: 5px; min-width: 0;">
-                                <!-- GRADIENT STORY RING -->
-                                <div style="width: 20px; height: 20px; border-radius: 50%; padding: 1.5px; background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 1px 4px rgba(0,0,0,0.4);">
+                        <!-- 2. CREATOR HEADER -->
+                        <div style="position: absolute; top: 9px; left: 5px; right: 5px; display: flex; align-items: center; justify-content: space-between; z-index: 2;">
+                            <div style="display: flex; align-items: center; gap: 4px; min-width: 0;">
+                                <div style="width: 16px; height: 16px; border-radius: 50%; padding: 1px; background: linear-gradient(45deg, #f09433, #dc2743); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                                     ${igProfilePic ? `
                                         <img src="${igProfilePic}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                        <div style="display:none; width: 100%; height: 100%; border-radius: 50%; background: #1a1a1a; color: #FFF; font-size: 0.55rem; font-weight: 800; align-items: center; justify-content: center;">${(igUsername[0] || 'C').toUpperCase()}</div>
+                                        <div style="display:none; width: 100%; height: 100%; border-radius: 50%; background: #1a1a1a; color: #FFF; font-size: 0.5rem; font-weight: 800; align-items: center; justify-content: center;">${(igUsername[0] || 'C').toUpperCase()}</div>
                                     ` : `
-                                        <div style="width: 100%; height: 100%; border-radius: 50%; background: #1a1a1a; color: #FFF; font-size: 0.55rem; font-weight: 800; display: flex; align-items: center; justify-content: center;">${(igUsername[0] || 'C').toUpperCase()}</div>
+                                        <div style="width: 100%; height: 100%; border-radius: 50%; background: #1a1a1a; color: #FFF; font-size: 0.5rem; font-weight: 800; display: flex; align-items: center; justify-content: center;">${(igUsername[0] || 'C').toUpperCase()}</div>
                                     `}
                                 </div>
-
-                                <!-- USERNAME & VERIFIED BADGE -->
-                                <div style="display: flex; align-items: center; gap: 2px; min-width: 0; overflow: hidden;">
-                                    <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 0.65rem; font-weight: 700; color: #FFFFFF; text-shadow: 0 1px 3px rgba(0,0,0,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 78px;">
-                                        ${igUsername}
-                                    </span>
-                                    <!-- META VERIFIED BLUE TICK -->
-                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0;" title="Meta Verified Account">
-                                        <circle cx="12" cy="12" r="10" fill="#0095F6"/>
-                                        <path d="M9.5 12.3l1.8 1.8 4.2-4.2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                    </svg>
-                                    <span style="font-size: 0.58rem; color: rgba(255,255,255,0.75); margin-left: 1px;">• 2h</span>
-                                </div>
+                                <span style="font-size: 0.58rem; font-weight: 700; color: #FFFFFF; text-shadow: 0 1px 2px rgba(0,0,0,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 58px;">
+                                    ${igUsername}
+                                </span>
+                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0;"><circle cx="12" cy="12" r="10" fill="#0095F6"/><path d="M9.5 12.3l1.8 1.8 4.2-4.2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </div>
-
-                            <!-- INSTAGRAM STORY GLYPH -->
-                            <div style="display: flex; align-items: center; gap: 3px; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); padding: 1.5px 5px; border-radius: 10px; border: 0.5px solid rgba(255,255,255,0.25);">
-                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-                                </svg>
-                                <span style="font-size: 0.55rem; font-weight: 700; color: #FFFFFF;">Story</span>
-                            </div>
+                            <span style="font-size: 0.52rem; color: rgba(255,255,255,0.85); font-weight: 700; background: rgba(0,0,0,0.45); padding: 1px 4px; border-radius: 6px;">Story</span>
                         </div>
 
-                        <!-- 3. LIVE STORY FLOATING BADGE -->
-                        <div style="position: absolute; top: 38px; left: 7px; z-index: 2;">
-                            <div style="font-size: 0.55rem; font-weight: 800; color: #FFFFFF; background: linear-gradient(45deg, #f09433, #dc2743); padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px; box-shadow: 0 2px 6px rgba(0,0,0,0.35); text-transform: uppercase; letter-spacing: 0.04em;">
-                                ⚡ Live Story
-                            </div>
+                        <!-- 3. LIVE BADGE -->
+                        <div style="position: absolute; top: 28px; left: 5px; z-index: 2;">
+                            <span style="font-size: 0.48rem; font-weight: 800; color: #FFFFFF; background: linear-gradient(45deg, #f09433, #dc2743); padding: 1.5px 4.5px; border-radius: 3px; display: inline-flex; align-items: center; text-transform: uppercase;">
+                                ⚡ Live
+                            </span>
                         </div>
 
-                        <!-- 4. BOTTOM SHADOW FOR STORY CONTROLS -->
-                        <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 85px; background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, transparent 100%); pointer-events: none; z-index: 1;"></div>
-
-                        <!-- 5. AUTHENTIC INSTAGRAM STORY BOTTOM REPLY BAR -->
-                        <div style="position: absolute; bottom: 7px; left: 7px; right: 7px; z-index: 2; display: flex; flex-direction: column; gap: 4px;">
-                            <div style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.32); border-radius: 18px; padding: 4px 8px; display: flex; align-items: center; justify-content: space-between;">
-                                <span style="font-size: 0.58rem; color: rgba(255,255,255,0.92); font-weight: 500;">Send message...</span>
-                                <div style="display: flex; align-items: center; gap: 4px;">
-                                    <span style="font-size: 0.62rem;">🤍</span>
-                                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                                    </svg>
-                                </div>
-                            </div>
-                            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.55rem; color: rgba(255,255,255,0.85); font-weight: 700; padding: 0 2px;">
-                                <span>🟢 24h Live Window</span>
-                                <span>Meta API ✓</span>
+                        <!-- 4. BOTTOM OVERLAY & REPLY BAR MOCKUP -->
+                        <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 55px; background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%); pointer-events: none; z-index: 1;"></div>
+                        <div style="position: absolute; bottom: 5px; left: 5px; right: 5px; z-index: 2;">
+                            <div style="background: rgba(255,255,255,0.22); backdrop-filter: blur(6px); border: 0.5px solid rgba(255,255,255,0.3); border-radius: 12px; padding: 2.5px 6px; display: flex; align-items: center; justify-content: space-between;">
+                                <span style="font-size: 0.52rem; color: rgba(255,255,255,0.92); font-weight: 500;">Send message...</span>
+                                <span style="font-size: 0.55rem;">🤍</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- METADATA FOOTER (BELOW 9:16 FRAME) -->
-                    <div style="padding: 0.6rem 0.7rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between; background: #FFFFFF;">
+                    <!-- METADATA FOOTER -->
+                    <div style="padding: 0.45rem 0.55rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between; background: #FFFFFF;">
                         <div>
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.2rem;">
-                                <span style="font-size: 0.6rem; font-weight: 800; color: var(--accent-primary); background: #FAF2EC; padding: 1px 5px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">
-                                    ⚡ Story Automation
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.15rem;">
+                                <span style="font-size: 0.55rem; font-weight: 800; color: var(--accent-primary); background: #FAF2EC; padding: 1px 4px; border-radius: 3px;">
+                                    ⚡ Story
                                 </span>
-                                <span style="font-size: 0.6rem; color: #15803D; font-weight: 700;">🟢 Active</span>
+                                <span style="font-size: 0.55rem; color: #15803D; font-weight: 700;">🟢 Active</span>
                             </div>
-                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.75rem; color: var(--text-primary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.72rem; color: var(--text-primary); line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                                 ${captionCut}
                             </div>
                         </div>
-                        <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 0.35rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-size: 0.62rem; color: var(--text-secondary); margin-top: 0.25rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
                             <span>${new Date(st.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                            <span style="color: var(--accent-primary); font-weight: 700;">Select Story →</span>
+                            <span style="color: var(--accent-primary); font-weight: 700;">Select →</span>
                         </div>
                     </div>
 
                     ${isSelected ? `
-                        <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.68rem; font-weight: 800; text-align: center; padding: 4px 6px; letter-spacing: 0.04em;">
-                            ✓ SELECTED FOR STORY AUTOMATION
+                        <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.62rem; font-weight: 800; text-align: center; padding: 3px 4px; letter-spacing: 0.03em;">
+                            ✓ SELECTED
                         </div>
                     ` : ''}
                 </div>
@@ -498,107 +491,112 @@ window['new-automation'] = {
             const isStoryMentionSelected = String(this.selectedMediaId) === 'story_mention';
 
             gridHtml = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 0.85rem; width: 100%;">
-                    <!-- COMPACT STORY REPLIES CARD -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 155px)); gap: 0.75rem; width: 100%;">
+                    
+                    <!-- 1. COMPACT "EVERY STORY" CARD (USP: GUARANTEED FOR ALL STORIES) -->
                     <div class="reel-card-item ${isStoryReplySelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('story', this)" style="
-                        border-radius: 14px;
+                        border-radius: 12px;
                         border: ${isStoryReplySelected ? '2.5px solid var(--accent-primary)' : '1px solid var(--border-color)'};
-                        outline: ${isStoryReplySelected ? '3px solid var(--accent-primary)' : 'none'};
-                        outline-offset: ${isStoryReplySelected ? '2px' : '0'};
+                        outline: ${isStoryReplySelected ? '2px solid var(--accent-primary)' : 'none'};
+                        outline-offset: ${isStoryReplySelected ? '1px' : '0'};
                         background: ${isStoryReplySelected ? '#FDF8F6' : '#FFFFFF'};
-                        box-shadow: ${isStoryReplySelected ? '0 0 0 3px rgba(217, 119, 87, 0.25)' : '0 1px 3px rgba(0,0,0,0.02)'};
+                        box-shadow: ${isStoryReplySelected ? '0 0 0 3px rgba(217, 119, 87, 0.2)' : '0 1px 3px rgba(0,0,0,0.02)'};
                         cursor: pointer;
                         overflow: hidden;
                         position: relative;
                         display: flex;
                         flex-direction: column;
+                        width: 100%;
+                        max-width: 155px;
                         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                     ">
-                        ${isStoryReplySelected ? `<div style="position:absolute; top:8px; right:8px; width:24px; height:24px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.78rem; z-index:10; border: 2px solid #FFFFFF; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">✓</div>` : ''}
+                        ${isStoryReplySelected ? `<div style="position:absolute; top:6px; right:6px; width:20px; height:20px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.7rem; z-index:10; border: 1.5px solid #FFFFFF; box-shadow: 0 1px 4px rgba(0,0,0,0.3);">✓</div>` : ''}
 
-                        <div style="height: 115px; background: linear-gradient(135deg, #FFF1EB 0%, #FEE5DC 60%, #FDC5B4 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.5rem; text-align: center; position: relative;">
-                            <div style="position: absolute; top: 6px; left: 6px; font-size: 0.62rem; font-weight: 800; color: #8F4932; background: rgba(255,255,255,0.88); padding: 2px 6px; border-radius: 5px;">⚡ ANY STORY</div>
-                            <div style="font-size: 1.6rem; margin-top: 0.15rem;">⚡</div>
-                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.85rem; color: var(--accent-primary); margin-top: 0.15rem;">All Stories</div>
-                            <div style="font-size: 0.68rem; color: #8F4932; font-weight: 600;">Incoming Replies</div>
+                        <div style="height: 100px; background: linear-gradient(135deg, #FFF1EB 0%, #FEE5DC 60%, #FDC5B4 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.4rem; text-align: center; position: relative;">
+                            <div style="position: absolute; top: 4px; left: 4px; font-size: 0.52rem; font-weight: 800; color: #8F4932; background: rgba(255,255,255,0.9); padding: 1.5px 5px; border-radius: 4px;">⚡ EVERY STORY</div>
+                            <div style="font-size: 1.4rem; margin-top: 0.1rem;">⚡</div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.8rem; color: var(--accent-primary); margin-top: 0.1rem;">All Stories</div>
+                            <div style="font-size: 0.62rem; color: #8F4932; font-weight: 600;">Incoming Replies</div>
                         </div>
 
-                        <div style="padding: 0.65rem 0.75rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="padding: 0.5rem 0.55rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
                             <div>
-                                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.78rem; color: var(--text-primary); margin-bottom: 0.2rem;">Story Reply Automation</div>
-                                <div style="font-size: 0.7rem; color: var(--text-secondary); line-height: 1.35;">Auto-reply when a user sends a keyword to any story you post.</div>
+                                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.72rem; color: var(--text-primary); margin-bottom: 0.15rem;">Every Story Automation</div>
+                                <div style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.3;">Auto-replies to any story you post (current & future).</div>
                             </div>
-                            <div style="margin-top: 0.5rem; display: flex; gap: 4px; flex-wrap: wrap;">
-                                <span style="font-size: 0.62rem; font-weight: 700; background: #FAF2EC; color: var(--accent-primary); padding: 2px 6px; border-radius: 5px;">📩 Auto-DM</span>
-                                <span style="font-size: 0.62rem; font-weight: 700; background: #FAF2EC; color: var(--accent-primary); padding: 2px 6px; border-radius: 5px;">🔐 Gate</span>
+                            <div style="margin-top: 0.35rem; display: flex; gap: 3px; flex-wrap: wrap;">
+                                <span style="font-size: 0.58rem; font-weight: 700; background: #FAF2EC; color: var(--accent-primary); padding: 1px 5px; border-radius: 4px;">📩 DM</span>
+                                <span style="font-size: 0.58rem; font-weight: 700; background: #FAF2EC; color: var(--accent-primary); padding: 1px 5px; border-radius: 4px;">🔐 Gate</span>
                             </div>
                         </div>
 
                         ${isStoryReplySelected ? `
-                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.68rem; font-weight: 800; text-align: center; padding: 4px 6px; letter-spacing: 0.04em;">
+                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.62rem; font-weight: 800; text-align: center; padding: 3px 4px; letter-spacing: 0.03em;">
                                 ✓ SELECTED
                             </div>
                         ` : ''}
                     </div>
 
-                    <!-- COMPACT STORY MENTIONS CARD -->
+                    <!-- 2. COMPACT "STORY MENTIONS" CARD -->
                     <div class="reel-card-item ${isStoryMentionSelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('story_mention', this)" style="
-                        border-radius: 14px;
+                        border-radius: 12px;
                         border: ${isStoryMentionSelected ? '2.5px solid var(--accent-primary)' : '1px solid var(--border-color)'};
-                        outline: ${isStoryMentionSelected ? '3px solid var(--accent-primary)' : 'none'};
-                        outline-offset: ${isStoryMentionSelected ? '2px' : '0'};
+                        outline: ${isStoryMentionSelected ? '2px solid var(--accent-primary)' : 'none'};
+                        outline-offset: ${isStoryMentionSelected ? '1px' : '0'};
                         background: ${isStoryMentionSelected ? '#FDF8F6' : '#FFFFFF'};
-                        box-shadow: ${isStoryMentionSelected ? '0 0 0 3px rgba(217, 119, 87, 0.25)' : '0 1px 3px rgba(0,0,0,0.02)'};
+                        box-shadow: ${isStoryMentionSelected ? '0 0 0 3px rgba(217, 119, 87, 0.2)' : '0 1px 3px rgba(0,0,0,0.02)'};
                         cursor: pointer;
                         overflow: hidden;
                         position: relative;
                         display: flex;
                         flex-direction: column;
+                        width: 100%;
+                        max-width: 155px;
                         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                     ">
-                        ${isStoryMentionSelected ? `<div style="position:absolute; top:8px; right:8px; width:24px; height:24px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.78rem; z-index:10; border: 2px solid #FFFFFF; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">✓</div>` : ''}
+                        ${isStoryMentionSelected ? `<div style="position:absolute; top:6px; right:6px; width:20px; height:20px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.7rem; z-index:10; border: 1.5px solid #FFFFFF; box-shadow: 0 1px 4px rgba(0,0,0,0.3);">✓</div>` : ''}
 
-                        <div style="height: 115px; background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 60%, #C7D2FE 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.5rem; text-align: center; position: relative;">
-                            <div style="position: absolute; top: 6px; left: 6px; font-size: 0.62rem; font-weight: 800; color: #4338CA; background: rgba(255,255,255,0.88); padding: 2px 6px; border-radius: 5px;">🏷️ MENTION</div>
-                            <div style="font-size: 1.6rem; margin-top: 0.15rem;">🏷️</div>
-                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.85rem; color: #4338CA; margin-top: 0.15rem;">Story Mentions</div>
-                            <div style="font-size: 0.68rem; color: #3730A3; font-weight: 600;">When Tagged</div>
+                        <div style="height: 100px; background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 60%, #C7D2FE 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.4rem; text-align: center; position: relative;">
+                            <div style="position: absolute; top: 4px; left: 4px; font-size: 0.52rem; font-weight: 800; color: #4338CA; background: rgba(255,255,255,0.9); padding: 1.5px 5px; border-radius: 4px;">🏷️ MENTION</div>
+                            <div style="font-size: 1.4rem; margin-top: 0.1rem;">🏷️</div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.8rem; color: #4338CA; margin-top: 0.1rem;">Story Mentions</div>
+                            <div style="font-size: 0.62rem; color: #3730A3; font-weight: 600;">When Tagged</div>
                         </div>
 
-                        <div style="padding: 0.65rem 0.75rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="padding: 0.5rem 0.55rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
                             <div>
-                                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.78rem; color: var(--text-primary); margin-bottom: 0.2rem;">Story Mention Automation</div>
-                                <div style="font-size: 0.7rem; color: var(--text-secondary); line-height: 1.35;">Auto-DM when someone tags @yourhandle in their story.</div>
+                                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.72rem; color: var(--text-primary); margin-bottom: 0.15rem;">Story Tagged Automation</div>
+                                <div style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.3;">Auto-DM when someone tags @${igUsername} in their story.</div>
                             </div>
-                            <div style="margin-top: 0.5rem; display: flex; gap: 4px; flex-wrap: wrap;">
-                                <span style="font-size: 0.62rem; font-weight: 700; background: #EEF2FF; color: #4338CA; padding: 2px 6px; border-radius: 5px;">🎁 Reward</span>
-                                <span style="font-size: 0.62rem; font-weight: 700; background: #EEF2FF; color: #4338CA; padding: 2px 6px; border-radius: 5px;">🔥 Viral</span>
+                            <div style="margin-top: 0.35rem; display: flex; gap: 3px; flex-wrap: wrap;">
+                                <span style="font-size: 0.58rem; font-weight: 700; background: #EEF2FF; color: #4338CA; padding: 1px 5px; border-radius: 4px;">🎁 Reward</span>
+                                <span style="font-size: 0.58rem; font-weight: 700; background: #EEF2FF; color: #4338CA; padding: 1px 5px; border-radius: 4px;">🔥 Viral</span>
                             </div>
                         </div>
 
                         ${isStoryMentionSelected ? `
-                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.68rem; font-weight: 800; text-align: center; padding: 4px 6px; letter-spacing: 0.04em;">
+                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.62rem; font-weight: 800; text-align: center; padding: 3px 4px; letter-spacing: 0.03em;">
                                 ✓ SELECTED
                             </div>
                         ` : ''}
                     </div>
 
-                    <!-- ACTIVE STORIES POSTED BY USER (AUTHENTIC INSTAGRAM STORY FRAMES) -->
-                    ${activeStories.map(st => {
+                    <!-- 3. ACTIVE STORIES POSTED BY CREATOR (COMPACT SLEEK INSTAGRAM STORY CARDS) -->
+                    ${filtered.map(st => {
                         const isSelected = String(this.selectedMediaId) === String(st.id) || String(this.selectedMediaId) === String(st.ig_media_id);
                         return renderStoryCard(st, isSelected);
                     }).join('')}
 
-                    ${activeStories.length === 0 ? `
-                        <div style="grid-column: 1 / -1; margin-top: 0.25rem; background: #FFFFFF; border: 1.5px dashed var(--border-color); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
-                            <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                <div style="width: 36px; height: 36px; border-radius: 50%; background: #FAF2EC; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;">📱</div>
+                    ${filtered.length === 0 ? `
+                        <div style="grid-column: 1 / -1; margin-top: 0.25rem; background: #FFFFFF; border: 1.5px dashed var(--border-color); border-radius: 12px; padding: 0.85rem 1.15rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 0.65rem;">
+                                <div style="width: 32px; height: 32px; border-radius: 50%; background: #FAF2EC; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">📱</div>
                                 <div>
-                                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.82rem; color: var(--text-primary);">No individual active stories live on Instagram right now</div>
-                                    <div style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.35; margin-top: 0.15rem;">Instagram stories expire after 24 hours. Select <strong>All Stories</strong> above to auto-DM anyone who replies to any future story, or post a new story on Instagram and click refresh!</div>
+                                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--text-primary);">No individual active stories live on Instagram right now</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-secondary); line-height: 1.35; margin-top: 0.1rem;">Instagram stories expire after 24 hours. Select <strong>All Stories</strong> above to automate every current and newly posted story, or post a new story on Instagram and click refresh!</div>
                                 </div>
                             </div>
-                            <button type="button" id="btn-refresh-stories-banner" class="btn btn-secondary btn-sm" onclick="window['new-automation'].refreshStories()" style="font-weight: 700; font-size: 0.78rem; padding: 0.4rem 0.85rem; white-space: nowrap; background: #FFFFFF; border: 1px solid var(--border-color);">
+                            <button type="button" id="btn-refresh-stories-banner" class="btn btn-secondary btn-sm" onclick="window['new-automation'].refreshStories()" style="font-weight: 700; font-size: 0.76rem; padding: 0.35rem 0.75rem; white-space: nowrap; background: #FFFFFF; border: 1px solid var(--border-color);">
                                 🔄 Refresh Stories
                             </button>
                         </div>
@@ -609,16 +607,16 @@ window['new-automation'] = {
             const isGlobalSelected = String(this.selectedMediaId) === 'global';
 
             gridHtml = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.85rem; width: 100%;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.85rem; width: 100%;">
                     
-                    <!-- GLOBAL OPTION -->
+                    <!-- GLOBAL OPTION (FOR REELS & POSTS) -->
                     <div class="reel-card-item ${isGlobalSelected ? 'selected' : ''}" onclick="window['new-automation'].selectReel('global', this)" style="
                         border-radius: 14px;
                         border: ${isGlobalSelected ? '2.5px solid var(--accent-primary)' : '1.5px solid var(--border-color)'};
                         outline: ${isGlobalSelected ? '3px solid var(--accent-primary)' : 'none'};
-                        outline-offset: ${isGlobalSelected ? '3px' : '0'};
+                        outline-offset: ${isGlobalSelected ? '2px' : '0'};
                         background: ${isGlobalSelected ? '#FDF8F6' : '#FFFFFF'};
-                        box-shadow: ${isGlobalSelected ? '0 0 0 4px rgba(217, 119, 87, 0.28), 0 8px 24px rgba(217, 119, 87, 0.2)' : '0 1px 4px rgba(0,0,0,0.02)'};
+                        box-shadow: ${isGlobalSelected ? '0 0 0 3px rgba(217, 119, 87, 0.25)' : '0 1px 4px rgba(0,0,0,0.02)'};
                         cursor: pointer;
                         overflow: hidden;
                         position: relative;
@@ -626,21 +624,21 @@ window['new-automation'] = {
                         flex-direction: column;
                         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                     ">
-                        ${isGlobalSelected ? `<div style="position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.85rem; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.25); border: 2px solid #FFFFFF;">✓</div>` : ''}
+                        ${isGlobalSelected ? `<div style="position:absolute; top:8px; right:8px; width:24px; height:24px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.8rem; z-index:10; box-shadow:0 2px 6px rgba(0,0,0,0.25); border: 2px solid #FFFFFF;">✓</div>` : ''}
                         
-                        <div style="height: 120px; background: linear-gradient(135deg, #FAF8F5 0%, #E6E1D8 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.65rem; text-align: center;">
-                            <div style="font-size: 1.5rem; margin-bottom: 0.15rem;">🌐</div>
-                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.88rem; color: var(--accent-primary);">Account-Wide Rule</div>
-                            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.1rem;">Applies to all current & newly posted Reels</div>
+                        <div style="height: 115px; background: linear-gradient(135deg, #FAF8F5 0%, #E6E1D8 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.6rem; text-align: center;">
+                            <div style="font-size: 1.4rem; margin-bottom: 0.1rem;">🌐</div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.85rem; color: var(--accent-primary);">Account-Wide Rule</div>
+                            <div style="font-size: 0.68rem; color: var(--text-secondary); margin-top: 0.1rem;">Applies to all current & newly posted Reels</div>
                         </div>
 
-                        <div style="padding: 0.75rem; flex: 1;">
-                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.82rem; color: var(--text-primary);">Global Account Rule</div>
-                            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.15rem; line-height: 1.35;">Triggers on comments across your entire Instagram profile</div>
+                        <div style="padding: 0.7rem; flex: 1;">
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--text-primary);">Global Account Rule</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.15rem; line-height: 1.35;">Triggers on comments across your entire Instagram profile</div>
                         </div>
 
                         ${isGlobalSelected ? `
-                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.7rem; font-weight: 800; text-align: center; padding: 4px 8px; letter-spacing: 0.04em;">
+                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.68rem; font-weight: 800; text-align: center; padding: 4px 8px; letter-spacing: 0.04em;">
                                 ✓ SELECTED
                             </div>
                         ` : ''}
@@ -649,14 +647,6 @@ window['new-automation'] = {
 
             filtered.forEach(m => {
                 const isSelected = String(this.selectedMediaId) === String(m.id);
-                const isStory = m.media_product_type === 'STORY' || m.media_type === 'STORY';
-
-                // IF ITEM IS STORY IN ALL CONTENTS, RENDER AUTHENTIC STORY CARD
-                if (isStory) {
-                    gridHtml += renderStoryCard(m, isSelected);
-                    return;
-                }
-
                 const isReel = m.media_product_type === 'REELS' || m.media_type === 'REEL' || (m.media_type === 'VIDEO' && m.media_product_type !== 'FEED');
                 const thumbUrl = m.thumbnail_url || m.media_url || '';
                 const captionCut = m.caption ? (m.caption.slice(0, 45) + '...') : 'Instagram Content';
@@ -667,9 +657,9 @@ window['new-automation'] = {
                         border-radius: 14px;
                         border: ${isSelected ? '2.5px solid var(--accent-primary)' : '1.5px solid var(--border-color)'};
                         outline: ${isSelected ? '3px solid var(--accent-primary)' : 'none'};
-                        outline-offset: ${isSelected ? '3px' : '0'};
+                        outline-offset: ${isSelected ? '2px' : '0'};
                         background: ${isSelected ? '#FDF8F6' : '#FFFFFF'};
-                        box-shadow: ${isSelected ? '0 0 0 4px rgba(217, 119, 87, 0.28), 0 8px 24px rgba(217, 119, 87, 0.2)' : '0 1px 4px rgba(0,0,0,0.02)'};
+                        box-shadow: ${isSelected ? '0 0 0 3px rgba(217, 119, 87, 0.25)' : '0 1px 4px rgba(0,0,0,0.02)'};
                         cursor: pointer;
                         overflow: hidden;
                         position: relative;
@@ -677,7 +667,7 @@ window['new-automation'] = {
                         flex-direction: column;
                         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                     ">
-                        ${isSelected ? `<div style="position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.85rem; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.25); border: 2px solid #FFFFFF;">✓</div>` : ''}
+                        ${isSelected ? `<div style="position:absolute; top:8px; right:8px; width:24px; height:24px; border-radius:50%; background:var(--accent-primary); color:#FFF; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.8rem; z-index:10; box-shadow:0 2px 6px rgba(0,0,0,0.25); border: 2px solid #FFFFFF;">✓</div>` : ''}
 
                         <!-- VERTICAL COVER FOR REELS / FEED -->
                         <div style="
@@ -690,32 +680,32 @@ window['new-automation'] = {
                             background-image: url('${thumbUrl}');
                         ">
                             <!-- TOP CREATOR HEADER OVERLAY -->
-                            <div style="position: absolute; top: 0; left: 0; right: 0; padding: 6px 8px; background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%); display: flex; align-items: center; justify-content: space-between; z-index: 2;">
+                            <div style="position: absolute; top: 0; left: 0; right: 0; padding: 5px 7px; background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%); display: flex; align-items: center; justify-content: space-between; z-index: 2;">
                                 <div style="display: flex; align-items: center; gap: 4px;">
-                                    <span style="font-size: 0.65rem; font-weight: 700; color: #FFFFFF; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">@${igUsername}</span>
-                                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#0095F6"/><path d="M9.5 12.3l1.8 1.8 4.2-4.2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    <span style="font-size: 0.62rem; font-weight: 700; color: #FFFFFF; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">@${igUsername}</span>
+                                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#0095F6"/><path d="M9.5 12.3l1.8 1.8 4.2-4.2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                 </div>
-                                <div style="font-size: 0.62rem; font-weight: 800; color: #FFFFFF; background: ${isReel ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.65)'}; backdrop-filter: blur(6px); padding: 2px 6px; border-radius: 4px; display: flex; align-items: center; gap: 3px;">
+                                <div style="font-size: 0.6rem; font-weight: 800; color: #FFFFFF; background: rgba(0,0,0,0.65); backdrop-filter: blur(6px); padding: 2px 5px; border-radius: 4px; display: flex; align-items: center; gap: 3px;">
                                     ${isReel ? '▶ REEL' : '📸 POST'}
                                 </div>
                             </div>
 
-                            <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 1.25rem 0.5rem 0.4rem 0.5rem; background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%); color: #FFF; font-size: 0.68rem; font-weight: 700;">
+                            <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 1.1rem 0.5rem 0.35rem 0.5rem; background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%); color: #FFF; font-size: 0.65rem; font-weight: 700;">
                                 💬 ${comments} comments
                             </div>
                         </div>
 
-                        <div style="padding: 0.65rem 0.75rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
-                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.8rem; color: var(--text-primary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                        <div style="padding: 0.6rem 0.7rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.78rem; color: var(--text-primary); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                                 ${captionCut}
                             </div>
-                            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.35rem; font-weight: 600;">
+                            <div style="font-size: 0.68rem; color: var(--text-secondary); margin-top: 0.3rem; font-weight: 600;">
                                 ${new Date(m.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                             </div>
                         </div>
 
                         ${isSelected ? `
-                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.7rem; font-weight: 800; text-align: center; padding: 4px 8px; letter-spacing: 0.04em;">
+                            <div style="background: var(--accent-primary); color: #FFFFFF; font-size: 0.68rem; font-weight: 800; text-align: center; padding: 4px 8px; letter-spacing: 0.04em;">
                                 ✓ SELECTED
                             </div>
                         ` : ''}
@@ -736,7 +726,7 @@ window['new-automation'] = {
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#0095F6"/><path d="M9.5 12.3l1.8 1.8 4.2-4.2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                 <span>@${igUsername}</span>
                                 <span style="color: #86EFAC;">•</span>
-                                <span>Meta Verified Token Active</span>
+                                <span>Meta Verified Active</span>
                             </div>
                         </div>
                         <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.1rem;">Select which Instagram Reel, Post, or Story interaction this automation will monitor.</p>
@@ -760,7 +750,7 @@ window['new-automation'] = {
                         🎬 Reels Only (${reelsCount})
                     </button>
                     <button type="button" onclick="window['new-automation'].setStep1Filter('all')" style="padding: 0.4rem 0.95rem; font-size: 0.82rem; font-weight: ${this.step1Filter === 'all' ? '800' : '600'}; border-radius: 8px; background: ${this.step1Filter === 'all' ? 'var(--accent-primary)' : '#FFFFFF'}; color: ${this.step1Filter === 'all' ? '#FFFFFF' : 'var(--text-secondary)'}; border: ${this.step1Filter === 'all' ? 'none' : '1px solid var(--border-color)'}; cursor: pointer; transition: all 0.15s ease;">
-                        📁 All Contents (${totalCount})
+                        📁 Posts & Reels (${feedCount})
                     </button>
                     <button type="button" onclick="window['new-automation'].setStep1Filter('story')" style="padding: 0.4rem 0.95rem; font-size: 0.82rem; font-weight: ${this.step1Filter === 'story' ? '800' : '600'}; border-radius: 8px; background: ${this.step1Filter === 'story' ? 'var(--accent-primary)' : '#FFFFFF'}; color: ${this.step1Filter === 'story' ? '#FFFFFF' : 'var(--text-secondary)'}; border: ${this.step1Filter === 'story' ? 'none' : '1px solid var(--border-color)'}; cursor: pointer; transition: all 0.15s ease;">
                         ⚡ Stories Only (${storiesCount})
@@ -780,6 +770,7 @@ window['new-automation'] = {
     },
 
     renderStep2(container) {
+        const isStory = this.isStoryTarget();
         const isAny = this.keywordMode === 'any';
 
         let chipsHtml = '';
@@ -791,17 +782,32 @@ window['new-automation'] = {
                 </div>
             `).join('');
         } else {
-            chipsHtml = `<div style="font-size: 0.85rem; color: var(--text-muted); font-style: italic;">No keywords added yet. Type below and click "+ Add Keyword" (or select "Any Comment" mode).</div>`;
+            chipsHtml = `<div style="font-size: 0.85rem; color: var(--text-muted); font-style: italic;">No keywords added yet. Type below and click "+ Add Keyword" (or select "${isStory ? 'Any Story Reply' : 'Any Comment'}" mode).</div>`;
         }
+
+        const step2Title = isStory ? 'Step 2: Story Reply Trigger Keywords' : 'Step 2: Trigger Keyword Configuration';
+        const step2Subtitle = isStory 
+            ? 'Configure keyword triggers for incoming Instagram Story direct replies.'
+            : 'Choose whether to trigger on specific keywords or on every single comment on this Reel.';
+
+        const specificTitle = isStory ? '🎯 Specific Keyword(s) in Story Reply' : '🎯 Specific Keyword(s) Only';
+        const specificDesc = isStory
+            ? 'Only followers who reply to your story with your chosen keywords (e.g. PLAYBOOK, PDF) receive the automated DM.'
+            : 'Only followers who comment your chosen keywords (e.g. PLAYBOOK, PDF) receive the automated DM.';
+
+        const anyTitle = isStory ? '⚡ Any Story Reply (Every Reply)' : '⚡ Any Comment (Every Comment)';
+        const anyDesc = isStory
+            ? 'Dispatches your automated DM for EVERY reply sent to your story, no matter what they write!'
+            : 'Triggers the automated DM for EVERY comment posted on this Reel, no matter what they write!';
 
         container.innerHTML = `
             <div style="width: 100%;">
                 <div style="margin-bottom: 1.15rem;">
-                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">Step 2: Trigger Keyword Configuration</h2>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.15rem;">Choose whether to trigger on specific keywords or on every single comment on this Reel.</p>
+                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">${step2Title}</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.15rem;">${step2Subtitle}</p>
                 </div>
 
-                <!-- 1. TRIGGER MODE SELECTION (SPECIFIC KEYWORDS vs ANY COMMENT) -->
+                <!-- 1. TRIGGER MODE SELECTION (SPECIFIC KEYWORDS vs ANY COMMENT/REPLY) -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.85rem; margin-bottom: 1.25rem;">
                     <div onclick="window['new-automation'].setKeywordMode('specific')" style="
                         padding: 1rem 1.25rem;
@@ -817,8 +823,8 @@ window['new-automation'] = {
                     ">
                         <input type="radio" name="trigger_mode" ${!isAny ? 'checked' : ''} style="accent-color: var(--accent-primary); margin-top: 3px; cursor: pointer;">
                         <div>
-                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.92rem; color: var(--text-primary);">🎯 Specific Keyword(s) Only</div>
-                            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.2rem; line-height: 1.4;">Only followers who comment your chosen keywords (e.g. PLAYBOOK, PDF) receive the automated DM.</div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.92rem; color: var(--text-primary);">${specificTitle}</div>
+                            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.2rem; line-height: 1.4;">${specificDesc}</div>
                         </div>
                     </div>
 
@@ -836,8 +842,8 @@ window['new-automation'] = {
                     ">
                         <input type="radio" name="trigger_mode" ${isAny ? 'checked' : ''} style="accent-color: var(--accent-primary); margin-top: 3px; cursor: pointer;">
                         <div>
-                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.92rem; color: var(--text-primary);">⚡ Any Comment (Every Comment)</div>
-                            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.2rem; line-height: 1.4;">Triggers the automated DM for EVERY comment posted on this Reel, no matter what they write!</div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.92rem; color: var(--text-primary);">${anyTitle}</div>
+                            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.2rem; line-height: 1.4;">${anyDesc}</div>
                         </div>
                     </div>
                 </div>
@@ -883,13 +889,15 @@ window['new-automation'] = {
 
                     </div>
                 ` : `
-                    <!-- ANY COMMENT MODE ACTIVE ALERT BANNER -->
+                    <!-- ANY COMMENT/REPLY MODE ACTIVE ALERT BANNER -->
                     <div style="padding: 1.25rem; background: #FDF8F6; border: 1.5px solid var(--accent-primary); border-radius: 12px; display: flex; gap: 0.85rem; align-items: center;">
                         <div style="font-size: 1.8rem;">⚡</div>
                         <div>
-                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.95rem; color: var(--accent-primary);">Universal Comment Trigger Enabled</div>
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.95rem; color: var(--accent-primary);">${isStory ? 'Universal Story Reply Trigger Enabled' : 'Universal Comment Trigger Enabled'}</div>
                             <div style="font-size: 0.84rem; color: var(--text-primary); margin-top: 0.2rem; line-height: 1.45;">
-                                InstaAuto will dispatch your automated DM for <strong>ANY comment</strong> left on this Reel. No keyword typing required by your followers!
+                                ${isStory 
+                                    ? 'InstaAuto will dispatch your automated DM for <strong>ANY reply</strong> sent to your story. No keyword typing required by your followers!'
+                                    : 'InstaAuto will dispatch your automated DM for <strong>ANY comment</strong> left on this Reel. No keyword typing required by your followers!'}
                             </div>
                         </div>
                     </div>
@@ -900,10 +908,11 @@ window['new-automation'] = {
 
     // STEP 3: DM & RESOURCE DISPATCH WITH FOLLOW-FIRST GATE WORKFLOW PREVIEW
     renderStep3(container) {
+        const isStory = this.isStoryTarget();
         const actionVal = this.savedActionType || 'link_dm';
-        const responseVal = this.savedResponseText || 'Hey! Thanks for commenting. Here is your requested resource link 🚀';
+        const responseVal = this.savedResponseText || 'Hey! Thanks for replying. Here is your requested resource link 🚀';
         const linkVal = this.savedLinkUrl || 'https://example.com/guide.pdf';
-        const promptVal = this.savedFollowPrompt || 'Thanks for commenting! Please follow @creator.studio first, then reply "I FOLLOWED" in this DM to unlock your link!';
+        const promptVal = this.savedFollowPrompt || 'Thanks for reaching out! Please follow @creator.studio first, then reply "I FOLLOWED" in this DM to unlock your link!';
 
         if (!this.savedButtonsConfig) {
             this.savedButtonsConfig = {
@@ -926,6 +935,15 @@ window['new-automation'] = {
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.15rem;">Configure the automated response message body and deliverable URL sent to followers.</p>
                 </div>
 
+                ${isStory ? `
+                    <div style="margin-bottom: 1rem; padding: 0.75rem 1rem; background: #FFF9F5; border: 1.5px solid #FDC5B4; border-radius: 10px; display: flex; align-items: center; gap: 0.65rem;">
+                        <span style="font-size: 1.15rem;">⚡</span>
+                        <div style="font-size: 0.8rem; color: #8F4932; line-height: 1.35;">
+                            <strong>Story Automation Active:</strong> Instagram Stories deliver interactions directly to Direct Messages. When a user replies to your story, your automated response is delivered straight to their private Instagram DM inbox!
+                        </div>
+                    </div>
+                ` : ''}
+
                 <div style="display: flex; flex-direction: column; gap: 1.1rem; width: 100%;">
                     
                     <div style="display: flex; flex-direction: column; gap: 0.35rem;">
@@ -947,7 +965,7 @@ window['new-automation'] = {
                                         <h3 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--accent-primary); margin: 0;">
                                             Follow-First Gate System Active
                                         </h3>
-                                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.1rem 0 0 0;">
+                                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.1rem;">
                                             Followers must follow your account to unlock your resource.
                                         </p>
                                     </div>
@@ -962,7 +980,7 @@ window['new-automation'] = {
                             <!-- 3-STEP VISUAL BUTTON FUNNEL PIPELINE -->
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; background: #FFFFFF; padding: 0.85rem; border-radius: 10px; border: 1px solid #F2E3D5; margin-bottom: 1rem;">
                                 <div style="font-size: 0.78rem;">
-                                    <strong style="color: var(--accent-primary);">1. Comment:</strong> Follower comments trigger keyword on your Reel.
+                                    <strong style="color: var(--accent-primary);">1. ${isStory ? 'Story Reply' : 'Comment'}:</strong> Follower triggers keywords on your ${isStory ? 'story' : 'Reel'}.
                                 </div>
                                 <div style="font-size: 0.78rem;">
                                     <strong style="color: var(--accent-primary);">2. Hook DM:</strong> Quick Reply button <em>"Send me the access"</em>.
@@ -1030,7 +1048,7 @@ window['new-automation'] = {
                     ` : `
                         <div style="display: flex; flex-direction: column; gap: 0.35rem;">
                             <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">DM Message Body</label>
-                            <textarea id="auto_response_text" rows="3" onchange="window['new-automation'].savedResponseText=this.value" placeholder="e.g. Thanks for commenting! Here is your requested resource link..." style="width: 100%; padding: 0.75rem 1.1rem; font-size: 0.9rem; font-family: inherit; font-weight: 500; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; box-shadow: inset 0 2px 4px rgba(0,0,0,0.03); outline: none; line-height: 1.45;">${responseVal}</textarea>
+                            <textarea id="auto_response_text" rows="3" onchange="window['new-automation'].savedResponseText=this.value" placeholder="e.g. Thanks for replying! Here is your requested resource link..." style="width: 100%; padding: 0.75rem 1.1rem; font-size: 0.9rem; font-family: inherit; font-weight: 500; border-radius: 10px; border: 1px solid #D1C9BE; background: #FAF8F5; box-shadow: inset 0 2px 4px rgba(0,0,0,0.03); outline: none; line-height: 1.45;">${responseVal}</textarea>
                         </div>
                     `}
 
@@ -1046,47 +1064,69 @@ window['new-automation'] = {
     },
 
     renderStep4(container) {
+        const isStory = this.isStoryTarget();
         const delayVal = this.savedDelay || 5;
+        const replyVal = this.savedPublicReply || 'Sent! Check your DMs 📩';
         const chosen = (this.mediaList || []).find(m => String(m.id) === String(this.selectedMediaId) || String(m.ig_media_id) === String(this.selectedMediaId));
+        
         let targetLabel = 'Account-Wide Global Rule (All Reels & Posts)';
         let targetIcon = '🌐';
         let targetThumb = '';
         if (this.selectedMediaId === 'story') {
-            targetLabel = 'All Active Stories (Story Replies)';
+            targetLabel = 'Every Story (All Current & Future Stories)';
             targetIcon = '⚡';
         } else if (this.selectedMediaId === 'story_mention') {
             targetLabel = 'Story Mentions & Tags';
             targetIcon = '🏷️';
         } else if (chosen) {
             targetThumb = chosen.thumbnail_url || chosen.media_url || '';
-            const isStory = chosen.media_product_type === 'STORY' || chosen.media_type === 'STORY';
-            targetIcon = isStory ? '⚡' : '🎬';
-            targetLabel = `${isStory ? 'Active Story' : 'Target Reel'}: "${chosen.caption ? chosen.caption.slice(0, 45) + '...' : 'Untitled Content'}"`;
+            const isMediaStory = chosen.media_product_type === 'STORY' || chosen.media_type === 'STORY';
+            targetIcon = isMediaStory ? '⚡' : '🎬';
+            targetLabel = `${isMediaStory ? 'Active Story' : 'Target Reel'}: "${chosen.caption ? chosen.caption.slice(0, 45) + '...' : 'Untitled Content'}"`;
         }
 
         container.innerHTML = `
             <div style="width: 100%;">
                 <div style="margin-bottom: 1rem;">
-                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">Step 4: Anti-Spam Pacing & Public Comment Reply</h2>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.15rem;">Protect account health with delay pacing and boost post engagement with public comment replies.</p>
+                    <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">Step 4: Pacing & Deployment Review</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.15rem;">${isStory ? 'Protect account health with delay pacing and review your story automation before deploying.' : 'Protect account health with delay pacing and boost post engagement with public comment replies.'}</p>
                 </div>
 
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; width: 100%;">
+                    <!-- DELAY PACING -->
                     <div style="padding: 1.15rem; background: #FAF8F5; border: 1px solid var(--border-color); border-radius: 12px;">
                         <label style="font-size: 0.88rem; font-weight: 800; color: var(--text-primary);">Anti-Spam Delay Pacing</label>
                         <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.1rem;">Natural delay before sending DM</div>
-                        <select id="auto_delay_seconds" onchange="window['new-automation'].savedDelay=parseInt(this.value)" style="width: 100%; padding: 0.65rem 0.95rem; font-size: 0.88rem; font-weight: 600; border-radius: 8px; border: 1px solid #D1C9BE; background: #FFF; marginTop: 0.5rem; outline: none;">
+                        <select id="auto_delay_seconds" onchange="window['new-automation'].savedDelay=parseInt(this.value)" style="width: 100%; padding: 0.65rem 0.95rem; font-size: 0.88rem; font-weight: 600; border-radius: 8px; border: 1px solid #D1C9BE; background: #FFF; margin-top: 0.5rem; outline: none;">
                             <option value="0" ${delayVal===0?'selected':''}>Instant Dispatch (0 seconds)</option>
                             <option value="5" ${delayVal===5?'selected':''}>5 Seconds Delay (Recommended)</option>
                             <option value="15" ${delayVal===15?'selected':''}>15 Seconds Delay</option>
                         </select>
                     </div>
 
-                    <div style="padding: 1.15rem; background: #FAF8F5; border: 1px solid var(--border-color); border-radius: 12px;">
-                        <label style="font-size: 0.88rem; font-weight: 800; color: var(--text-primary);">Public Comment Reply (Optional)</label>
-                        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.1rem;">Posts public comment reply under post</div>
-                        <input type="text" id="auto_public_reply" value="${replyVal}" onchange="window['new-automation'].savedPublicReply=this.value" placeholder="e.g. Sent! Check your DMs 📩" style="width: 100%; padding: 0.65rem 0.95rem; font-size: 0.88rem; font-weight: 500; border-radius: 8px; border: 1px solid #D1C9BE; background: #FFF; marginTop: 0.5rem; outline: none;">
-                    </div>
+                    <!-- STORY MODE: DIRECT DM NOTICE / FEED MODE: PUBLIC COMMENT REPLY -->
+                    ${isStory ? `
+                        <div style="padding: 1.15rem; background: #FAF8F5; border: 1px solid var(--border-color); border-radius: 12px; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                    <span style="font-size: 1.1rem;">⚡</span>
+                                    <label style="font-size: 0.88rem; font-weight: 800; color: var(--text-primary); margin: 0;">Direct DM Delivery (Story Mode)</label>
+                                </div>
+                                <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.35rem; line-height: 1.4;">
+                                    Instagram Stories operate purely via Direct Messages. When a user replies to your story, your automated response is delivered straight to their private Instagram DM inbox.
+                                </div>
+                            </div>
+                            <div style="margin-top: 0.65rem; display: inline-flex; align-items: center; gap: 4px; background: #F0FDF4; border: 1px solid #BBF7D0; padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; color: #15803D; width: fit-content;">
+                                ✓ Direct DM Inbox Delivery
+                            </div>
+                        </div>
+                    ` : `
+                        <div style="padding: 1.15rem; background: #FAF8F5; border: 1px solid var(--border-color); border-radius: 12px;">
+                            <label style="font-size: 0.88rem; font-weight: 800; color: var(--text-primary);">Public Comment Reply (Optional)</label>
+                            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.1rem;">Posts public comment reply under post</div>
+                            <input type="text" id="auto_public_reply" value="${replyVal}" onchange="window['new-automation'].savedPublicReply=this.value" placeholder="e.g. Sent! Check your DMs 📩" style="width: 100%; padding: 0.65rem 0.95rem; font-size: 0.88rem; font-weight: 500; border-radius: 8px; border: 1px solid #D1C9BE; background: #FFF; margin-top: 0.5rem; outline: none;">
+                        </div>
+                    `}
                 </div>
 
                 <!-- AUTOMATION DEPLOYMENT SUMMARY PREVIEW -->
@@ -1101,7 +1141,7 @@ window['new-automation'] = {
                             <div style="font-size: 0.72rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 0.05em;">READY TO DEPLOY</div>
                             <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.92rem; color: var(--text-primary);">${targetLabel}</div>
                             <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.1rem;">
-                                Trigger: <strong>${this.keywordMode === 'any' ? 'Universal (*)' : (this.keywordList.join(', ') || this.savedKeywords || 'ANY')}</strong> • Action: <strong>${this.savedActionType || 'link_dm'}</strong>
+                                Trigger: <strong>${this.keywordMode === 'any' ? (isStory ? 'Any Story Reply (*)' : 'Universal Comment (*)') : (this.keywordList.join(', ') || this.savedKeywords || 'ANY')}</strong> • Action: <strong>${this.savedActionType || 'link_dm'}</strong>
                             </div>
                         </div>
                     </div>
@@ -1119,7 +1159,7 @@ window['new-automation'] = {
             this.savedKeywords = 'PDF, GUIDE, EBOOK';
             this.keywordList = ['PDF', 'GUIDE', 'EBOOK'];
             this.savedActionType = 'link_dm';
-            this.savedResponseText = 'Thanks for commenting! Here is your requested PDF resource link:';
+            this.savedResponseText = 'Thanks for reaching out! Here is your requested PDF resource link:';
             this.savedLinkUrl = 'https://example.com/free-guide.pdf';
             this.savedPublicReply = 'Sent to your DMs! Check your inbox 📩';
             App.showToast('Applied "Lead E-Book" preset', 'success');
@@ -1127,7 +1167,7 @@ window['new-automation'] = {
             this.savedKeywords = 'SECRET, LINK, UNLOCK';
             this.keywordList = ['SECRET', 'LINK', 'UNLOCK'];
             this.savedActionType = 'follow_first';
-            this.savedFollowPrompt = 'Thanks for commenting! Please follow @creator.studio first, then reply "I FOLLOWED" in this DM to unlock your link!';
+            this.savedFollowPrompt = 'Thanks for reaching out! Please follow @creator.studio first, then reply "I FOLLOWED" in this DM to unlock your link!';
             this.savedResponseText = '🎉 Thank you for following @creator.studio! Here is your requested resource link:';
             this.savedLinkUrl = 'https://example.com/secret-guide.pdf';
             this.savedPublicReply = 'Check your DMs for access instructions!';
@@ -1157,7 +1197,7 @@ window['new-automation'] = {
 
         let triggerWord = '';
         if (this.keywordMode === 'any') {
-            triggerWord = '*'; // Universal trigger for ANY comment
+            triggerWord = '*'; // Universal trigger for ANY comment or reply
         } else {
             triggerWord = (this.keywordList && this.keywordList.length > 0)
                 ? this.keywordList.join(', ')
@@ -1183,17 +1223,17 @@ window['new-automation'] = {
             ? (buttonsConfig.step3_text || this.savedResponseText || 'Dost appko document bejhdiya hai bahut mehnat sa bnaya hai please follow')
             : (this.savedResponseText || document.getElementById('auto_response_text')?.value || 'Here is your resource link!');
 
+        const isStory = this.isStoryTarget();
         let sourceType = 'reel';
         if (this.selectedMediaId === 'story') {
             sourceType = 'story';
         } else if (this.selectedMediaId === 'story_mention') {
             sourceType = 'story_mention';
-        } else {
-            const chosen = (this.mediaList || []).find(m => String(m.id) === String(this.selectedMediaId) || String(m.ig_media_id) === String(this.selectedMediaId));
-            if (chosen && (chosen.media_product_type === 'STORY' || chosen.media_type === 'STORY')) {
-                sourceType = 'story';
-            }
+        } else if (isStory) {
+            sourceType = 'story';
         }
+
+        const publicReply = isStory ? null : (this.savedPublicReply || document.getElementById('auto_public_reply')?.value || 'Sent to DMs!');
 
         const payload = {
             media_id: this.selectedMediaId,
@@ -1203,7 +1243,7 @@ window['new-automation'] = {
             response_text: responseText,
             link_url: this.savedLinkUrl || document.getElementById('auto_link_url')?.value || 'https://example.com/guide.pdf',
             follow_prompt: this.savedFollowPrompt || document.getElementById('auto_follow_prompt')?.value || 'Please follow us first!',
-            public_reply: this.savedPublicReply || document.getElementById('auto_public_reply')?.value || 'Sent to DMs!',
+            public_reply: publicReply,
             delay_seconds: this.savedDelay !== undefined ? this.savedDelay : 5,
             buttons_config_json: JSON.stringify(buttonsConfig),
             is_active: true

@@ -474,6 +474,8 @@ async function hydrateLocalFromTurso(localDb) {
                     }
                 } catch(e) {}
             }
+        }
+
         try {
             const { backupInstagramAccounts, backupSettings, backupRules } = require('../database');
             backupInstagramAccounts(localDb);

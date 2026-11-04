@@ -312,6 +312,16 @@ async function sendPrivateReply(token, commentId, commenterId, messagePayload) {
         ? `${base}/${igUserId}/messages`
         : `${base}/me/messages`;
 
+    const postConfig = {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        params: {
+            access_token: token
+        }
+    };
+
     const messageObj = typeof messagePayload === 'string' ? { text: messagePayload } : messagePayload;
 
     // Strategy 1: Official Instagram Private Reply using recipient: { comment_id } with button template
@@ -320,12 +330,7 @@ async function sendPrivateReply(token, commentId, commenterId, messagePayload) {
         const res = await axios.post(endpoint, {
             recipient: { comment_id: commentId },
             message: messageObj
-        }, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        }, postConfig);
         console.log(`[Instagram] ✅ Private Reply DM delivered successfully with buttons!`, res.data);
         return res.data;
     } catch (err) {
@@ -339,12 +344,7 @@ async function sendPrivateReply(token, commentId, commenterId, messagePayload) {
                 const res2 = await axios.post(endpoint, {
                     recipient: { id: commenterId },
                     message: messageObj
-                }, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
+                }, postConfig);
                 console.log(`[Instagram] ✅ DM delivered via user ID with buttons!`, res2.data);
                 return res2.data;
             } catch (err2) {
@@ -375,12 +375,7 @@ async function sendPrivateReply(token, commentId, commenterId, messagePayload) {
                 const resGeneric = await axios.post(endpoint, {
                     recipient: { comment_id: commentId },
                     message: genericPayload
-                }, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
+                }, postConfig);
                 console.log(`[Instagram] ✅ Generic Template delivered on comment_id!`, resGeneric.data);
                 return resGeneric.data;
             } catch (errGeneric) {
@@ -396,12 +391,7 @@ async function sendPrivateReply(token, commentId, commenterId, messagePayload) {
                 const resFallback = await axios.post(endpoint, {
                     recipient: { comment_id: commentId },
                     message: { text: fallbackText }
-                }, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
+                }, postConfig);
                 console.log(`[Instagram] ✅ Private Reply plain text delivered!`, resFallback.data);
                 return resFallback.data;
             } catch (e) {}
@@ -411,12 +401,7 @@ async function sendPrivateReply(token, commentId, commenterId, messagePayload) {
                     const res2Fallback = await axios.post(endpoint, {
                         recipient: { id: commenterId },
                         message: { text: fallbackText }
-                    }, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
+                    }, postConfig);
                     return res2Fallback.data;
                 } catch (e) {}
             }
@@ -438,6 +423,9 @@ async function replyToComment(token, commentId, messageText) {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
+            },
+            params: {
+                access_token: token
             }
         });
         console.log(`[Instagram] ✅ Public comment reply published:`, res.data);

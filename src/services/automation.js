@@ -2,6 +2,7 @@ const { getDb, getConfig, getInstagramAccountByIgId } = require('../database');
 const { getSingleMedia, checkIsUserFollowing } = require('./instagram');
 const { enqueue } = require('./queue');
 const { syncLeadToSheet } = require('./googleSheets');
+const { asyncSync } = require('./turso');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
 
@@ -357,6 +358,11 @@ async function processCommentEvent(payload) {
                 );
                 
                 const eventId = eventResult.lastInsertRowid;
+                asyncSync(`
+                    INSERT INTO events (id, rule_id, comment_id, comment_text, commenter_ig_id, commenter_username, media_ig_id, tracking_id, user_id, created_at, dm_status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+                    ON CONFLICT(id) DO NOTHING
+                `, [eventId, rule.id, commentId, text, from.id, from.username || 'user', mediaId, trackingId, targetUserId, new Date().toISOString()]);
 
                 // Asynchronously sync lead to Google Sheet (non-blocking)
                 syncLeadToSheet({
@@ -519,6 +525,11 @@ function dispatchStoryRule({ db, rule, senderId, username, activeToken, targetUs
         rule.id, fakeCommentId, interactionText || `[${interactionType}]`, senderId, username || 'user', finalMediaIgId, trackingId, targetUserId, new Date().toISOString()
     );
     const eventId = eventResult.lastInsertRowid;
+    asyncSync(`
+        INSERT INTO events (id, rule_id, comment_id, comment_text, commenter_ig_id, commenter_username, media_ig_id, tracking_id, user_id, created_at, dm_status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+        ON CONFLICT(id) DO NOTHING
+    `, [eventId, rule.id, fakeCommentId, interactionText || `[${interactionType}]`, senderId, username || 'user', finalMediaIgId, trackingId, targetUserId, new Date().toISOString()]);
 
     if (rule.action_type === 'follow_first') {
         const isButtonMode = !btnCfg || btnCfg.gate_type !== 'text';

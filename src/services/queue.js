@@ -1,5 +1,6 @@
 const { sendPrivateReply, replyToComment, sendDirectMessage } = require('./instagram');
 const { getDb, getConfig } = require('../database');
+const { asyncSync } = require('./turso');
 
 const queue = [];
 let isProcessing = false;
@@ -64,8 +65,10 @@ async function processNext() {
         }
 
         if (job.eventId) {
+            const msgId = result?.id || result?.message_id || 'msg_' + Date.now();
             getDb().prepare("UPDATE events SET dm_status = 'delivered', dm_message_id = ? WHERE id = ?")
-                .run(result?.id || result?.message_id || 'msg_' + Date.now(), job.eventId);
+                .run(msgId, job.eventId);
+            asyncSync("UPDATE events SET dm_status = 'delivered', dm_message_id = ? WHERE id = ?", [msgId, job.eventId]);
         }
 
         currentInterval = 1000;
@@ -76,6 +79,7 @@ async function processNext() {
         if (job.eventId) {
             getDb().prepare("UPDATE events SET dm_status = 'failed' WHERE id = ?")
                 .run(job.eventId);
+            asyncSync("UPDATE events SET dm_status = 'failed' WHERE id = ?", [job.eventId]);
         }
 
         if (err.response && err.response.status === 429) {
