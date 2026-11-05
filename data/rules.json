@@ -15,7 +15,8 @@
     "variations_json": null,
     "user_id": 1,
     "buttons_config_json": null,
-    "is_deleted": 1
+    "is_deleted": 1,
+    "source_type": "reel"
   },
   {
     "id": 33,
@@ -33,7 +34,8 @@
     "variations_json": null,
     "user_id": 1,
     "buttons_config_json": "{\"step1_button\":\"Send me the access\",\"step2_text\":\"Almost there !\\nPlease visit my profile and tap follow to continue 😄\",\"step2_profile_button\":\"Visit Profile\",\"step2_confirm_button\":\"I'm following ✅\",\"step3_button\":\"Open Resource Pass 📄\"}",
-    "is_deleted": 1
+    "is_deleted": 1,
+    "source_type": "reel"
   },
   {
     "id": 38,
@@ -51,7 +53,8 @@
     "variations_json": null,
     "user_id": 1,
     "buttons_config_json": "{\"step1_button\":\"Send me the access\",\"step2_text\":\"Almost there !\\nPlease visit my profile and tap follow to continue 😄\",\"step2_profile_button\":\"Visit Profile\",\"step2_confirm_button\":\"I'm following ✅\",\"step3_button\":\"Open Resource Pass 📄\"}",
-    "is_deleted": 1
+    "is_deleted": 1,
+    "source_type": "reel"
   },
   {
     "id": 47,
@@ -69,7 +72,8 @@
     "variations_json": null,
     "user_id": 1,
     "buttons_config_json": null,
-    "is_deleted": 1
+    "is_deleted": 1,
+    "source_type": "reel"
   },
   {
     "id": 48,
@@ -87,7 +91,8 @@
     "variations_json": null,
     "user_id": 1,
     "buttons_config_json": null,
-    "is_deleted": 1
+    "is_deleted": 1,
+    "source_type": "reel"
   },
   {
     "id": 51,
@@ -105,7 +110,8 @@
     "variations_json": null,
     "user_id": 1,
     "buttons_config_json": "{\"step1_button\":\"Send me the access\",\"step2_text\":\"Almost there !\\nPlease visit my profile and tap follow to continue 😄\",\"step2_profile_button\":\"Visit Profile\",\"step2_confirm_button\":\"I'm following ✅\",\"not_following_text\":\"Wait! It looks like you're not following us yet! 👀\\n\\nPlease visit our profile, tap Follow, and then click \\\"I'm following ✅\\\" below to unlock your link!\",\"step3_button\":\"Open Resource Pass 📄\"}",
-    "is_deleted": 1
+    "is_deleted": 1,
+    "source_type": "reel"
   },
   {
     "id": 52,
@@ -123,7 +129,8 @@
     "variations_json": null,
     "user_id": 1,
     "buttons_config_json": "{\"step1_button\":\"Send me the access\",\"step2_text\":\"Almost there !\\nPlease visit my profile and tap follow to continue 😄\",\"step2_profile_button\":\"Visit Profile\",\"step2_confirm_button\":\"I'm following ✅\",\"not_following_text\":\"Wait! It looks like you're not following us yet! 👀\\n\\nPlease visit our profile, tap Follow, and then click \\\"I'm following ✅\\\" below to unlock your link!\",\"step3_button\":\"Open Resource Pass 📄\"}",
-    "is_deleted": 1
+    "is_deleted": 1,
+    "source_type": "reel"
   },
   {
     "id": 53,
@@ -141,7 +148,8 @@
     "variations_json": null,
     "user_id": 1,
     "buttons_config_json": "{\"step1_button\":\"Send me the access\",\"step2_text\":\"Almost there !\\nPlease visit my profile and tap follow to continue 😄\",\"step2_profile_button\":\"Visit Profile\",\"step2_confirm_button\":\"I'm following ✅\",\"not_following_text\":\"Wait! It looks like you're not following us yet! 👀\\n\\nPlease visit our profile, tap Follow, and then click \\\"I'm following ✅\\\" below to unlock your link!\",\"step3_button\":\"Open Resource Pass 📄\"}",
-    "is_deleted": 1
+    "is_deleted": 1,
+    "source_type": "reel"
   },
   {
     "id": 54,
@@ -159,7 +167,8 @@
     "variations_json": null,
     "user_id": 1,
     "buttons_config_json": "{\"step1_button\":\"Send me the access\",\"step2_text\":\"Almost there !\\nPlease visit my profile and tap follow to continue 😄\",\"step2_profile_button\":\"Visit Profile\",\"step2_confirm_button\":\"I'm following ✅\",\"not_following_text\":\"Wait! It looks like you're not following us yet! 👀\\n\\nPlease visit our profile, tap Follow, and then click \\\"I'm following ✅\\\" below to unlock your link!\",\"step3_button\":\"Open Resource Pass 📄\"}",
-    "is_deleted": 1
+    "is_deleted": 1,
+    "source_type": "reel"
   },
   {
     "id": 55,
@@ -177,7 +186,8 @@
     "variations_json": null,
     "user_id": 1,
     "buttons_config_json": "{\"step1_button\":\"Send me the access\",\"step2_text\":\"Almost there !\\nPlease visit my profile and tap follow to continue 😄\",\"step2_profile_button\":\"Visit Profile\",\"step2_confirm_button\":\"I'm following ✅\",\"not_following_text\":\"Wait! It looks like you're not following us yet! 👀\\n\\nPlease visit our profile, tap Follow, and then click \\\"I'm following ✅\\\" below to unlock your link!\",\"step3_button\":\"Open Resource Pass 📄\"}",
-    "is_deleted": 1
+    "is_deleted": 1,
+    "source_type": "reel"
   },
   {
     "id": 56,
@@ -195,7 +205,8 @@
     "variations_json": null,
     "user_id": 1,
     "buttons_config_json": "{\"step1_button\":\"Send me the access\",\"step2_text\":\"Almost there !\\nPlease visit my profile and tap follow to continue 😄\",\"step2_profile_button\":\"Visit Profile\",\"step2_confirm_button\":\"I'm following ✅\",\"not_following_text\":\"Wait! It looks like you're not following us yet! 👀\\n\\nPlease visit our profile, tap Follow, and then click \\\"I'm following ✅\\\" below to unlock your link!\",\"step3_button\":\"Open Resource Pass 📄\"}",
-    "is_deleted": 1
+    "is_deleted": 1,
+    "source_type": "reel"
   },
   {
     "id": 57,
@@ -213,7 +224,8 @@
     "variations_json": null,
     "user_id": 1,
     "buttons_config_json": "{\"step1_button\":\"Send me the access\",\"step2_text\":\"Almost there !\\nPlease visit my profile and tap follow to continue 😄\",\"step2_profile_button\":\"Visit Profile\",\"step2_confirm_button\":\"I'm following ✅\",\"not_following_text\":\"Wait! It looks like you're not following us yet! 👀\\n\\nPlease visit our profile, tap Follow, and then click \\\"I'm following ✅\\\" below to unlock your link!\",\"step3_button\":\"Open Resource Pass 📄\"}",
-    "is_deleted": 1
+    "is_deleted": 1,
+    "source_type": "reel"
   },
   {
     "id": 58,
@@ -231,7 +243,8 @@
     "variations_json": null,
     "user_id": 1,
     "buttons_config_json": "{\"gate_type\":\"buttons\",\"step1_text\":\"Hey there! Glad you're here ☺️\\n\\nTap below and I'll send you the access in just a moment ✨\",\"step1_button\":\"Send me the access\",\"step2_text\":\"Almost there !\\nPlease visit my profile and tap follow to continue 😄\",\"step2_profile_button\":\"Visit Profile\",\"step2_confirm_button\":\"I'm following ✅\",\"step3_text\":\"Dost appko document bejhdiya hai bahut mehnat sa bnaya hai please follow\",\"step3_button\":\"Click me\"}",
-    "is_deleted": 1
+    "is_deleted": 1,
+    "source_type": "reel"
   },
   {
     "id": 59,
@@ -241,15 +254,16 @@
     "response_text": "Here is your resource link!",
     "link_url": "https://judgeflow-20.vercel.app/login",
     "follow_prompt": "Please follow us first!",
-    "is_active": 1,
+    "is_active": 0,
     "created_at": "2026-11-02T10:30:20.795Z",
-    "updated_at": "2026-11-02T10:56:57.417Z",
+    "updated_at": "2026-11-04T08:36:55.172Z",
     "public_reply": "Sent! Check your DMs 📩",
     "delay_seconds": 5,
     "variations_json": null,
     "user_id": 1,
     "buttons_config_json": "{\"gate_type\":\"buttons\",\"step1_text\":\"Hey there! Glad you're here ☺️\\n\\nTap below and I'll send you the access in just a moment ✨\",\"step1_button\":\"Send me the access\",\"step2_text\":\"Almost there !\\nPlease visit my profile and tap follow to continue 😄\",\"step2_profile_button\":\"Visit Profile\",\"step2_confirm_button\":\"I'm following ✅\",\"step3_text\":\"Dost appko document bejhdiya hai bahut mehnat sa bnaya hai please follow\",\"step3_button\":\"Click me\"}",
-    "is_deleted": 0
+    "is_deleted": 1,
+    "source_type": "reel"
   },
   {
     "id": 60,
@@ -267,6 +281,26 @@
     "variations_json": null,
     "user_id": 1,
     "buttons_config_json": "{\"gate_type\":\"buttons\",\"step1_text\":\"Hey there! Glad you're here ☺️\\n\\nTap below and I'll send you the access in just a moment ✨\",\"step1_button\":\"Send me the access\",\"step2_text\":\"Almost there !\\nPlease visit my profile and tap follow to continue 😄\",\"step2_profile_button\":\"Visit Profile\",\"step2_confirm_button\":\"I'm following ✅\",\"step3_text\":\"Dost appko document bejhdiya hai bahut mehnat sa bnaya hai please follow\",\"step3_button\":\"Click me\"}",
-    "is_deleted": 1
+    "is_deleted": 1,
+    "source_type": "reel"
+  },
+  {
+    "id": 61,
+    "media_id": null,
+    "trigger_keyword": "PLAYBOOK, PDF, LINK",
+    "action_type": "link_dm",
+    "response_text": "Hey! Thanks for commenting. Here is your requested resource link 🚀",
+    "link_url": "https://news-flow-one.vercel.app/today",
+    "follow_prompt": "Please follow us first!",
+    "is_active": 0,
+    "created_at": "2026-11-04T07:21:22.135Z",
+    "updated_at": "2026-11-04T08:36:52.184Z",
+    "public_reply": "Sent to DMs!",
+    "delay_seconds": 5,
+    "variations_json": null,
+    "user_id": 1,
+    "buttons_config_json": "{\"gate_type\":\"buttons\",\"step1_text\":\"Hey there! Glad you're here ☺️\\n\\nTap below and I'll send you the access in just a moment ✨\",\"step1_button\":\"Send me the access\",\"step2_text\":\"Almost there !\\nPlease visit my profile and tap follow to continue 😄\",\"step2_profile_button\":\"Visit Profile\",\"step2_confirm_button\":\"I'm following ✅\",\"step3_text\":\"Dost appko document bejhdiya hai bahut mehnat sa bnaya hai please follow\",\"step3_button\":\"Click me\"}",
+    "is_deleted": 1,
+    "source_type": "story"
   }
 ]

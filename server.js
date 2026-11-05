@@ -112,7 +112,7 @@ cron.schedule('* * * * *', async () => {
 // Story reply safety-net: recover replies/mentions Meta failed to push via webhook
 const { pollStoryReplies } = require('./src/services/storyPoller');
 let storyPollRunning = false;
-cron.schedule('* * * * *', async () => {
+cron.schedule('*/10 * * * * *', async () => {
   if (storyPollRunning) return;
   storyPollRunning = true;
   try {

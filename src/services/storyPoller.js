@@ -3,11 +3,12 @@ const { getDb, getConfig } = require('../database');
 
 const IG_API = 'https://graph.instagram.com/v22.0';
 const MAX_AGE_MS = 23 * 60 * 60 * 1000; // stay inside Meta's 24h messaging window
+const lastSeen = new Map();
 
 /**
- * Safety net for story replies: Meta does not always deliver `messages` webhooks
+ * Safety net for story replies & keyword DMs: Meta does not always deliver `messages` webhooks
  * (e.g. app in Development mode / tester roles). This polls the Conversations API
- * and feeds any unhandled story reply through the normal automation engine.
+ * every 10 seconds and feeds any unhandled story reply or keyword DM through the automation engine.
  * De-duplication is done by message id (stored as events.comment_id).
  */
 async function pollStoryReplies() {
@@ -26,7 +27,7 @@ async function pollStoryReplies() {
     try {
         const res = await axios.get(`${IG_API}/me/conversations`, {
             params: { platform: 'instagram', fields: 'id,updated_time', limit: 25, access_token: token },
-            timeout: 20000
+            timeout: 15000
         });
         convs = res.data?.data || [];
     } catch (err) {
@@ -38,6 +39,7 @@ async function pollStoryReplies() {
 
     for (const conv of convs) {
         if (conv.updated_time && new Date(conv.updated_time).getTime() < cutoff) continue;
+        if (conv.updated_time && lastSeen.get(conv.id) === conv.updated_time) continue;
 
         let messages = [];
         try {
@@ -46,20 +48,24 @@ async function pollStoryReplies() {
                     fields: 'messages.limit(10){id,created_time,from,message,story}',
                     access_token: token
                 },
-                timeout: 20000
+                timeout: 15000
             });
             messages = res.data?.messages?.data || [];
+            if (conv.updated_time) lastSeen.set(conv.id, conv.updated_time);
         } catch (err) {
             continue;
         }
 
-        // oldest first so replies are handled in order
+        // oldest first so replies are handled in chronological order
         messages.sort((a, b) => new Date(a.created_time) - new Date(b.created_time));
 
         for (const m of messages) {
             const storyReplyId = m.story?.reply_to?.id;
             const isMention = !!m.story?.mention;
-            if (!storyReplyId && !isMention) continue;
+            const rawText = (m.message || '').trim();
+
+            // Must be a story reply, mention, or a message containing text
+            if (!storyReplyId && !isMention && !rawText) continue;
 
             const fromUsername = (m.from?.username || '').toLowerCase();
             if (!m.from?.id || (myUsername && fromUsername === myUsername)) continue;
@@ -79,17 +85,17 @@ async function pollStoryReplies() {
                         timestamp: new Date(m.created_time).getTime(),
                         message: {
                             mid: m.id,
-                            text: m.message || '',
+                            text: rawText,
                             ...(storyReplyId
                                 ? { reply_to: { story: { id: String(storyReplyId) } } }
-                                : { attachments: [{ type: 'story_mention', payload: {} }] })
+                                : (isMention ? { attachments: [{ type: 'story_mention', payload: {} }] } : {}))
                         }
                     }]
                 }]
             };
 
             try {
-                console.log(`[StoryPoller] 📩 Recovering story ${storyReplyId ? 'reply' : 'mention'} from @${m.from.username}: "${m.message || ''}"`);
+                console.log(`[StoryPoller] ⚡ Processing message from @${m.from.username}: "${rawText}" (story: ${storyReplyId || 'none'})`);
                 await processMessageEvent(payload);
                 processed++;
             } catch (err) {

@@ -1065,7 +1065,7 @@ window['new-automation'] = {
 
     renderStep4(container) {
         const isStory = this.isStoryTarget();
-        const delayVal = this.savedDelay || 5;
+        const delayVal = this.savedDelay !== undefined ? this.savedDelay : 0;
         const replyVal = this.savedPublicReply || 'Sent! Check your DMs 📩';
         const chosen = (this.mediaList || []).find(m => String(m.id) === String(this.selectedMediaId) || String(m.ig_media_id) === String(this.selectedMediaId));
         
@@ -1098,8 +1098,8 @@ window['new-automation'] = {
                         <label style="font-size: 0.88rem; font-weight: 800; color: var(--text-primary);">Anti-Spam Delay Pacing</label>
                         <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.1rem;">Natural delay before sending DM</div>
                         <select id="auto_delay_seconds" onchange="window['new-automation'].savedDelay=parseInt(this.value)" style="width: 100%; padding: 0.65rem 0.95rem; font-size: 0.88rem; font-weight: 600; border-radius: 8px; border: 1px solid #D1C9BE; background: #FFF; margin-top: 0.5rem; outline: none;">
-                            <option value="0" ${delayVal===0?'selected':''}>Instant Dispatch (0 seconds)</option>
-                            <option value="5" ${delayVal===5?'selected':''}>5 Seconds Delay (Recommended)</option>
+                            <option value="0" ${delayVal===0?'selected':''}>Instant Dispatch (0 seconds — Recommended)</option>
+                            <option value="5" ${delayVal===5?'selected':''}>5 Seconds Delay</option>
                             <option value="15" ${delayVal===15?'selected':''}>15 Seconds Delay</option>
                         </select>
                     </div>
@@ -1244,7 +1244,7 @@ window['new-automation'] = {
             link_url: this.savedLinkUrl || document.getElementById('auto_link_url')?.value || 'https://example.com/guide.pdf',
             follow_prompt: this.savedFollowPrompt || document.getElementById('auto_follow_prompt')?.value || 'Please follow us first!',
             public_reply: publicReply,
-            delay_seconds: this.savedDelay !== undefined ? this.savedDelay : 5,
+            delay_seconds: this.savedDelay !== undefined ? this.savedDelay : 0,
             buttons_config_json: JSON.stringify(buttonsConfig),
             is_active: true
         };
