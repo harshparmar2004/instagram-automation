@@ -109,6 +109,21 @@ cron.schedule('* * * * *', async () => {
   }
 });
 
+// Story reply safety-net: recover replies/mentions Meta failed to push via webhook
+const { pollStoryReplies } = require('./src/services/storyPoller');
+let storyPollRunning = false;
+cron.schedule('* * * * *', async () => {
+  if (storyPollRunning) return;
+  storyPollRunning = true;
+  try {
+    await pollStoryReplies();
+  } catch (err) {
+    console.warn('[StoryPoller] notice:', err.message);
+  } finally {
+    storyPollRunning = false;
+  }
+});
+
 const { ensureAccountWebhooksSubscribed } = require('./src/services/instagram');
 
 if (require.main === module) {

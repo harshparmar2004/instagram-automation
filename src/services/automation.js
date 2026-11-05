@@ -415,7 +415,15 @@ function cleanUrl(url) {
     return trimmed;
 }
 
-function dispatchStoryRule({ db, rule, senderId, username, activeToken, targetUserId, interactionText, interactionType, storyMediaId }) {
+function dispatchStoryRule({ db, rule, senderId, username, activeToken, targetUserId, interactionText, interactionType, storyMediaId, messageId }) {
+    // 0. Hard dedupe by Instagram message id (webhook + poller can both see the same reply)
+    if (messageId) {
+        const seen = db.prepare('SELECT id FROM events WHERE comment_id = ?').get(String(messageId));
+        if (seen) {
+            console.log(`[Automation] Story message ${messageId} already handled, skipping.`);
+            return null;
+        }
+    }
     // 1. Deduplication: only 1 DM per sender per rule within last 2 minutes to prevent webhook duplicates
     const recent = db.prepare(`
         SELECT id FROM events 
@@ -514,7 +522,7 @@ function dispatchStoryRule({ db, rule, senderId, username, activeToken, targetUs
         }
     }
 
-    const fakeCommentId = 'story_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+    const fakeCommentId = messageId ? String(messageId) : ('story_' + Date.now() + '_' + Math.floor(Math.random() * 10000));
     const insertEvent = db.prepare(`
         INSERT INTO events (rule_id, comment_id, comment_text, commenter_ig_id, commenter_username, media_ig_id, tracking_id, user_id, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -641,7 +649,8 @@ async function processMessageEvent(payload) {
                             targetUserId,
                             interactionText: rawText || 'Story Mention',
                             interactionType: 'Story Mention',
-                            storyMediaId: storyId || 'story'
+                            storyMediaId: storyId || 'story',
+                            messageId: msgEvent.message?.mid
                         });
                         continue;
                     }
@@ -755,7 +764,8 @@ async function processMessageEvent(payload) {
                             targetUserId,
                             interactionText: rawText || (isStoryReply ? 'Story Reply' : 'DM'),
                             interactionType: isStoryReply ? 'Story Reply' : 'Direct DM',
-                            storyMediaId: storyId || 'story'
+                            storyMediaId: storyId || 'story',
+                            messageId: msgEvent.message?.mid
                         });
                         continue;
                     }
