@@ -1411,6 +1411,47 @@ function getInstagramAccountByIgId(igUserId) {
   return null;
 }
 
+function getAllActiveInstagramAccounts() {
+  const db = getDb();
+  let accounts = [];
+  try {
+    accounts = db.prepare(`
+      SELECT a.*, u.id as owner_id, u.name as owner_name, u.email as owner_email, u.status as owner_status
+      FROM instagram_accounts a
+      JOIN users u ON a.user_id = u.id
+      WHERE a.is_active = 1 AND u.status = 'active'
+    `).all();
+  } catch (e) {
+    accounts = [];
+  }
+
+  for (const acct of accounts) {
+    if (acct.access_token) {
+      acct.access_token = decryptToken(acct.access_token);
+    }
+  }
+
+  // Include default/admin config account if configured and not already represented
+  const cfgToken = getConfig('access_token');
+  const cfgIgId = String(getConfig('ig_user_id') || '').trim();
+  const cfgUsername = (getConfig('ig_username') || '').toLowerCase().replace('@', '').trim();
+  if (cfgToken && cfgToken.length > 30 && !cfgToken.includes('••••')) {
+    const alreadyPresent = accounts.some(a => (cfgIgId && String(a.ig_user_id).trim() === cfgIgId) || a.access_token === cfgToken);
+    if (!alreadyPresent) {
+      accounts.push({
+        id: 0,
+        user_id: 1,
+        ig_user_id: cfgIgId || '28689630687300805',
+        ig_username: cfgUsername || 'harshparmar007__',
+        access_token: cfgToken,
+        is_active: 1
+      });
+    }
+  }
+
+  return accounts;
+}
+
 function getAllUsers(search = '') {
   const db = getDb();
   let query = `
@@ -1546,6 +1587,7 @@ module.exports = {
   getUserInstagramAccount,
   saveUserInstagramAccount,
   getInstagramAccountByIgId,
+  getAllActiveInstagramAccounts,
   getAllUsers,
   updateUserStatus,
   deleteUser,

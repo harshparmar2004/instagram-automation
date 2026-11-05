@@ -103,7 +103,19 @@ cron.schedule('0 */6 * * *', async () => {
 // Real-time comment poller & media sync every 60 seconds (zero dropped comments guarantee)
 cron.schedule('* * * * *', async () => {
   try {
-    await syncMedia();
+    const { getAllActiveInstagramAccounts } = require('./src/database');
+    const accounts = getAllActiveInstagramAccounts();
+    if (accounts.length === 0) {
+      await syncMedia();
+    } else {
+      for (const acct of accounts) {
+        try {
+          await syncMedia(acct.user_id);
+        } catch (err) {
+          console.warn(`[Poller] Media sync notice for user ${acct.user_id}:`, err.message);
+        }
+      }
+    }
   } catch (err) {
     console.warn('[Poller] Real-time media/comment sync notice:', err.message);
   }
