@@ -40,10 +40,19 @@ router.get('/r/:trackingId', (req, res) => {
         }
 
         // Log click in local DB
-        db.prepare(`
+        const clickedAt = new Date().toISOString();
+        const userAgent = req.get('User-Agent') || '';
+        const clickRes = db.prepare(`
             INSERT INTO clicks (event_id, tracking_id, clicked_at, user_agent) 
             VALUES (?, ?, ?, ?)
-        `).run(event.event_id, trackingId, new Date().toISOString(), req.get('User-Agent') || '');
+        `).run(event.event_id, trackingId, clickedAt, userAgent);
+        try {
+            const { asyncSync } = require('../services/turso');
+            asyncSync(
+                'INSERT OR IGNORE INTO clicks (id, event_id, tracking_id, clicked_at, user_agent) VALUES (?, ?, ?, ?, ?)',
+                [clickRes.lastInsertRowid, event.event_id, trackingId, clickedAt, userAgent]
+            );
+        } catch (e) {}
 
         // Update reel_stats_history in real time
         try {

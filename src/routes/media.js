@@ -65,6 +65,7 @@ router.get('/media/automated', auth, (req, res) => {
         
         let rulesQuery = `
             SELECT r.*, 
+                   (SELECT COUNT(*) FROM events e WHERE e.rule_id = r.id) as total_comments,
                    (SELECT COUNT(*) FROM events e WHERE (e.rule_id = r.id OR (r.media_id IS NOT NULL AND (e.media_ig_id IN (SELECT ig_media_id FROM media WHERE id = r.media_id) OR e.media_ig_id = CAST(r.media_id AS TEXT)))) AND e.dm_status IN ('sent', 'delivered')) as total_triggers,
                    (SELECT COUNT(*) FROM clicks c JOIN events e ON c.event_id = e.id WHERE (e.rule_id = r.id OR (r.media_id IS NOT NULL AND (e.media_ig_id IN (SELECT ig_media_id FROM media WHERE id = r.media_id) OR e.media_ig_id = CAST(r.media_id AS TEXT))))) as total_clicks
             FROM rules r

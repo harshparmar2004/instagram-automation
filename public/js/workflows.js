@@ -300,6 +300,7 @@ window.workflows = {
 
                 const keywords = (rule.trigger_keyword || '').split(',').map(k => k.trim());
                 const dmsSent = rule.total_triggers !== undefined && rule.total_triggers !== null ? rule.total_triggers : 0;
+                const ruleComments = Math.max(comments, rule.total_comments || 0, dmsSent);
                 const clicks = rule.total_clicks !== undefined && rule.total_clicks !== null ? rule.total_clicks : 0;
                 const ctr = dmsSent > 0 ? Math.round((clicks / dmsSent) * 100) : 0;
                 const isDeleted = rule.is_deleted === 1 || rule.is_deleted === true || rule.is_deleted === '1';
@@ -505,7 +506,7 @@ window.workflows = {
                             <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; font-size: 0.85rem; color: var(--text-primary);">
                                 <span><span style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem;">Likes:</span> <strong id="likes-${rule.id}">${likes.toLocaleString()}</strong></span>
                                 <span style="color:var(--border-color);">•</span>
-                                <span><span style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem;">Comments:</span> <strong id="comments-${rule.id}">${comments.toLocaleString()}</strong></span>
+                                <span><span style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem;">Comments:</span> <strong id="comments-${rule.id}">${ruleComments.toLocaleString()}</strong></span>
                                 <span style="color:var(--border-color);">•</span>
                                 <span><span style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem;">DMs Dispatched:</span> <strong id="dms-${rule.id}" style="color:var(--accent-primary);">${dmsSent.toLocaleString()}</strong></span>
                                 <span style="color:var(--border-color);">•</span>

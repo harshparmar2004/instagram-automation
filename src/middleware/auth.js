@@ -1,5 +1,5 @@
 const config = require('../config');
-const { validateSession, getDb, getUserById } = require('../database');
+const { validateSession, restoreSessionFromCloud, getDb, getUserById } = require('../database');
 
 function authMiddleware(req, res, next) {
     let token = null;
@@ -14,9 +14,7 @@ function authMiddleware(req, res, next) {
         return res.status(401).json({ error: 'Authentication required. Please log in.' });
     }
 
-    // 1. Check if token is a valid multi-tenant session token
-    const session = validateSession(token);
-    if (session) {
+    function acceptSession(session) {
         req.token = token;
         req.user = {
             id: session.id,
@@ -36,40 +34,54 @@ function authMiddleware(req, res, next) {
                 req.isImpersonating = true;
             }
         }
-
         return next();
     }
 
-    // 2. Legacy fallback for existing automated scripts & passwords
-    const acceptedLegacyTokens = [
-        config.DASHBOARD_PASSWORD,
-        'changeme',
-        'admin',
-        'instaauto',
-        'creator',
-        'password',
-        'harsh',
-        'harsh2004'
-    ].filter(Boolean);
+    function legacyOrReject() {
+        // Legacy fallback for existing automated scripts & passwords
+        const acceptedLegacyTokens = [
+            config.DASHBOARD_PASSWORD,
+            'changeme',
+            'admin',
+            'instaauto',
+            'creator',
+            'password',
+            'harsh',
+            'harsh2004'
+        ].filter(Boolean);
 
-    if (acceptedLegacyTokens.includes(token)) {
-        try {
-            const db = getDb();
-            const superAdmin = db.prepare('SELECT id, name, email, role, status FROM users WHERE role = "super_admin" LIMIT 1').get();
-            if (superAdmin) {
-                req.user = superAdmin;
-                req.token = token;
-                return next();
-            }
-        } catch (e) {}
+        if (acceptedLegacyTokens.includes(token)) {
+            try {
+                const db = getDb();
+                const superAdmin = db.prepare('SELECT id, name, email, role, status FROM users WHERE role = "super_admin" LIMIT 1').get();
+                if (superAdmin) {
+                    req.user = superAdmin;
+                    req.token = token;
+                    return next();
+                }
+            } catch (e) {}
 
-        // Fallback default user object if DB not yet loaded
-        req.user = { id: 1, name: 'Admin', email: 'admin@instaauto.app', role: 'super_admin', status: 'active' };
-        req.token = token;
-        return next();
+            // Fallback default user object if DB not yet loaded
+            req.user = { id: 1, name: 'Admin', email: 'admin@instaauto.app', role: 'super_admin', status: 'active' };
+            req.token = token;
+            return next();
+        }
+
+        return res.status(401).json({ error: 'Unauthorized or session expired. Please log in.' });
     }
 
-    return res.status(401).json({ error: 'Unauthorized or session expired. Please log in.' });
+    // 1. Valid multi-tenant session token (local DB)
+    const session = validateSession(token);
+    if (session) return acceptSession(session);
+
+    // 2. Fresh container / not yet hydrated: look the session up in Turso Cloud
+    if (/^[a-f0-9]{64}$/i.test(token)) {
+        return restoreSessionFromCloud(token)
+            .then(s => (s ? acceptSession(s) : legacyOrReject()))
+            .catch(() => legacyOrReject());
+    }
+
+    return legacyOrReject();
 }
 
 function superAdminOnly(req, res, next) {

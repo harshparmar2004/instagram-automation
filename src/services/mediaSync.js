@@ -165,6 +165,7 @@ async function syncMedia(userId = null) {
             if (realMediaRows.length > 0 && allRules.length > 0) {
                 for (const rule of allRules) {
                     if (rule.media_id === 'global' || rule.media_id === null) continue;
+                    if (rule.source_type === 'story' || rule.source_type === 'story_mention') continue;
 
                     // Check if current media_id exists in media table
                     const existingMedia = db.prepare("SELECT id, ig_media_id, status FROM media WHERE id = ? OR ig_media_id = ?").get(rule.media_id, rule.media_id);
@@ -195,8 +196,43 @@ async function syncMedia(userId = null) {
             const { processCommentEvent } = require('./automation');
             
             for (const m of mediaToFetch) {
-                const igMediaId = m.id || m.ig_media_id;
+                const igMediaId = m.ig_media_id || m.id;
                 if (!igMediaId) continue;
+
+                const mediaRow = db.prepare("SELECT id, views_count, comments_count FROM media WHERE ig_media_id = ?").get(String(igMediaId));
+                const mediaLocalId = mediaRow ? mediaRow.id : null;
+                if (mediaRow && m.id) {
+                    // Always keep the monthly analytics snapshot fresh, even with zero comments
+                    try {
+                        const currentMonth = new Date().toISOString().slice(0, 7);
+                        const dmsNow = db.prepare("SELECT COUNT(*) as c FROM events WHERE media_ig_id = ? AND dm_status IN ('sent', 'delivered')").get(String(igMediaId))?.c || 0;
+                        const clicksNow = db.prepare("SELECT COUNT(*) as c FROM clicks c JOIN events e ON c.event_id = e.id WHERE e.media_ig_id = ?").get(String(igMediaId))?.c || 0;
+                        const statsArgs = [mediaRow.id, currentMonth, m.views_count || mediaRow.views_count || 0, m.comments_count || mediaRow.comments_count || 0, dmsNow, clicksNow, new Date().toISOString()];
+                        db.prepare(`
+                            INSERT INTO reel_stats_history (media_id, month_year, views_count, comments_count, dms_sent_count, clicks_count, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(media_id, month_year) DO UPDATE SET 
+                                comments_count = excluded.comments_count,
+                                views_count = excluded.views_count,
+                                dms_sent_count = excluded.dms_sent_count,
+                                clicks_count = excluded.clicks_count,
+                                updated_at = excluded.updated_at
+                        `).run(...statsArgs);
+                        try {
+                            const { asyncSync } = require('./turso');
+                            asyncSync(`
+                                INSERT INTO reel_stats_history (media_id, month_year, views_count, comments_count, dms_sent_count, clicks_count, updated_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                                ON CONFLICT(media_id, month_year) DO UPDATE SET 
+                                    comments_count = excluded.comments_count, views_count = excluded.views_count,
+                                    dms_sent_count = excluded.dms_sent_count, clicks_count = excluded.clicks_count,
+                                    updated_at = excluded.updated_at
+                            `, statsArgs);
+                        } catch (se) {}
+                    } catch (e) {
+                        console.warn('[MediaSync] Stats snapshot notice:', e.message);
+                    }
+                }
 
                 // Fetch real comments on this reel via Meta Graph API
                 const comments = await getMediaComments(token, igMediaId, 100);

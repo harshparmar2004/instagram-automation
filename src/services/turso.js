@@ -476,6 +476,49 @@ async function hydrateLocalFromTurso(localDb) {
             }
         }
 
+        // 6. Restore Sessions (so users stay logged in across restarts/redeploys)
+        try {
+            const nowIso = new Date().toISOString();
+            const sessRes = await execute('SELECT * FROM user_sessions WHERE expires_at > ?', [nowIso]);
+            const ins = localDb.prepare('INSERT OR IGNORE INTO user_sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)');
+            for (const s of sessRes.rows) {
+                try { ins.run(s.token, s.user_id, s.expires_at, s.created_at); } catch (e) {}
+            }
+        } catch (e) { console.warn('[Turso] Session hydration notice:', e.message); }
+
+        // 7. Restore Events / Clicks / Conversations / Monthly stats (dashboard counters + tracking)
+        try {
+            const evRes = await execute('SELECT * FROM events');
+            const insEv = localDb.prepare(`INSERT OR IGNORE INTO events (id, rule_id, comment_id, comment_text, commenter_ig_id, commenter_username, media_ig_id, dm_status, dm_message_id, tracking_id, synced_to_sheet, user_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+            const updEv = localDb.prepare('UPDATE events SET dm_status = ?, dm_message_id = ? WHERE id = ?');
+            for (const e of evRes.rows) {
+                try {
+                    insEv.run(e.id, e.rule_id, e.comment_id, e.comment_text, e.commenter_ig_id, e.commenter_username, e.media_ig_id, e.dm_status, e.dm_message_id, e.tracking_id, e.synced_to_sheet || 0, e.user_id, e.created_at);
+                    updEv.run(e.dm_status, e.dm_message_id, e.id);
+                } catch (er) {}
+            }
+
+            const clRes = await execute('SELECT * FROM clicks');
+            const insCl = localDb.prepare('INSERT OR IGNORE INTO clicks (id, event_id, tracking_id, clicked_at, user_agent) VALUES (?, ?, ?, ?, ?)');
+            for (const c of clRes.rows) {
+                try { insCl.run(c.id, c.event_id, c.tracking_id, c.clicked_at, c.user_agent); } catch (er) {}
+            }
+
+            const cvRes = await execute('SELECT * FROM conversations');
+            const insCv = localDb.prepare('INSERT OR IGNORE INTO conversations (id, commenter_ig_id, rule_id, event_id, user_id, state, created_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+            for (const c of cvRes.rows) {
+                try { insCv.run(c.id, c.commenter_ig_id, c.rule_id, c.event_id, c.user_id, c.state, c.created_at, c.completed_at); } catch (er) {}
+            }
+
+            const stRes = await execute('SELECT * FROM reel_stats_history');
+            const insSt = localDb.prepare(`INSERT OR IGNORE INTO reel_stats_history (id, media_id, month_year, views_count, comments_count, dms_sent_count, clicks_count, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+            for (const s of stRes.rows) {
+                try { insSt.run(s.id, s.media_id, s.month_year, s.views_count, s.comments_count, s.dms_sent_count, s.clicks_count, s.updated_at); } catch (er) {}
+            }
+        } catch (e) { console.warn('[Turso] Tracking hydration notice:', e.message); }
+
         try {
             const { backupInstagramAccounts, backupSettings, backupRules } = require('../database');
             backupInstagramAccounts(localDb);

@@ -1205,6 +1205,14 @@ function createSession(userId, daysValid = 30) {
     VALUES (?, ?, ?, ?)
   `).run(token, userId, expiresAt, now.toISOString());
 
+  try {
+    const { asyncSync } = require('./services/turso');
+    asyncSync(
+      'INSERT OR REPLACE INTO user_sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)',
+      [token, userId, expiresAt, now.toISOString()]
+    );
+  } catch (e) {}
+
   return { token, expiresAt };
 }
 
@@ -1227,9 +1235,41 @@ function validateSession(token) {
   return session;
 }
 
+// Fallback for the window right after a restart, before hydration finishes:
+// look the session up in Turso Cloud and restore it locally.
+async function restoreSessionFromCloud(token) {
+  if (!token || !/^[a-f0-9]{64}$/i.test(token)) return null;
+  try {
+    const turso = require('./services/turso');
+    const cfg = turso.getTursoConfig();
+    if (!cfg || !cfg.token) return null;
+    const res = await turso.execute('SELECT token, user_id, expires_at, created_at FROM user_sessions WHERE token = ?', [token]);
+    const row = res.rows[0];
+    if (!row || new Date(row.expires_at) < new Date()) return null;
+
+    const db = getDb();
+    if (!db.prepare('SELECT id FROM users WHERE id = ?').get(row.user_id)) {
+      const ures = await turso.execute('SELECT * FROM users WHERE id = ?', [row.user_id]);
+      const u = ures.rows[0];
+      if (!u) return null;
+      db.prepare('INSERT OR IGNORE INTO users (id, name, email, password_hash, role, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(u.id, u.name, u.email, u.password_hash, u.role, u.status, u.created_at, u.updated_at);
+    }
+    db.prepare('INSERT OR IGNORE INTO user_sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
+      .run(row.token, row.user_id, row.expires_at, row.created_at);
+    return validateSession(token);
+  } catch (e) {
+    return null;
+  }
+}
+
 function deleteSession(token) {
   if (!token) return;
   getDb().prepare('DELETE FROM user_sessions WHERE token = ?').run(token);
+  try {
+    const { asyncSync } = require('./services/turso');
+    asyncSync('DELETE FROM user_sessions WHERE token = ?', [token]);
+  } catch (e) {}
 }
 
 function getUserInstagramAccount(userId) {
@@ -1501,6 +1541,7 @@ module.exports = {
   getUserByEmail,
   createSession,
   validateSession,
+  restoreSessionFromCloud,
   deleteSession,
   getUserInstagramAccount,
   saveUserInstagramAccount,
