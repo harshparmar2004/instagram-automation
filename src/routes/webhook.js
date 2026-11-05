@@ -31,18 +31,31 @@ router.get('/', (req, res) => {
     }
 });
 
+const recentWebhooks = [];
+
+router.get('/recent', auth, (req, res) => {
+    res.json(recentWebhooks);
+});
+
 router.post('/', webhookVerify, async (req, res) => {
     // Always respond 200 immediately to avoid timeouts
     res.sendStatus(200);
 
+    let payload = null;
     try {
-        const payload = JSON.parse(req.body.toString());
-        if (payload.object === 'instagram' || payload.object === 'page') {
-            await processCommentEvent(payload);
-            await processMessageEvent(payload);
-        }
+        payload = JSON.parse(req.body.toString());
     } catch (err) {
-        console.error('[Webhook] Error processing payload:', err);
+        console.error('[Webhook] Invalid JSON payload:', err.message);
+        return;
+    }
+
+    console.log('[Webhook] 📥 Incoming:', JSON.stringify(payload).slice(0, 1500));
+    recentWebhooks.unshift({ at: new Date().toISOString(), payload });
+    if (recentWebhooks.length > 30) recentWebhooks.pop();
+
+    if (payload.object === 'instagram' || payload.object === 'page') {
+        try { await processCommentEvent(payload); } catch (err) { console.error('[Webhook] Comment processing error:', err); }
+        try { await processMessageEvent(payload); } catch (err) { console.error('[Webhook] Message processing error:', err); }
     }
 });
 

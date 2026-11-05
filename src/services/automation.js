@@ -64,7 +64,7 @@ function checkDedupUserForMedia(commenterIgId, mediaIgId) {
         WHERE commenter_ig_id = ? 
           AND media_ig_id = ? 
           AND dm_status = 'delivered'
-          AND created_at > datetime('now', '-24 hours')
+          AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 hours')
         LIMIT 1
     `).get(commenterIgId, mediaIgId);
     return !!row;
@@ -422,7 +422,7 @@ function dispatchStoryRule({ db, rule, senderId, username, activeToken, targetUs
         WHERE commenter_ig_id = ? 
           AND rule_id = ? 
           AND dm_status = 'delivered'
-          AND created_at > datetime('now', '-2 minutes')
+          AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 minutes')
         LIMIT 1
     `).get(senderId, rule.id);
     if (recent) {
@@ -654,7 +654,7 @@ async function processMessageEvent(payload) {
                     if (storyId) {
                         let specificQuery = `
                             SELECT r.* FROM rules r
-                            LEFT JOIN media m ON r.media_id = m.id
+                            LEFT JOIN media m ON (r.media_id = m.id OR r.media_id = m.ig_media_id)
                             WHERE (r.media_id = ? OR m.ig_media_id = ?)
                               AND r.is_active = 1 AND (r.is_deleted = 0 OR r.is_deleted IS NULL)
                         `;
