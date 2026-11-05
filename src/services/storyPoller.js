@@ -67,6 +67,17 @@ async function pollStoryReplies() {
             // Must be a story reply, mention, or a message containing text
             if (!storyReplyId && !isMention && !rawText) continue;
 
+            // If it's a regular DM (not story reply/mention), only process if it matches an active rule keyword
+            if (!storyReplyId && !isMention) {
+                const activeRules = db.prepare("SELECT trigger_keyword FROM rules WHERE is_active = 1 AND (is_deleted = 0 OR is_deleted IS NULL)").all();
+                const matchesAny = activeRules.some(r => {
+                    const kw = (r.trigger_keyword || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+                    const t = rawText.toLowerCase();
+                    return kw.some(k => k === '*' || k === 'any' || t.includes(k));
+                });
+                if (!matchesAny) continue;
+            }
+
             const fromUsername = (m.from?.username || '').toLowerCase();
             if (!m.from?.id || (myUsername && fromUsername === myUsername)) continue;
             if (new Date(m.created_time).getTime() < cutoff) continue;
