@@ -144,6 +144,36 @@ async function syncMedia(userId = null) {
             } catch(e) {}
         }
 
+        // Reconcile stories: mark any story in DB not returned in activeStories by Meta API as 'expired'
+        const liveStoryIgIds = activeStories.map(story => String(story.id));
+        if (liveStoryIgIds.length > 0) {
+            const storyPlaceholders = liveStoryIgIds.map(() => '?').join(',');
+            let expireStoryQuery = `UPDATE media SET status = 'expired' WHERE (media_product_type = 'STORY' OR media_type = 'STORY') AND ig_media_id NOT IN (${storyPlaceholders})`;
+            const expireStoryParams = [...liveStoryIgIds];
+            if (userId) {
+                expireStoryQuery += ` AND (user_id = ? OR user_id IS NULL)`;
+                expireStoryParams.push(userId);
+            }
+            db.prepare(expireStoryQuery).run(...expireStoryParams);
+            try {
+                const { asyncSync } = require('./turso');
+                asyncSync(expireStoryQuery, expireStoryParams);
+            } catch(e) {}
+        } else {
+            // Meta returned 0 live stories — mark all stored stories as expired
+            let expireStoryQuery = `UPDATE media SET status = 'expired' WHERE (media_product_type = 'STORY' OR media_type = 'STORY')`;
+            const expireStoryParams = [];
+            if (userId) {
+                expireStoryQuery += ` AND (user_id = ? OR user_id IS NULL)`;
+                expireStoryParams.push(userId);
+            }
+            db.prepare(expireStoryQuery).run(...expireStoryParams);
+            try {
+                const { asyncSync } = require('./turso');
+                asyncSync(expireStoryQuery, expireStoryParams);
+            } catch(e) {}
+        }
+
         // Expire any stories older than 24h and move their specific rules to Deleted Automations
         try {
             checkAndExpireOldStoryRules();

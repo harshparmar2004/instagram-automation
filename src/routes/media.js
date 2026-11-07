@@ -9,11 +9,16 @@ const router = express.Router();
 router.get('/media', auth, (req, res) => {
     try {
         const db = getDb();
+        try {
+            checkAndExpireOldStoryRules();
+        } catch(e) {}
+
         const type = req.query.type; // 'reels', 'feed', or all
         const userId = req.user?.id;
         const userObj = userId ? db.prepare('SELECT email, role FROM users WHERE id = ?').get(userId) : null;
         const isSuperAdmin = (req.user?.role === 'super_admin' || userObj?.role === 'super_admin' || (userObj?.email && userObj.email.includes('harshparmar'))) && !req.isImpersonating;
         const includeDeleted = req.query.include_deleted === 'true';
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
         let query = `
             SELECT m.*, 
@@ -31,7 +36,9 @@ router.get('/media', auth, (req, res) => {
         }
 
         if (!includeDeleted) {
-            whereClauses.push("(m.status IS NULL OR m.status != 'deleted')");
+            whereClauses.push("(m.status IS NULL OR (m.status != 'deleted' AND m.status != 'expired'))");
+            whereClauses.push("((m.media_product_type != 'STORY' AND m.media_type != 'STORY') OR m.timestamp IS NULL OR m.timestamp >= ?)");
+            params.push(twentyFourHoursAgo);
         }
 
         if (type === 'reels') {
@@ -40,6 +47,9 @@ router.get('/media', auth, (req, res) => {
             whereClauses.push("(m.media_product_type != 'REELS' AND m.media_type != 'REEL' AND m.media_product_type != 'STORY')");
         } else if (type === 'stories') {
             whereClauses.push("(m.media_product_type = 'STORY' OR m.media_type = 'STORY')");
+            whereClauses.push("(m.status = 'active' OR m.status IS NULL)");
+            whereClauses.push("(m.timestamp IS NULL OR m.timestamp >= ?)");
+            params.push(twentyFourHoursAgo);
         }
 
         if (whereClauses.length > 0) {
@@ -227,7 +237,17 @@ router.post('/stories/sync', auth, async (req, res) => {
     try {
         await syncMedia(req.user?.id);
         const db = getDb();
-        const activeStories = db.prepare("SELECT * FROM media WHERE (media_product_type = 'STORY' OR media_type = 'STORY') AND (status IS NULL OR status != 'deleted')").all();
+        try {
+            checkAndExpireOldStoryRules();
+        } catch(e) {}
+        const cutoffTime = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const activeStories = db.prepare(`
+            SELECT * FROM media 
+            WHERE (media_product_type = 'STORY' OR media_type = 'STORY') 
+              AND (status IS NULL OR (status != 'deleted' AND status != 'expired'))
+              AND (timestamp IS NULL OR timestamp >= ?)
+            ORDER BY timestamp DESC
+        `).all(cutoffTime);
         res.json({ success: true, count: activeStories.length, stories: activeStories });
     } catch (err) {
         res.status(500).json({ error: err.response?.data?.error?.message || err.message });

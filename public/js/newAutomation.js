@@ -341,10 +341,18 @@ window['new-automation'] = {
         const igUsername = igAccount.username || user.ig_username || 'harshparmar007__';
         const igProfilePic = igAccount.profilePic || user.profile_pic || user.avatar_url || '';
 
-        // Strict Separation: Stories are kept exclusively in Stories Only
-        const activeStories = (this.mediaList || []).filter(m => 
-            (m.media_product_type === 'STORY' || m.media_type === 'STORY') && m.status !== 'deleted'
-        );
+        // Strict Separation: Stories are kept exclusively in Stories Only (valid within 24 hours only)
+        const nowMs = Date.now();
+        const activeStories = (this.mediaList || []).filter(m => {
+            const isStory = m.media_product_type === 'STORY' || m.media_type === 'STORY';
+            if (!isStory) return false;
+            if (m.status === 'deleted' || m.status === 'expired') return false;
+            if (m.timestamp) {
+                const ageMs = nowMs - new Date(m.timestamp).getTime();
+                if (ageMs > 24 * 60 * 60 * 1000) return false;
+            }
+            return true;
+        });
         const storiesCount = activeStories.length;
 
         const feedMedia = (this.mediaList || []).filter(m => 

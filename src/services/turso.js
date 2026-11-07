@@ -435,7 +435,7 @@ async function hydrateLocalFromTurso(localDb) {
             const upsertMedia = localDb.prepare(`
                 INSERT INTO media (id, ig_media_id, media_type, media_product_type, caption, thumbnail_url, media_url, permalink, timestamp, synced_at, views_count, comments_count, like_count, status, user_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(ig_media_id) DO UPDATE SET caption = excluded.caption, comments_count = excluded.comments_count, like_count = excluded.like_count, views_count = excluded.views_count, status = 'active', synced_at = excluded.synced_at
+                ON CONFLICT(ig_media_id) DO UPDATE SET caption = excluded.caption, comments_count = excluded.comments_count, like_count = excluded.like_count, views_count = excluded.views_count, status = excluded.status, synced_at = excluded.synced_at
             `);
             for (const m of mediaRes.rows) {
                 try {
@@ -525,6 +525,11 @@ async function hydrateLocalFromTurso(localDb) {
             backupSettings(localDb);
             backupRules(localDb);
         } catch(be) {}
+
+        try {
+            const { checkAndExpireOldStoryRules } = require('./storyExpiration');
+            checkAndExpireOldStoryRules();
+        } catch(se) {}
 
         console.log(`✅ [Turso] Local state successfully hydrated from Turso Cloud!`);
     } catch (err) {

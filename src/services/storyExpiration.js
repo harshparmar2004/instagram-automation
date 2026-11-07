@@ -42,7 +42,7 @@ function checkAndExpireOldStoryRules() {
             } catch (e) {}
         }
 
-        // 2. Expire specific story rules created > 24 hours ago whose attached story has passed 24h
+        // 2. Expire specific story rules created > 24 hours ago OR whose attached story is already expired
         const expiredByRuleAge = db.prepare(`
             SELECT r.id as rule_id, r.created_at, r.media_id
             FROM rules r
@@ -51,12 +51,15 @@ function checkAndExpireOldStoryRules() {
               AND r.media_id != 'story'
               AND r.media_id != 'story_mention'
               AND (r.is_deleted = 0 OR r.is_deleted IS NULL)
-              AND r.created_at IS NOT NULL
-              AND r.created_at < ?
+              AND (
+                  (r.created_at IS NOT NULL AND r.created_at < ?)
+                  OR r.media_id IN (SELECT id FROM media WHERE status = 'expired')
+                  OR r.media_id IN (SELECT ig_media_id FROM media WHERE status = 'expired')
+              )
         `).all(cutoffTime);
 
         for (const row of expiredByRuleAge) {
-            console.log(`[StoryExpiration] ⏳ Expiring specific story Rule #${row.rule_id} (>24h since creation: ${row.created_at})`);
+            console.log(`[StoryExpiration] ⏳ Expiring specific story Rule #${row.rule_id} (story expired or >24h since creation: ${row.created_at})`);
             db.prepare("UPDATE rules SET is_deleted = 1, is_active = 0, updated_at = ? WHERE id = ?").run(now, row.rule_id);
             try {
                 asyncSync("UPDATE rules SET is_deleted = 1, is_active = 0, updated_at = ? WHERE id = ?", [now, row.rule_id]);
@@ -64,15 +67,18 @@ function checkAndExpireOldStoryRules() {
         }
 
         // 3. Mark any stories in media table that are older than 24h as 'expired'
-        db.prepare(`
+        const expireMediaSql = `
             UPDATE media 
             SET status = 'expired' 
             WHERE (media_product_type = 'STORY' OR media_type = 'STORY')
-              AND status != 'expired' 
-              AND status != 'deleted'
+              AND (status IS NULL OR (status != 'expired' AND status != 'deleted'))
               AND timestamp IS NOT NULL
               AND timestamp < ?
-        `).run(cutoffTime);
+        `;
+        db.prepare(expireMediaSql).run(cutoffTime);
+        try {
+            asyncSync(expireMediaSql, [cutoffTime]);
+        } catch (e) {}
 
         return { expiredCount: expiredByMedia.length + expiredByRuleAge.length };
     } catch (err) {
