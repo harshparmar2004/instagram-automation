@@ -2,6 +2,7 @@ const express = require('express');
 const { getDb } = require('../database');
 const auth = require('../middleware/auth');
 const { syncMedia } = require('../services/mediaSync');
+const { checkAndExpireOldStoryRules } = require('../services/storyExpiration');
 
 const router = express.Router();
 
@@ -58,6 +59,10 @@ router.get('/media', auth, (req, res) => {
 router.get('/media/automated', auth, (req, res) => {
     try {
         const db = getDb();
+        
+        // 0. Auto-expire any stories older than 24 hours into Deleted Automations
+        checkAndExpireOldStoryRules();
+
         const userId = req.user?.id;
         const userObj = userId ? db.prepare('SELECT email, role FROM users WHERE id = ?').get(userId) : null;
         const isSuperAdmin = (req.user?.role === 'super_admin' || userObj?.role === 'super_admin' || (userObj?.email && userObj.email.includes('harshparmar'))) && !req.isImpersonating;
@@ -91,7 +96,7 @@ router.get('/media/automated', auth, (req, res) => {
             mediaParams.push(userId);
         }
         if (!includeDeleted) {
-            mediaWhereClauses.push("(status IS NULL OR status != 'deleted')");
+            mediaWhereClauses.push("(status IS NULL OR (status != 'deleted' AND status != 'expired'))");
         }
         if (mediaWhereClauses.length > 0) {
             mediaQuery += ` WHERE ` + mediaWhereClauses.join(' AND ');
@@ -109,7 +114,10 @@ router.get('/media/automated', auth, (req, res) => {
         const storyRules = [];
 
         for (const rule of allRules) {
-            if (rule.source_type === 'story' || rule.source_type === 'story_mention' || rule.media_id === 'story' || rule.media_id === 'story_mention') {
+            // General story rules (All Stories / Mentions) with no specific media item
+            const isGeneralStory = (rule.source_type === 'story' || rule.source_type === 'story_mention') && 
+                                   (!rule.media_id || rule.media_id === 'story' || rule.media_id === 'story_mention');
+            if (isGeneralStory) {
                 storyRules.push(rule);
                 continue;
             }
@@ -136,14 +144,16 @@ router.get('/media/automated', auth, (req, res) => {
                 }
                 mediaMap.get(matchedMedia.id).rules.push(rule);
             } else {
-                // Rule linked to a media ID not currently in media table — never drop it!
+                // Rule linked to a media ID not currently in media table — preserve with appropriate type
                 const placeholderKey = `orphan_${rule.media_id}`;
                 if (!mediaMap.has(placeholderKey)) {
+                    const isStorySource = rule.source_type === 'story';
                     mediaMap.set(placeholderKey, {
                         id: rule.media_id,
                         ig_media_id: String(rule.media_id),
-                        caption: `Automation (Reel / Media #${rule.media_id})`,
-                        media_type: 'REEL',
+                        caption: isStorySource ? `Instagram Story #${rule.media_id}` : `Automation (Reel / Media #${rule.media_id})`,
+                        media_type: isStorySource ? 'STORY' : 'REEL',
+                        media_product_type: isStorySource ? 'STORY' : 'FEED',
                         thumbnail_url: '',
                         permalink: '',
                         timestamp: rule.created_at || new Date().toISOString(),
@@ -160,13 +170,22 @@ router.get('/media/automated', auth, (req, res) => {
         const result = Array.from(mediaMap.values());
 
         if (storyRules.length > 0) {
+            // Find latest active story to provide live preview thumbnail for "All Stories"
+            const latestActiveStory = allMedia.find(m => 
+                (m.media_product_type === 'STORY' || m.media_type === 'STORY') && 
+                (m.thumbnail_url || m.media_url) && 
+                m.status !== 'expired' && 
+                m.status !== 'deleted'
+            );
+
             result.unshift({
                 id: 'story',
                 caption: '⚡ Instagram Stories (Replies & Mentions)',
                 media_type: 'STORY',
-                thumbnail_url: '',
-                permalink: '',
-                timestamp: new Date().toISOString(),
+                media_product_type: 'STORY',
+                thumbnail_url: latestActiveStory?.thumbnail_url || latestActiveStory?.media_url || '',
+                permalink: latestActiveStory?.permalink || '',
+                timestamp: latestActiveStory?.timestamp || new Date().toISOString(),
                 views_count: 0,
                 comments_count: 0,
                 history: [],

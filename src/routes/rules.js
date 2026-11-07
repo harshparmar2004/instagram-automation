@@ -3,6 +3,7 @@ const { getDb, getConfig, backupRules } = require('../database');
 const auth = require('../middleware/auth');
 const { getMediaComments } = require('../services/instagram');
 const { enqueue } = require('../services/queue');
+const { checkAndExpireOldStoryRules } = require('../services/storyExpiration');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
 
@@ -11,6 +12,7 @@ const router = express.Router();
 router.get('/rules', auth, (req, res) => {
     try {
         const db = getDb();
+        checkAndExpireOldStoryRules();
 
         // If any rule has an IG media ID string as media_id, resolve it to local media.id if present
         try {

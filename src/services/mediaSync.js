@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { getMedia, getMediaComments, getMediaInsights, getStories } = require('./instagram');
 const { getDb, getConfig, getUserInstagramAccount, backupRules, restoreRules, backupEvents, restoreEvents, backupMedia } = require('../database');
+const { checkAndExpireOldStoryRules } = require('./storyExpiration');
 
 async function syncMedia(userId = null) {
     let token = null;
@@ -143,9 +144,9 @@ async function syncMedia(userId = null) {
             } catch(e) {}
         }
 
-        // Expire any stories older than 24h
+        // Expire any stories older than 24h and move their specific rules to Deleted Automations
         try {
-            db.prepare("UPDATE media SET status = 'deleted' WHERE media_product_type = 'STORY' AND timestamp < datetime('now', '-24 hours')").run();
+            checkAndExpireOldStoryRules();
         } catch(e) {}
 
         // Persist all synced media to data/media.json for restart persistence

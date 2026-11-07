@@ -282,6 +282,23 @@ window.workflows = {
 
             item.rules.forEach(rule => {
                 const ruleIsStory = isStory || rule.source_type === 'story' || rule.source_type === 'story_mention';
+                const isSpecificStory = ruleIsStory && item.id !== 'story' && item.id !== 'story_mention' && rule.media_id !== 'story' && rule.media_id !== 'story_mention' && !!rule.media_id;
+
+                let storyRemainingText = '';
+                let storyIsExpired = false;
+                if (isSpecificStory && item.timestamp) {
+                    const ageMs = Date.now() - new Date(item.timestamp).getTime();
+                    const remainingMs = (24 * 60 * 60 * 1000) - ageMs;
+                    if (remainingMs > 0) {
+                        const hoursLeft = Math.floor(remainingMs / (1000 * 60 * 60));
+                        const minsLeft = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+                        storyRemainingText = hoursLeft > 0 ? `${hoursLeft}h ${minsLeft}m left` : `${minsLeft}m left`;
+                    } else {
+                        storyIsExpired = true;
+                        storyRemainingText = 'Story Expired (24h)';
+                    }
+                }
+
                 let actionText = 'Send Resource Link in DM';
                 let isButtonFunnel = false;
                 if (rule.action_type === 'direct_dm') { actionText = 'Send Direct Text DM (No Link)'; }
@@ -312,7 +329,7 @@ window.workflows = {
                         
                         <!-- CARD HEADER BAR -->
                         <div style="padding: 0.85rem 1.5rem; background: ${isDeleted ? '#FEF2F2' : '#FAF8F5'}; border-bottom: 1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
-                            <div style="display:flex; align-items:center; gap:0.75rem;">
+                            <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
                                 <span style="font-family:'Plus Jakarta Sans', sans-serif; font-size:0.85rem; font-weight:800; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.04em;">AUTOMATION RULE #${rule.id}</span>
                                 <span style="color:var(--border-color);">•</span>
                                 ${isDeleted ? `
@@ -320,6 +337,11 @@ window.workflows = {
                                     <span>🗑️</span>
                                     <span>Deleted Automation</span>
                                 </span>
+                                ${ruleIsStory ? `
+                                <span style="font-size:0.8rem; font-weight:800; color:#9A3412; display: inline-flex; align-items: center; gap: 0.35rem; background:#FFEDD5; border:1px solid #FED7AA; padding: 3px 8px; border-radius: 6px;">
+                                    <span>⏳ Story Expired (24h Elapsed)</span>
+                                </span>
+                                ` : ''}
                                 ` : `
                                 <span style="font-size:0.85rem; font-weight:800; color:${isActive ? '#1B5E20' : '#B45309'}; display: inline-flex; align-items: center; gap: 0.35rem; background: ${isActive ? '#E8F5E9' : '#FEF3C7'}; padding: 3px 8px; border-radius: 6px;">
                                     <span>${isActive ? '🟢' : '⏸️'}</span>
@@ -328,8 +350,14 @@ window.workflows = {
                                 `}
                                 ${ruleIsStory && !isDeleted ? `
                                 <span style="font-size:0.8rem; font-weight:800; color:#C2410C; display: inline-flex; align-items: center; gap: 0.35rem; background:#FFF7ED; border:1px solid #FFEDD5; padding: 3px 8px; border-radius: 6px;">
-                                    <span>⚡ Story Automation</span>
+                                    <span>⚡ ${isSpecificStory ? 'Specific Story Automation' : (rule.source_type === 'story_mention' ? 'Story Mentions' : 'Every Story Automation')}</span>
+                                </span>
+                                ${isSpecificStory && storyRemainingText ? `
+                                <span style="font-size:0.78rem; font-weight:700; color:${storyIsExpired ? '#991B1B' : '#047857'}; display: inline-flex; align-items: center; gap: 0.35rem; background:${storyIsExpired ? '#FEF2F2' : '#ECFDF5'}; border:1px solid ${storyIsExpired ? '#FECACA' : '#A7F3D0'}; padding: 3px 8px; border-radius: 6px;">
+                                    <span>${storyIsExpired ? '⏳' : '🟢'}</span>
+                                    <span>${storyRemainingText}</span>
                                 </span>` : ''}
+                                ` : ''}
                                 ${isButtonFunnel && !isDeleted ? `
                                 <span style="font-size:0.8rem; font-weight:800; color:#1D4ED8; display: inline-flex; align-items: center; gap: 0.35rem; background:#EFF6FF; border:1px solid #BFDBFE; padding: 3px 8px; border-radius: 6px;">
                                     <span>🔘 Interactive Button Funnel</span>
@@ -382,34 +410,68 @@ window.workflows = {
                                             <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Applies automatically across all active posts & reels</div>
                                         </div>
                                     ` : ruleIsStory ? `
-                                        <div style="display:flex; flex-direction:column; gap:0.65rem;">
+                                        <div style="display:flex; flex-direction:column; gap:0.75rem;">
                                             ${thumbUrl ? `
-                                                <div style="width:100%; height:130px; border-radius:12px; background-size:cover; background-position:center; background-image:url('${thumbUrl}'); border:1px solid var(--border-color); position:relative; overflow:hidden;">
+                                                <div style="width:100%; height:140px; border-radius:12px; background-size:cover; background-position:center; background-image:url('${thumbUrl}'); border:1.5px solid var(--border-color); position:relative; overflow:hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
                                                     <div style="position:absolute; top:0; left:0; right:0; height:45px; background:linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%); z-index:1;"></div>
+                                                    <div style="position:absolute; bottom:0; left:0; right:0; height:45px; background:linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%); z-index:1;"></div>
+
                                                     <div style="position:absolute; top:6px; left:6px; right:6px; display:flex; align-items:center; justify-content:space-between; z-index:2;">
-                                                        <span style="font-size:0.62rem; font-weight:800; background:linear-gradient(45deg, #f09433, #dc2743); color:#FFF; padding:2px 6px; border-radius:4px; box-shadow:0 1px 4px rgba(0,0,0,0.3); display:flex; align-items:center; gap:3px;">⚡ INSTAGRAM STORY</span>
-                                                        <div style="display:flex; align-items:center; gap:3px; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); padding:2px 6px; border-radius:10px; font-size:0.58rem; color:#FFF; font-weight:700;">
+                                                        <span style="font-size:0.6rem; font-weight:800; background:linear-gradient(45deg, #f09433, #dc2743); color:#FFF; padding:2px 7px; border-radius:4px; box-shadow:0 1px 4px rgba(0,0,0,0.3); display:flex; align-items:center; gap:3px;">
+                                                            ⚡ INSTAGRAM STORY
+                                                        </span>
+                                                        <div style="display:flex; align-items:center; gap:3px; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px); padding:2px 6px; border-radius:10px; font-size:0.6rem; color:#FFF; font-weight:700;">
                                                             <span>@${igUsername}</span>
-                                                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#0095F6"/><path d="M9.5 12.3l1.8 1.8 4.2-4.2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#0095F6"/><path d="M9.5 12.3l1.8 1.8 4.2-4.2" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                                         </div>
                                                     </div>
-                                                    <div style="position:absolute; bottom:6px; left:8px; right:8px; background:rgba(255,255,255,0.22); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.35); border-radius:14px; padding:3px 8px; font-size:0.58rem; color:#FFF; display:flex; justify-content:space-between; align-items:center; z-index:2;">
+
+                                                    <div style="position:absolute; bottom:6px; left:8px; right:8px; background:rgba(255,255,255,0.22); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.35); border-radius:14px; padding:3px 8px; font-size:0.6rem; color:#FFF; display:flex; justify-content:space-between; align-items:center; z-index:2;">
                                                         <span style="font-weight:500;">Send message...</span>
                                                         <span>🤍 ✈️</span>
                                                     </div>
                                                 </div>
                                             ` : `
-                                                <div style="width:100%; height:95px; border-radius:12px; background: linear-gradient(135deg, #FFF1EB 0%, #FDD1C3 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; border:1px solid #FDC8B6;">
-                                                    <div style="font-size: 1.8rem;">⚡</div>
-                                                    <div style="font-size: 0.75rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase;">Instagram Story</div>
+                                                <div style="width:100%; height:130px; border-radius:12px; background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%); display:flex; flex-direction:column; justify-content:space-between; padding:0.65rem; border:1px solid rgba(0,0,0,0.1); position:relative; overflow:hidden; box-shadow: 0 4px 12px rgba(214,36,159,0.15);">
+                                                    <div style="display:flex; align-items:center; justify-content:space-between; z-index:2;">
+                                                        <span style="font-size:0.6rem; font-weight:800; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); color:#FFF; padding:2px 7px; border-radius:4px;">⚡ INSTAGRAM STORY</span>
+                                                        <span style="font-size:0.6rem; font-weight:700; color:#FFF; background:rgba(0,0,0,0.4); padding:2px 6px; border-radius:10px;">@${igUsername}</span>
+                                                    </div>
+                                                    <div style="text-align:center; color:#FFF; z-index:2; margin:auto 0;">
+                                                        <div style="font-size:1.6rem; line-height:1;">📱</div>
+                                                        <div style="font-family:'Plus Jakarta Sans', sans-serif; font-weight:800; font-size:0.78rem; text-shadow:0 1px 2px rgba(0,0,0,0.4); margin-top:0.2rem;">${isSpecificStory ? 'Specific 24h Story' : 'All Stories Automation'}</div>
+                                                    </div>
+                                                    <div style="background:rgba(255,255,255,0.3); backdrop-filter:blur(6px); border-radius:12px; padding:2px 8px; font-size:0.58rem; color:#FFF; display:flex; justify-content:space-between; z-index:2;">
+                                                        <span>Reply with keyword...</span>
+                                                        <span>✈️</span>
+                                                    </div>
                                                 </div>
                                             `}
+
                                             <div>
-                                                <div style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.15rem;">
-                                                    ${rule.source_type === 'story_mention' ? '🏷️ Story Mentions' : '⚡ Story Replies'}
+                                                <div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.25rem; flex-wrap:wrap;">
+                                                    <span style="font-size:0.68rem; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--accent-primary); background:#FAF2EC; padding:2px 6px; border-radius:4px;">
+                                                        ${isSpecificStory ? '🎯 Specific Story' : (rule.source_type === 'story_mention' ? '🏷️ Story Mentions' : '⚡ All Stories')}
+                                                    </span>
+                                                    ${isSpecificStory && storyRemainingText ? `
+                                                        <span style="font-size:0.68rem; font-weight:700; color:${storyIsExpired ? '#991B1B' : '#15803D'};">
+                                                            ${storyRemainingText}
+                                                        </span>
+                                                    ` : ''}
                                                 </div>
-                                                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.92rem; line-height: 1.4; color: var(--text-primary);">
-                                                    ${item.caption || (rule.source_type === 'story_mention' ? 'Follower mentions your account in their story' : 'Follower replies to your active Instagram Story')}
+
+                                                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 0.9rem; line-height: 1.4; color: var(--text-primary);">
+                                                    ${isSpecificStory 
+                                                        ? (item.caption && item.caption !== 'Active Instagram Story' ? item.caption : `Active Story #${item.ig_media_id || item.id}`) 
+                                                        : (rule.source_type === 'story_mention' ? `Follower mentions @${igUsername} in their story` : 'Follower replies to your active Instagram story')}
+                                                </div>
+
+                                                <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.2rem; line-height:1.35;">
+                                                    ${isDeleted 
+                                                        ? '⚠️ This story passed 24h and was removed from Instagram. Safely archived in Deleted Automations.' 
+                                                        : (isSpecificStory 
+                                                            ? 'Auto-sends DM when someone replies to this 24-hour story with your keywords.' 
+                                                            : 'Auto-delivers DMs to followers across all current and future active stories.')}
                                                 </div>
                                             </div>
                                         </div>

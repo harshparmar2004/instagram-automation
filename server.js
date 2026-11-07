@@ -103,6 +103,13 @@ cron.schedule('0 */6 * * *', async () => {
 // Real-time comment poller & media sync every 60 seconds (zero dropped comments guarantee)
 cron.schedule('* * * * *', async () => {
   try {
+    const { checkAndExpireOldStoryRules } = require('./src/services/storyExpiration');
+    checkAndExpireOldStoryRules();
+  } catch (err) {
+    console.warn('[Poller] Story expiration check notice:', err.message);
+  }
+
+  try {
     const { getAllActiveInstagramAccounts } = require('./src/database');
     const accounts = getAllActiveInstagramAccounts();
     if (accounts.length === 0) {
